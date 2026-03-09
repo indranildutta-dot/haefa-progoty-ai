@@ -14,7 +14,8 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import { logout, UserProfile } from '../services/authService';
+import { logout } from '../services/authService';
+import { UserProfile } from '../types';
 import SystemHealthIndicator from './SystemHealthIndicator';
 
 interface TopBarProps {

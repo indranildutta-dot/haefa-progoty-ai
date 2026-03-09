@@ -21,7 +21,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import HistoryIcon from '@mui/icons-material/History';
 import AssignmentIcon from '@mui/icons-material/Assignment';
-import { UserProfile } from '../services/authService';
+import { UserProfile } from '../types';
 
 const drawerWidth = 240;
 
