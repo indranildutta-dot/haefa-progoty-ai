@@ -49,7 +49,7 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
     if (!selectedCountry || !selectedClinic) return;
     
     const q = query(
-      collection(db, "queue"),
+      collection(db, "queues_active"),
       where("country_code", "==", selectedCountry.id),
       where("clinic_id", "==", selectedClinic.id)
     );
@@ -62,7 +62,7 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
         })) as QueueItem[];
 
       const filteredAndSorted = items
-        .filter(item => ["WAITING_FOR_VITALS", "READY_FOR_DOCTOR", "WAITING_FOR_PHARMACY"].includes(item.status))
+        .filter(item => ["WAITING_FOR_VITALS", "READY_FOR_DOCTOR", "IN_CONSULTATION", "WAITING_FOR_PHARMACY"].includes(item.status))
         .sort((a, b) => {
           const priorityA = a.priority_score || 0;
           const priorityB = b.priority_score || 0;
@@ -150,7 +150,7 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
     const filteredItems = queueItems.filter(item => item.status === status);
 
     return (
-      <Grid size={{ xs: 12, md: 4 }}>
+      <Grid size={{ xs: 12, md: 3 }}>
         <Paper 
           elevation={0} 
           sx={{ 
@@ -181,7 +181,7 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
             ) : (
               filteredItems.map((item) => {
                 const waitMinutes = getWaitTimeMinutes(item.created_at);
-                const isEscalated = getEscalationStatus(item.triage_level, waitMinutes);
+                const isEscalated = item.status !== 'IN_CONSULTATION' && getEscalationStatus(item.triage_level, waitMinutes);
 
                 return (
                   <Card 
@@ -211,6 +211,14 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
                             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
                               Village: {item.patient?.village || '...'}
                             </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                              Triage: <span style={{ color: getTriageColor(item.triage_level), fontWeight: 'bold', textTransform: 'capitalize' }}>{item.triage_level || 'Standard'}</span>
+                            </Typography>
+                            {item.status === 'IN_CONSULTATION' && (
+                              <Typography variant="caption" color="primary.main" sx={{ display: 'block', fontWeight: 'bold' }}>
+                                Doctor: Assigned
+                              </Typography>
+                            )}
                           </Box>
                         </Box>
                         <Box sx={{ textAlign: 'right' }}>
@@ -269,6 +277,7 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
       <Grid container spacing={3}>
         {renderQueueColumn("WAITING_FOR_VITALS", "WAITING_FOR_VITALS", "#6366f1")}
         {renderQueueColumn("READY_FOR_DOCTOR", "READY_FOR_DOCTOR", "#10b981")}
+        {renderQueueColumn("DOCTOR ROOM", "IN_CONSULTATION", "#8b5cf6")}
         {renderQueueColumn("WAITING_FOR_PHARMACY", "WAITING_FOR_PHARMACY", "#f59e0b")}
       </Grid>
     </Container>

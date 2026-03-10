@@ -15,6 +15,8 @@ import { Patient } from "../types";
 import { useAppStore } from "../store/useAppStore";
 import { logAction } from "./auditService";
 
+import { updateMetrics } from "./metricsService";
+
 const PATIENTS_COLLECTION = "patients";
 
 export const createPatient = async (patientData: Omit<Patient, 'id' | 'created_at' | 'country_code' | 'clinic_id'>) => {
@@ -25,12 +27,17 @@ export const createPatient = async (patientData: Omit<Patient, 'id' | 'created_a
     ...patientData,
     country_code: selectedCountry.id,
     clinic_id: selectedClinic.id,
-    created_at: serverTimestamp()
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp()
   });
 
   await logAction({
     action: 'PATIENT_CREATED',
     patient_id: docRef.id
+  });
+
+  await updateMetrics(selectedClinic.id, selectedCountry.id, {
+    patients_today: 1
   });
 
   return docRef.id;

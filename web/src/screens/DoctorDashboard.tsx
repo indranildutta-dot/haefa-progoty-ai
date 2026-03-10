@@ -35,12 +35,13 @@ import {
   getDocs 
 } from "firebase/firestore";
 import { db } from "../firebase";
-import { subscribeToQueue, updateQueueStatus } from '../services/queueService';
+import { subscribeToQueue, updateQueueStatus, callNextPatient } from '../services/queueService';
 import { 
   getLatestEncounter, 
   saveConsultation, 
   getVitalsByEncounter,
-  getEncounterById
+  getEncounterById,
+  updateEncounterStatus
 } from '../services/encounterService';
 import { getPatientById } from '../services/patientService';
 import { QueueItem, Encounter, Patient, Prescription, VitalsRecord } from '../types';
@@ -105,15 +106,40 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
   }, [selectedCountry, selectedClinic]);
 
   useEffect(() => {
-    const unsubscribe = subscribeToQueue('READY_FOR_DOCTOR', (items) => {
+    const unsubscribe = subscribeToQueue(['READY_FOR_DOCTOR', 'IN_CONSULTATION'] as any, (items) => {
       setWaitingList(items);
     });
     return () => unsubscribe();
   }, []);
 
+  const handleCallNextPatient = async () => {
+    const readyPatients = waitingList.filter(p => p.status === 'READY_FOR_DOCTOR');
+    if (readyPatients.length === 0) {
+      notify("No patients waiting for consultation.", "info");
+      return;
+    }
+    
+    const nextPatient = readyPatients[0];
+    
+    try {
+      await handleOpenConsult(nextPatient);
+      notify(`Called next patient: ${nextPatient.patient_name || nextPatient.patient_id}`, 'success');
+    } catch (err) {
+      console.error(err);
+      setErrorMsg("Failed to call next patient.");
+      notify("Failed to call next patient", "error");
+    }
+  };
+
   const handleOpenConsult = async (item: QueueItem) => {
     setSelectedItem(item);
     try {
+      const uid = auth.currentUser?.uid || 'unknown';
+      if (item.status === 'READY_FOR_DOCTOR') {
+        await callNextPatient(item.id!, uid);
+        await updateEncounterStatus(item.encounter_id, 'IN_CONSULTATION');
+      }
+
       const [patient, encounter, vitals] = await Promise.all([
         getPatientById(item.patient_id),
         getEncounterById(item.encounter_id),
@@ -154,6 +180,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
         ? `${consultData.notes}\n\n[Safety Override Justification]: ${overrideJustification}`
         : consultData.notes;
 
+      const hasPrescriptions = consultData.prescriptions.length > 0;
       await saveConsultation(
         {
           encounter_id: selectedItem.encounter_id,
@@ -163,7 +190,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
           notes: finalNotes,
           created_by: uid
         },
-        consultData.prescriptions.length > 0 ? {
+        hasPrescriptions ? {
           encounter_id: selectedItem.encounter_id,
           patient_id: selectedItem.patient_id,
           prescriptions: consultData.prescriptions,
@@ -171,7 +198,8 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
         } : undefined
       );
 
-      await updateQueueStatus(selectedItem.id!, 'WAITING_FOR_PHARMACY' as any);
+      const nextStatus = hasPrescriptions ? 'WAITING_FOR_PHARMACY' : 'COMPLETED';
+      await updateQueueStatus(selectedItem.id!, nextStatus as any);
       
       // Refresh count
       if (selectedCountry && selectedClinic) {
@@ -206,14 +234,25 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
         <Typography variant="h4" fontWeight="bold">
           Doctor Consultation
         </Typography>
-        <Button 
-          variant="outlined" 
-          component={Link} 
-          to="/queue"
-          startIcon={<AssignmentIcon />}
-        >
-          View Queue Board
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button 
+            variant="contained" 
+            color="primary"
+            onClick={handleCallNextPatient}
+            disabled={waitingList.length === 0}
+            size="large"
+          >
+            Call Next Patient
+          </Button>
+          <Button 
+            variant="outlined" 
+            component={Link} 
+            to="/queue"
+            startIcon={<AssignmentIcon />}
+          >
+            View Queue Board
+          </Button>
+        </Box>
       </Box>
 
       {successMsg && <Alert severity="success" sx={{ mb: 3 }}>{successMsg}</Alert>}
@@ -266,11 +305,12 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
                         </TableCell>
                         <TableCell align="right">
                           <Button 
-                            variant="contained" 
+                            variant={item.status === 'IN_CONSULTATION' ? "outlined" : "contained"} 
+                            color={item.status === 'IN_CONSULTATION' ? "secondary" : "primary"}
                             size="small" 
                             onClick={() => handleOpenConsult(item)}
                           >
-                            Start Consultation
+                            {item.status === 'IN_CONSULTATION' ? 'Resume Consultation' : 'Start Consultation'}
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -409,7 +449,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
             size="large"
             disabled={!consultData.diagnosis}
           >
-            Complete Consultation & Send to Pharmacy
+            Finish Consultation
           </Button>
         </DialogActions>
       </Dialog>

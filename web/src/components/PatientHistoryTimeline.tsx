@@ -10,7 +10,7 @@ import {
   Chip
 } from '@mui/material';
 import { 
-  getEncountersByPatient, 
+  getPatientHistory,
   getVitalsByEncounter, 
   getDiagnosisByEncounter, 
   getPrescriptionByEncounter 
@@ -19,6 +19,7 @@ import { Encounter, VitalsRecord, DiagnosisRecord, PrescriptionRecord } from '..
 
 interface PatientHistoryTimelineProps {
   patientId: string;
+  includeArchived?: boolean;
 }
 
 interface HistoryItem {
@@ -28,7 +29,7 @@ interface HistoryItem {
   prescription: PrescriptionRecord | null;
 }
 
-const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patientId }) => {
+const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patientId, includeArchived = false }) => {
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,7 +37,7 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
     const fetchHistory = async () => {
       setLoading(true);
       try {
-        const encounters = await getEncountersByPatient(patientId);
+        const encounters = await getPatientHistory(patientId);
         const completedEncounters = encounters.filter(e => e.encounter_status === 'COMPLETED');
         
         const items = await Promise.all(completedEncounters.map(async (encounter) => {
@@ -57,7 +58,7 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
     };
 
     if (patientId) fetchHistory();
-  }, [patientId]);
+  }, [patientId, includeArchived]);
 
   if (loading) return <CircularProgress size={24} />;
 

@@ -26,10 +26,15 @@ export interface Patient {
   date_of_birth: string;
   phone: string;
   village: string;
-  country_id?: string; // Optional for backward compatibility
   country_code: string;
   clinic_id: string;
+  latest_encounter_id?: string;
+  last_visit_date?: Timestamp;
+  encounter_count?: number;
   created_at: Timestamp;
+  updated_at?: Timestamp;
+  sync_status?: 'synced' | 'pending' | 'error';
+  device_id?: string;
 }
 
 export type TriageLevel = 'emergency' | 'urgent' | 'standard' | 'low';
@@ -41,14 +46,18 @@ export interface QueueItem {
   patient_name: string;
   station: string;
   status: string;
-  countryId?: string; // Optional for backward compatibility
   country_code: string;
   clinic_id: string;
   triage_level?: TriageLevel;
   priority_score?: number;
   triage_source?: 'automatic' | 'manual';
   triage_reason?: string;
+  doctor_id?: string;
+  doctor_called_at?: Timestamp;
   created_at: Timestamp;
+  updated_at?: Timestamp;
+  sync_status?: 'synced' | 'pending' | 'error';
+  device_id?: string;
 }
 
 export interface Vitals {
@@ -79,6 +88,9 @@ export interface VitalsRecord extends Vitals {
   clinic_id: string;
   created_at: Timestamp;
   created_by: string;
+  updated_at?: Timestamp;
+  sync_status?: 'synced' | 'pending' | 'error';
+  device_id?: string;
 }
 
 export interface DiagnosisRecord {
@@ -92,6 +104,9 @@ export interface DiagnosisRecord {
   clinic_id: string;
   created_at: Timestamp;
   created_by: string;
+  updated_at?: Timestamp;
+  sync_status?: 'synced' | 'pending' | 'error';
+  device_id?: string;
 }
 
 export interface PrescriptionRecord {
@@ -104,17 +119,23 @@ export interface PrescriptionRecord {
   clinic_id: string;
   created_at: Timestamp;
   created_by: string;
+  updated_at?: Timestamp;
+  sync_status?: 'synced' | 'pending' | 'error';
+  device_id?: string;
 }
 
 export interface Encounter {
   id?: string;
   patient_id: string;
   encounter_status: EncounterStatus;
+  status: EncounterStatus;
   current_station: string;
-  country_id?: string; // Optional
   country_code: string;
   clinic_id: string;
   created_at: Timestamp;
+  updated_at?: Timestamp;
+  sync_status?: 'synced' | 'pending' | 'error';
+  device_id?: string;
 }
 
 export interface Medication {
@@ -173,11 +194,14 @@ export interface AuditLog {
   id?: string;
   user_id: string;
   role: UserRole | 'unknown';
-  action: 'PATIENT_CREATED' | 'VITALS_RECORDED' | 'DIAGNOSIS_CREATED' | 'PRESCRIPTION_ISSUED' | 'MEDICATION_DISPENSED' | 'ENCOUNTER_STATUS_CHANGED';
+  action: 'PATIENT_CREATED' | 'VITALS_RECORDED' | 'DIAGNOSIS_CREATED' | 'PRESCRIPTION_ISSUED' | 'MEDICATION_DISPENSED' | 'ENCOUNTER_STATUS_CHANGED' | 'DOCTOR_CALLED_PATIENT';
   patient_id?: string;
   encounter_id?: string;
   timestamp: Timestamp;
   device_id: string;
   country_code: string;
   clinic_id: string;
+  created_at?: Timestamp;
+  updated_at?: Timestamp;
+  sync_status?: 'synced' | 'pending' | 'error';
 }

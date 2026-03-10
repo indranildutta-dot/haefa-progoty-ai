@@ -9,7 +9,8 @@ import {
   updateDoc,
   serverTimestamp,
   orderBy,
-  limit
+  limit,
+  increment
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { 
@@ -25,6 +26,7 @@ import { useAppStore } from "../store/useAppStore";
 import { logAction } from "./auditService";
 
 const ENCOUNTERS_COLLECTION = "encounters";
+const ENCOUNTERS_ARCHIVE_COLLECTION = "encounters_archive";
 const VITALS_COLLECTION = "vitals";
 const DIAGNOSES_COLLECTION = "diagnoses";
 const PRESCRIPTIONS_COLLECTION = "prescriptions";
@@ -36,12 +38,47 @@ export const createEncounter = async (patient_id: string) => {
   const docRef = await addDoc(collection(db, ENCOUNTERS_COLLECTION), {
     patient_id,
     encounter_status: 'WAITING_FOR_VITALS',
+    status: 'WAITING_FOR_VITALS',
     current_station: 'registration',
     country_code: selectedCountry.id,
     clinic_id: selectedClinic.id,
-    created_at: serverTimestamp()
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp()
   });
+
+  const patientRef = doc(db, "patients", patient_id);
+  await updateDoc(patientRef, {
+    latest_encounter_id: docRef.id,
+    last_visit_date: serverTimestamp(),
+    encounter_count: increment(1),
+    updated_at: serverTimestamp()
+  });
+
   return docRef.id;
+};
+
+export const getPatientHistory = async (patientId: string): Promise<Encounter[]> => {
+  const activeQuery = query(
+    collection(db, ENCOUNTERS_COLLECTION),
+    where("patient_id", "==", patientId),
+    orderBy("created_at", "desc"),
+    limit(20)
+  );
+  const activeSnapshot = await getDocs(activeQuery);
+  let encounters = activeSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Encounter));
+
+  if (encounters.length < 20) {
+    const archiveQuery = query(
+      collection(db, ENCOUNTERS_ARCHIVE_COLLECTION),
+      where("patient_id", "==", patientId),
+      orderBy("created_at", "desc")
+    );
+    const archiveSnapshot = await getDocs(archiveQuery);
+    const archivedEncounters = archiveSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Encounter));
+    encounters = [...encounters, ...archivedEncounters];
+  }
+  
+  return encounters.sort((a, b) => b.created_at.toMillis() - a.created_at.toMillis());
 };
 
 export const getEncounterById = async (encounterId: string): Promise<Encounter | null> => {
@@ -56,25 +93,16 @@ export const getEncounterById = async (encounterId: string): Promise<Encounter |
 export const getLatestEncounter = async (patientId: string): Promise<Encounter | null> => {
   const q = query(
     collection(db, ENCOUNTERS_COLLECTION),
-    where("patient_id", "==", patientId)
+    where("patient_id", "==", patientId),
+    orderBy("created_at", "desc"),
+    limit(1)
   );
   
   const querySnapshot = await getDocs(q);
   if (querySnapshot.empty) return null;
 
-  const encounters = querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  })) as Encounter[];
-
-  // Sort on client side to avoid index requirement
-  encounters.sort((a, b) => {
-    const timeA = a.created_at?.toMillis() || 0;
-    const timeB = b.created_at?.toMillis() || 0;
-    return timeB - timeA;
-  });
-
-  return encounters[0];
+  const docSnap = querySnapshot.docs[0];
+  return { id: docSnap.id, ...docSnap.data() } as Encounter;
 };
 
 export const updateEncounterStatus = async (encounterId: string, status: EncounterStatus) => {
@@ -84,7 +112,7 @@ export const updateEncounterStatus = async (encounterId: string, status: Encount
 
   await updateDoc(docRef, {
     encounter_status: status,
-    updatedAt: serverTimestamp()
+    updated_at: serverTimestamp()
   });
 
   await logAction({
@@ -102,13 +130,15 @@ export const saveVitals = async (vitalsData: Omit<VitalsRecord, 'id' | 'created_
     ...vitalsData,
     country_code: selectedCountry.id,
     clinic_id: selectedClinic.id,
-    created_at: serverTimestamp()
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp()
   });
   
   const encounterRef = doc(db, ENCOUNTERS_COLLECTION, vitalsData.encounter_id);
   await updateDoc(encounterRef, {
     encounter_status: 'READY_FOR_DOCTOR',
-    current_station: 'vitals'
+    current_station: 'vitals',
+    updated_at: serverTimestamp()
   });
 
   await logAction({
@@ -135,7 +165,8 @@ export const saveConsultation = async (
     ...diagnosisData,
     country_code: selectedCountry.id,
     clinic_id: selectedClinic.id,
-    created_at: serverTimestamp()
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp()
   });
 
   if (prescriptionData && prescriptionData.prescriptions.length > 0) {
@@ -144,7 +175,8 @@ export const saveConsultation = async (
       status: 'PENDING',
       country_code: selectedCountry.id,
       clinic_id: selectedClinic.id,
-      created_at: serverTimestamp()
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp()
     });
   }
 
@@ -152,7 +184,8 @@ export const saveConsultation = async (
   const newStatus = prescriptionData ? 'WAITING_FOR_PHARMACY' : 'COMPLETED';
   await updateDoc(encounterRef, {
     encounter_status: newStatus,
-    current_station: 'doctor'
+    current_station: 'doctor',
+    updated_at: serverTimestamp()
   });
 
   await logAction({
@@ -223,10 +256,16 @@ export const markPrescriptionDispensed = async (prescriptionId: string) => {
   const pDoc = await getDoc(docRef);
   if (pDoc.exists()) {
     const data = pDoc.data();
-    await updateDoc(docRef, { status: 'DISPENSED' });
+    await updateDoc(docRef, { 
+      status: 'DISPENSED',
+      updated_at: serverTimestamp()
+    });
     
     const encounterRef = doc(db, ENCOUNTERS_COLLECTION, data.encounter_id);
-    await updateDoc(encounterRef, { encounter_status: 'COMPLETED' });
+    await updateDoc(encounterRef, { 
+      encounter_status: 'COMPLETED',
+      updated_at: serverTimestamp()
+    });
 
     await logAction({
       action: 'MEDICATION_DISPENSED',
@@ -242,20 +281,12 @@ export const markPrescriptionDispensed = async (prescriptionId: string) => {
   }
 };
 
-export const getEncountersByPatient = async (patientId: string): Promise<Encounter[]> => {
+export const getEncountersByPatient = async (patientId: string, includeArchived: boolean = false): Promise<Encounter[]> => {
   const q = query(
-    collection(db, ENCOUNTERS_COLLECTION),
-    where("patient_id", "==", patientId)
+    collection(db, includeArchived ? "encounters_archive" : "encounters"),
+    where("patient_id", "==", patientId),
+    orderBy("created_at", "desc")
   );
   const querySnapshot = await getDocs(q);
-  const encounters = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Encounter[];
-  
-  // Sort on client side
-  encounters.sort((a, b) => {
-    const timeA = a.created_at?.toMillis() || 0;
-    const timeB = b.created_at?.toMillis() || 0;
-    return timeB - timeA;
-  });
-
-  return encounters;
+  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Encounter[];
 };

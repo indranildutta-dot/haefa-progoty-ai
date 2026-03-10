@@ -40,7 +40,9 @@ export const logAction = async (params: {
       timestamp: serverTimestamp() as any,
       device_id: getDeviceId(),
       country_code: selectedCountry.id,
-      clinic_id: selectedClinic.id
+      clinic_id: selectedClinic.id,
+      created_at: serverTimestamp() as any,
+      updated_at: serverTimestamp() as any
     };
 
     await addDoc(collection(db, AUDIT_LOGS_COLLECTION), logEntry);

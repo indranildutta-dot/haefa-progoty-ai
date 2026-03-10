@@ -9,47 +9,132 @@ import {
   updateDoc,
   serverTimestamp,
   orderBy,
-  onSnapshot
+  onSnapshot,
+  deleteDoc,
+  setDoc
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { QueueItem, EncounterStatus } from "../types";
 import { useAppStore } from "../store/useAppStore";
 import { logAction } from "./auditService";
+import { updateMetrics } from "./metricsService";
 
-const QUEUE_COLLECTION = "queue";
+const QUEUE_ACTIVE_COLLECTION = "queues_active";
+const QUEUE_ARCHIVE_COLLECTION = "queues_archive";
 
 export const addToQueue = async (queueData: Omit<QueueItem, 'id' | 'created_at' | 'country_code' | 'clinic_id'>) => {
   const { selectedCountry, selectedClinic } = useAppStore.getState();
   if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
 
-  const docRef = await addDoc(collection(db, QUEUE_COLLECTION), {
+  const docRef = await addDoc(collection(db, QUEUE_ACTIVE_COLLECTION), {
     ...queueData,
     country_code: selectedCountry.id,
     clinic_id: selectedClinic.id,
-    created_at: serverTimestamp()
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp()
   });
+
+  await updateMetrics(selectedClinic.id, selectedCountry.id, {
+    active_queue: 1
+  });
+
   return docRef.id;
 };
 
-export const updateQueueStatus = async (queueId: string, status: EncounterStatus) => {
-  const docRef = doc(db, QUEUE_COLLECTION, queueId);
+export const callNextPatient = async (queueId: string, doctorId: string) => {
+  const docRef = doc(db, QUEUE_ACTIVE_COLLECTION, queueId);
   const docSnap = await getDoc(docRef);
   
-  await updateDoc(docRef, { status });
+  await updateDoc(docRef, { 
+    status: 'IN_CONSULTATION',
+    station: 'doctor',
+    doctor_id: doctorId,
+    doctor_called_at: serverTimestamp(),
+    updated_at: serverTimestamp()
+  });
 
   if (docSnap.exists()) {
     const data = docSnap.data();
+    await logAction({
+      action: 'DOCTOR_CALLED_PATIENT',
+      encounter_id: data.encounter_id,
+      patient_id: data.patient_id
+    });
     await logAction({
       action: 'ENCOUNTER_STATUS_CHANGED',
       encounter_id: data.encounter_id,
       patient_id: data.patient_id
     });
+
+    await updateMetrics(data.clinic_id, data.country_code, {
+      in_consultation: 1
+    });
+  }
+};
+
+export const updateQueueStatus = async (queueId: string, status: EncounterStatus) => {
+  const docRef = doc(db, QUEUE_ACTIVE_COLLECTION, queueId);
+  const docSnap = await getDoc(docRef);
+  
+  let station = 'registration';
+  if (status === 'WAITING_FOR_VITALS') station = 'vitals';
+  else if (status === 'READY_FOR_DOCTOR' || status === 'IN_CONSULTATION') station = 'doctor';
+  else if (status === 'WAITING_FOR_PHARMACY') station = 'pharmacy';
+  else if (status === 'COMPLETED') station = 'completed';
+
+  if (docSnap.exists()) {
+    const data = docSnap.data();
+    
+    if (status === 'COMPLETED') {
+      // Move to archive
+      const archiveRef = doc(db, QUEUE_ARCHIVE_COLLECTION, queueId);
+      await setDoc(archiveRef, {
+        ...data,
+        status,
+        station,
+        updated_at: serverTimestamp()
+      });
+      await deleteDoc(docRef);
+    } else {
+      await updateDoc(docRef, { 
+        status, 
+        station,
+        updated_at: serverTimestamp()
+      });
+    }
+
+    await logAction({
+      action: 'ENCOUNTER_STATUS_CHANGED',
+      encounter_id: data.encounter_id,
+      patient_id: data.patient_id
+    });
+
+    if (status === 'COMPLETED') {
+      const waitMinutes = data.created_at ? Math.floor((Date.now() - data.created_at.toMillis()) / 60000) : 0;
+      await updateMetrics(data.clinic_id, data.country_code, {
+        active_queue: -1,
+        completed_today: 1,
+        wait_time_minutes: waitMinutes
+      });
+      if (data.status === 'IN_CONSULTATION') {
+        await updateMetrics(data.clinic_id, data.country_code, {
+          in_consultation: -1
+        });
+      }
+    } else if (data.status === 'IN_CONSULTATION' && status !== 'IN_CONSULTATION') {
+      await updateMetrics(data.clinic_id, data.country_code, {
+        in_consultation: -1
+      });
+    }
   }
 };
 
 export const updateQueueTriage = async (queueId: string, triageData: Partial<QueueItem>) => {
-  const docRef = doc(db, QUEUE_COLLECTION, queueId);
-  await updateDoc(docRef, triageData);
+  const docRef = doc(db, QUEUE_ACTIVE_COLLECTION, queueId);
+  await updateDoc(docRef, {
+    ...triageData,
+    updated_at: serverTimestamp()
+  });
 };
 
 export const getQueueByStatus = async (status: EncounterStatus) => {
@@ -57,7 +142,7 @@ export const getQueueByStatus = async (status: EncounterStatus) => {
   if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
 
   const q = query(
-    collection(db, QUEUE_COLLECTION),
+    collection(db, QUEUE_ACTIVE_COLLECTION),
     where("country_code", "==", selectedCountry.id),
     where("clinic_id", "==", selectedClinic.id)
   );
@@ -82,12 +167,12 @@ export const getQueueByStatus = async (status: EncounterStatus) => {
     });
 };
 
-export const subscribeToQueue = (status: EncounterStatus, callback: (items: QueueItem[]) => void) => {
+export const subscribeToQueue = (status: EncounterStatus | EncounterStatus[], callback: (items: QueueItem[]) => void) => {
   const { selectedCountry, selectedClinic } = useAppStore.getState();
   if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
 
   const q = query(
-    collection(db, QUEUE_COLLECTION),
+    collection(db, QUEUE_ACTIVE_COLLECTION),
     where("country_code", "==", selectedCountry.id),
     where("clinic_id", "==", selectedClinic.id)
   );
@@ -98,8 +183,10 @@ export const subscribeToQueue = (status: EncounterStatus, callback: (items: Queu
       ...doc.data()
     })) as QueueItem[];
 
+    const statuses = Array.isArray(status) ? status : [status];
+
     const filtered = items
-      .filter(item => item.status === status)
+      .filter(item => statuses.includes(item.status as EncounterStatus))
       .sort((a, b) => {
         const priorityA = a.priority_score || 0;
         const priorityB = b.priority_score || 0;
