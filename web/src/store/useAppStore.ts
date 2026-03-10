@@ -1,0 +1,69 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { User } from 'firebase/auth';
+import { CountryConfig, ClinicConfig } from '../config/countries';
+import { UserProfile } from '../types';
+
+interface Notification {
+  message: string;
+  type: 'success' | 'error' | 'info' | 'warning';
+  id: string;
+}
+
+interface AppState {
+  // Auth
+  user: User | null;
+  userProfile: UserProfile | null;
+  setUser: (user: User | null, profile?: UserProfile | null) => void;
+  
+  // Session
+  selectedCountry: CountryConfig | null;
+  selectedClinic: ClinicConfig | null;
+  setSession: (country: CountryConfig | null, clinic: ClinicConfig | null) => void;
+  
+  // Notifications
+  notifications: Notification[];
+  notify: (message: string, type?: Notification['type']) => void;
+  removeNotification: (id: string) => void;
+}
+
+export const useAppStore = create<AppState>()(
+  persist(
+    (set) => ({
+      user: null,
+      userProfile: null,
+      setUser: (user, profile = null) => set({ user, userProfile: profile }),
+      
+      selectedCountry: null,
+      selectedClinic: null,
+      setSession: (country, clinic) => set({ 
+        selectedCountry: country, 
+        selectedClinic: clinic 
+      }),
+      
+      notifications: [],
+      notify: (message, type = 'info') => {
+        const id = Math.random().toString(36).substring(7);
+        set((state) => ({
+          notifications: [...state.notifications, { id, message, type }]
+        }));
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+          set((state) => ({
+            notifications: state.notifications.filter((n) => n.id !== id)
+          }));
+        }, 5000);
+      },
+      removeNotification: (id) => set((state) => ({
+        notifications: state.notifications.filter((n) => n.id !== id)
+      })),
+    }),
+    {
+      name: 'haefa-progoty-storage',
+      partialize: (state) => ({ 
+        selectedCountry: state.selectedCountry, 
+        selectedClinic: state.selectedClinic 
+      }),
+    }
+  )
+);

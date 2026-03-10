@@ -25,12 +25,19 @@ import { createPatient, searchPatients } from '../services/patientService';
 import { createEncounter } from '../services/encounterService';
 import { addToQueue } from '../services/queueService';
 import { Patient } from '../types';
+import { PatientSchema } from '../schemas/clinical';
+import { useAppStore } from '../store/useAppStore';
+
+import { getCountryConfig } from '../config/useCountry';
 
 interface RegistrationStationProps {
   countryId: string;
 }
 
 const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) => {
+  const country = getCountryConfig(countryId);
+  const { notify } = useAppStore();
+  
   // Search State
   const [searchParams, setSearchParams] = useState({
     first_name: '',
@@ -65,7 +72,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
     setErrorMsg(null);
     setSearchPerformed(true);
     try {
-      const results = await searchPatients(searchParams, countryId);
+      const results = await searchPatients(searchParams);
       setSearchResults(results);
     } catch (err) {
       console.error(err);
@@ -80,24 +87,25 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
     setErrorMsg(null);
     try {
       // 1. Create Encounter
-      const encounterId = await createEncounter(patientId, countryId);
+      const encounterId = await createEncounter(patientId);
 
       // 2. Add to Queue
       await addToQueue({
         encounter_id: encounterId,
         patient_id: patientId,
+        patient_name: patientName,
         station: 'vitals',
-        status: 'waiting'
+        status: 'WAITING_FOR_VITALS'
       });
 
-      setSuccessMsg(`Encounter started successfully for ${patientName}. Patient moved to Vitals queue.`);
+      notify(`Encounter started for ${patientName}`, 'success');
       setSearchResults([]);
       setSearchParams({ first_name: '', last_name: '', phone: '' });
       setSearchPerformed(false);
-      setTimeout(() => setSuccessMsg(null), 5000);
     } catch (err) {
       console.error(err);
       setErrorMsg("Failed to start encounter.");
+      notify("Failed to start encounter", "error");
     } finally {
       setLoading(false);
     }
@@ -108,24 +116,28 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
     setLoading(true);
     setErrorMsg(null);
     try {
-      // 1. Create Patient
+      // 1. Validate with Zod
+      const validatedPatient = PatientSchema.parse(newPatient);
+
+      // 2. Create Patient
       const patientId = await createPatient({
-        ...newPatient,
-        country_id: countryId
+        ...validatedPatient,
+        country_id: countryId // Keeping for legacy
       });
 
-      // 2. Create Encounter
-      const encounterId = await createEncounter(patientId, countryId);
+      // 3. Create Encounter
+      const encounterId = await createEncounter(patientId);
 
-      // 3. Add to Queue
+      // 4. Add to Queue
       await addToQueue({
         encounter_id: encounterId,
         patient_id: patientId,
+        patient_name: `${validatedPatient.first_name} ${validatedPatient.last_name}`,
         station: 'vitals',
-        status: 'waiting'
+        status: 'WAITING_FOR_VITALS'
       });
 
-      setSuccessMsg(`Patient ${newPatient.first_name} ${newPatient.last_name} registered and encounter started.`);
+      notify(`Patient ${validatedPatient.first_name} registered successfully`, 'success');
       setNewPatient({
         first_name: '',
         last_name: '',
@@ -136,10 +148,14 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
       });
       setSearchResults([]);
       setSearchPerformed(false);
-      setTimeout(() => setSuccessMsg(null), 5000);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setErrorMsg("Failed to register patient and start encounter.");
+      if (err.errors) {
+        setErrorMsg(err.errors[0].message);
+      } else {
+        setErrorMsg("Failed to register patient.");
+      }
+      notify("Registration failed", "error");
     } finally {
       setLoading(false);
     }
@@ -294,6 +310,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                     type="date"
                     required
                     InputLabelProps={{ shrink: true }}
+                    helperText={country ? `Format: ${country.dateFormat}` : ''}
                     value={newPatient.date_of_birth}
                     onChange={(e) => setNewPatient({ ...newPatient, date_of_birth: e.target.value })}
                   />

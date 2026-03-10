@@ -26,7 +26,9 @@ export interface Patient {
   date_of_birth: string;
   phone: string;
   village: string;
-  country_id: string;
+  country_id?: string; // Optional for backward compatibility
+  country_code: string;
+  clinic_id: string;
   created_at: Timestamp;
 }
 
@@ -34,8 +36,12 @@ export interface QueueItem {
   id?: string;
   encounter_id: string;
   patient_id: string;
+  patient_name: string;
   station: string;
   status: string;
+  countryId?: string; // Optional for backward compatibility
+  country_code: string;
+  clinic_id: string;
   created_at: Timestamp;
 }
 
@@ -59,16 +65,61 @@ export interface Prescription {
   instructions: string;
 }
 
+export interface VitalsRecord extends Vitals {
+  id?: string;
+  encounter_id: string;
+  patient_id: string;
+  country_code: string;
+  clinic_id: string;
+  created_at: Timestamp;
+  created_by: string;
+}
+
+export interface DiagnosisRecord {
+  id?: string;
+  encounter_id: string;
+  patient_id: string;
+  chief_complaint: string;
+  diagnosis: string;
+  notes: string;
+  country_code: string;
+  clinic_id: string;
+  created_at: Timestamp;
+  created_by: string;
+}
+
+export interface PrescriptionRecord {
+  id?: string;
+  encounter_id: string;
+  patient_id: string;
+  prescriptions: Prescription[];
+  status: 'PENDING' | 'DISPENSED';
+  country_code: string;
+  clinic_id: string;
+  created_at: Timestamp;
+  created_by: string;
+}
+
 export interface Encounter {
   id?: string;
   patient_id: string;
-  encounter_status: string;
+  encounter_status: EncounterStatus;
   current_station: string;
-  vitals?: Vitals;
-  chiefComplaint?: string;
-  diagnosis?: string;
-  notes?: string;
-  prescriptions?: Prescription[];
-  country_id: string;
+  country_id?: string; // Optional
+  country_code: string;
+  clinic_id: string;
   created_at: Timestamp;
+}
+
+export interface AuditLog {
+  id?: string;
+  user_id: string;
+  role: UserRole | 'unknown';
+  action: 'PATIENT_CREATED' | 'VITALS_RECORDED' | 'DIAGNOSIS_CREATED' | 'PRESCRIPTION_ISSUED' | 'MEDICATION_DISPENSED' | 'ENCOUNTER_STATUS_CHANGED';
+  patient_id?: string;
+  encounter_id?: string;
+  timestamp: Timestamp;
+  device_id: string;
+  country_code: string;
+  clinic_id: string;
 }

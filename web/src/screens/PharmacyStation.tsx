@@ -27,34 +27,45 @@ import {
 import MedicationIcon from '@mui/icons-material/Medication';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { subscribeToQueue, updateQueueStatus } from '../services/queueService';
-import { getLatestEncounter, updateEncounterStatus } from '../services/encounterService';
-import { QueueItem, Encounter, Prescription } from '../types';
+import { 
+  getDiagnosisByEncounter, 
+  getPrescriptionByEncounter, 
+  markPrescriptionDispensed 
+} from '../services/encounterService';
+import { QueueItem, DiagnosisRecord, PrescriptionRecord } from '../types';
+import { useAppStore } from '../store/useAppStore';
 
 interface PharmacyStationProps {
   countryId: string;
 }
 
 const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
+  const { notify } = useAppStore();
   const [waitingList, setWaitingList] = useState<QueueItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<QueueItem | null>(null);
-  const [currentEncounter, setCurrentEncounter] = useState<Encounter | null>(null);
+  const [currentDiagnosis, setCurrentDiagnosis] = useState<DiagnosisRecord | null>(null);
+  const [currentPrescription, setCurrentPrescription] = useState<PrescriptionRecord | null>(null);
   const [openDispenseDialog, setOpenDispenseDialog] = useState(false);
   const [dispensedItems, setDispensedItems] = useState<Record<number, boolean>>({});
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = subscribeToQueue('WAITING_FOR_PHARMACY', countryId, (items) => {
+    const unsubscribe = subscribeToQueue('WAITING_FOR_PHARMACY', (items) => {
       setWaitingList(items);
     });
     return () => unsubscribe();
-  }, [countryId]);
+  }, []);
 
   const handleOpenDispense = async (item: QueueItem) => {
     setSelectedItem(item);
     try {
-      const encounter = await getLatestEncounter(item.patient_id);
-      setCurrentEncounter(encounter);
+      const [diagnosis, prescription] = await Promise.all([
+        getDiagnosisByEncounter(item.encounter_id),
+        getPrescriptionByEncounter(item.encounter_id)
+      ]);
+      setCurrentDiagnosis(diagnosis);
+      setCurrentPrescription(prescription);
       setDispensedItems({});
       setOpenDispenseDialog(true);
     } catch (err) {
@@ -68,22 +79,22 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
   };
 
   const handleCompleteDispensing = async () => {
-    if (!currentEncounter || !selectedItem) return;
+    if (!currentPrescription || !selectedItem) return;
     try {
-      await updateEncounterStatus(currentEncounter.id!, 'COMPLETED' as any);
+      await markPrescriptionDispensed(currentPrescription.id!);
       await updateQueueStatus(selectedItem.id!, 'COMPLETED' as any);
       
-      setSuccessMsg(`Medication dispensed. Encounter completed.`);
+      notify(`Medication dispensed for ${selectedItem.patient_name}`, 'success');
       setOpenDispenseDialog(false);
       setSelectedItem(null);
-      setTimeout(() => setSuccessMsg(null), 5000);
     } catch (err) {
       console.error(err);
       setErrorMsg("Failed to complete dispensing.");
+      notify("Failed to complete dispensing", "error");
     }
   };
 
-  const allDispensed = currentEncounter?.prescriptions?.every((_, i) => dispensedItems[i]) ?? false;
+  const allDispensed = currentPrescription?.prescriptions?.every((_, i) => dispensedItems[i]) ?? false;
 
   return (
     <Box>
@@ -124,7 +135,7 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
                   ) : (
                     waitingList.map((item) => (
                       <TableRow key={item.id}>
-                        <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_id}</TableCell>
+                        <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_name || item.patient_id}</TableCell>
                         <TableCell>
                           {item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : '??'} mins
                         </TableCell>
@@ -171,7 +182,7 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
         <DialogContent dividers>
           <Box mb={3}>
             <Typography variant="subtitle2" color="textSecondary">Diagnosis</Typography>
-            <Typography variant="body1" fontWeight="medium">{currentEncounter?.diagnosis || 'N/A'}</Typography>
+            <Typography variant="body1" fontWeight="medium">{currentDiagnosis?.diagnosis || 'N/A'}</Typography>
           </Box>
           
           <Divider sx={{ my: 2 }} />
@@ -180,9 +191,9 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
             Prescribed Medications
           </Typography>
           
-          {currentEncounter?.prescriptions && currentEncounter.prescriptions.length > 0 ? (
+          {currentPrescription?.prescriptions && currentPrescription.prescriptions.length > 0 ? (
             <FormGroup>
-              {currentEncounter.prescriptions.map((p, index) => (
+              {currentPrescription.prescriptions.map((p, index) => (
                 <Paper key={index} variant="outlined" sx={{ p: 2, mb: 1, bgcolor: dispensedItems[index] ? '#f1f8e9' : 'white' }}>
                   <FormControlLabel
                     control={

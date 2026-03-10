@@ -28,15 +28,19 @@ import MonitorWeightIcon from '@mui/icons-material/MonitorWeight';
 import ThermostatIcon from '@mui/icons-material/Thermostat';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import { subscribeToQueue, updateQueueStatus } from '../services/queueService';
-import { createEncounter, updateEncounterVitals } from '../services/encounterService';
+import { saveVitals } from '../services/encounterService';
 import { QueueItem, Vitals, Patient } from '../types';
 import { getPatientById } from '../services/patientService';
+import { auth } from '../firebase';
+import { VitalsSchema } from '../schemas/clinical';
+import { useAppStore } from '../store/useAppStore';
 
 interface VitalsStationProps {
   countryId: string;
 }
 
 const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
+  const { notify } = useAppStore();
   const [waitingList, setWaitingList] = useState<QueueItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<QueueItem | null>(null);
   const [openVitalsDialog, setOpenVitalsDialog] = useState(false);
@@ -56,11 +60,11 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
   });
 
   useEffect(() => {
-    const unsubscribe = subscribeToQueue('REGISTERED', countryId, (items) => {
+    const unsubscribe = subscribeToQueue('WAITING_FOR_VITALS' as any, (items) => {
       setWaitingList(items);
     });
     return () => unsubscribe();
-  }, [countryId]);
+  }, []);
 
   // Calculate BMI automatically
   useEffect(() => {
@@ -80,20 +84,31 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
     if (!selectedItem) return;
     setErrorMsg(null);
     try {
-      // 1. Create Encounter and Save Vitals
-      const encounterId = await createEncounter(selectedItem.patient_id, countryId);
-      await updateEncounterVitals(encounterId, vitals);
+      // 1. Validate with Zod
+      const validatedVitals = VitalsSchema.parse(vitals);
 
-      // 2. Update Queue Status
+      // 2. Save Vitals
+      await saveVitals({
+        ...validatedVitals,
+        encounter_id: selectedItem.encounter_id,
+        patient_id: selectedItem.patient_id,
+        created_by: auth.currentUser?.uid || 'unknown'
+      });
+
+      // 3. Update Queue Status
       await updateQueueStatus(selectedItem.id!, 'READY_FOR_DOCTOR' as any);
 
-      setSuccessMsg(`Vitals recorded. Patient moved to Doctor queue.`);
+      notify(`Vitals recorded for ${selectedItem.patient_name}`, 'success');
       setOpenVitalsDialog(false);
       setSelectedItem(null);
-      setTimeout(() => setSuccessMsg(null), 5000);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setErrorMsg("Failed to save vitals.");
+      if (err.errors) {
+        setErrorMsg(err.errors[0].message);
+      } else {
+        setErrorMsg("Failed to save vitals.");
+      }
+      notify("Failed to save vitals", "error");
     }
   };
 
@@ -136,7 +151,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
                   ) : (
                     waitingList.map((item) => (
                       <TableRow key={item.id}>
-                        <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_id}</TableCell>
+                        <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_name || item.patient_id}</TableCell>
                         <TableCell>
                           {item.created_at?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </TableCell>

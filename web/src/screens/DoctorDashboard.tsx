@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Typography, 
   Box, 
@@ -27,22 +28,38 @@ import {
 import HistoryIcon from '@mui/icons-material/History';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import MedicationIcon from '@mui/icons-material/Medication';
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs 
+} from "firebase/firestore";
+import { db } from "../firebase";
 import { subscribeToQueue, updateQueueStatus } from '../services/queueService';
-import { getLatestEncounter, updateEncounterConsultation } from '../services/encounterService';
+import { 
+  getLatestEncounter, 
+  saveConsultation, 
+  getVitalsByEncounter,
+  getEncounterById
+} from '../services/encounterService';
 import { getPatientById } from '../services/patientService';
-import { QueueItem, Encounter, Patient, Prescription } from '../types';
+import { QueueItem, Encounter, Patient, Prescription, VitalsRecord } from '../types';
 import PatientHistoryTimeline from '../components/PatientHistoryTimeline';
 import PrescriptionForm from '../components/PrescriptionForm';
+import { auth } from '../firebase';
+import { useAppStore } from '../store/useAppStore';
 
 interface DoctorDashboardProps {
   countryId: string;
 }
 
 const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
+  const { notify, selectedCountry, selectedClinic } = useAppStore();
   const [waitingList, setWaitingList] = useState<QueueItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<QueueItem | null>(null);
   const [currentEncounter, setCurrentEncounter] = useState<Encounter | null>(null);
   const [currentPatient, setCurrentPatient] = useState<Patient | null>(null);
+  const [currentVitals, setCurrentVitals] = useState<VitalsRecord | null>(null);
   const [openConsultDialog, setOpenConsultDialog] = useState(false);
   const [tabValue, setTabValue] = useState(0);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -56,22 +73,48 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
     prescriptions: [] as Prescription[]
   });
 
+  const [consultationCount, setConsultationCount] = useState(0);
+
   useEffect(() => {
-    const unsubscribe = subscribeToQueue('READY_FOR_DOCTOR', countryId, (items) => {
+    const fetchConsultationCount = async () => {
+      try {
+        if (!selectedCountry || !selectedClinic) return;
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        
+        const q = query(
+          collection(db, "diagnoses"),
+          where("country_code", "==", selectedCountry.id),
+          where("clinic_id", "==", selectedClinic.id),
+          where("created_at", ">=", startOfDay)
+        );
+        const snapshot = await getDocs(q);
+        setConsultationCount(snapshot.size);
+      } catch (err) {
+        console.error("Error fetching consultation count:", err);
+      }
+    };
+    fetchConsultationCount();
+  }, [selectedCountry, selectedClinic]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToQueue('READY_FOR_DOCTOR', (items) => {
       setWaitingList(items);
     });
     return () => unsubscribe();
-  }, [countryId]);
+  }, []);
 
   const handleOpenConsult = async (item: QueueItem) => {
     setSelectedItem(item);
     try {
-      const [patient, encounter] = await Promise.all([
+      const [patient, encounter, vitals] = await Promise.all([
         getPatientById(item.patient_id),
-        getLatestEncounter(item.patient_id)
+        getEncounterById(item.encounter_id),
+        getVitalsByEncounter(item.encounter_id)
       ]);
       setCurrentPatient(patient);
       setCurrentEncounter(encounter);
+      setCurrentVitals(vitals);
       setOpenConsultDialog(true);
     } catch (err) {
       console.error(err);
@@ -80,27 +123,69 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
   };
 
   const handleSaveConsult = async () => {
-    if (!currentEncounter || !selectedItem) return;
+    if (!selectedItem) return;
     try {
-      await updateEncounterConsultation(currentEncounter.id!, consultData);
+      const uid = auth.currentUser?.uid || 'unknown';
+      
+      await saveConsultation(
+        {
+          encounter_id: selectedItem.encounter_id,
+          patient_id: selectedItem.patient_id,
+          chief_complaint: consultData.chiefComplaint,
+          diagnosis: consultData.diagnosis,
+          notes: consultData.notes,
+          created_by: uid
+        },
+        consultData.prescriptions.length > 0 ? {
+          encounter_id: selectedItem.encounter_id,
+          patient_id: selectedItem.patient_id,
+          prescriptions: consultData.prescriptions,
+          created_by: uid
+        } : undefined
+      );
+
       await updateQueueStatus(selectedItem.id!, 'WAITING_FOR_PHARMACY' as any);
       
-      setSuccessMsg(`Consultation completed. Sent to Pharmacy.`);
+      // Refresh count
+      if (selectedCountry && selectedClinic) {
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const q = query(
+          collection(db, "diagnoses"), 
+          where("country_code", "==", selectedCountry.id),
+          where("clinic_id", "==", selectedClinic.id),
+          where("created_at", ">=", startOfDay)
+        );
+        const snapshot = await getDocs(q);
+        setConsultationCount(snapshot.size);
+      }
+
+      notify(`Consultation completed for ${currentPatient?.first_name}`, 'success');
       setOpenConsultDialog(false);
       setSelectedItem(null);
       setConsultData({ chiefComplaint: '', diagnosis: '', notes: '', prescriptions: [] });
-      setTimeout(() => setSuccessMsg(null), 5000);
     } catch (err) {
       console.error(err);
       setErrorMsg("Failed to save consultation.");
+      notify("Failed to save consultation", "error");
     }
   };
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom fontWeight="bold">
-        Doctor Consultation
-      </Typography>
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h4" fontWeight="bold">
+          Doctor Consultation
+        </Typography>
+        <Button 
+          variant="outlined" 
+          component={Link} 
+          to="/queue"
+          startIcon={<AssignmentIcon />}
+        >
+          View Queue Board
+        </Button>
+      </Box>
 
       {successMsg && <Alert severity="success" sx={{ mb: 3 }}>{successMsg}</Alert>}
       {errorMsg && <Alert severity="error" sx={{ mb: 3 }}>{errorMsg}</Alert>}
@@ -135,7 +220,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
                   ) : (
                     waitingList.map((item) => (
                       <TableRow key={item.id}>
-                        <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_id}</TableCell>
+                        <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_name || item.patient_id}</TableCell>
                         <TableCell>
                           {item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : '??'} mins
                         </TableCell>
@@ -168,7 +253,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
           <Card sx={{ borderRadius: 2, mb: 3, bgcolor: 'primary.dark', color: 'white' }}>
             <CardContent>
               <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>Consultations Today</Typography>
-              <Typography variant="h3" fontWeight="bold">12</Typography>
+              <Typography variant="h3" fontWeight="bold">{consultationCount}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -177,7 +262,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
       {/* Consultation Dialog */}
       <Dialog open={openConsultDialog} onClose={() => setOpenConsultDialog(false)} maxWidth="lg" fullWidth>
         <DialogTitle sx={{ fontWeight: 'bold', bgcolor: '#f8f9fa' }}>
-          Consultation
+          Consultation - {currentPatient ? `${currentPatient.first_name} ${currentPatient.last_name}` : 'Loading...'}
           <Typography variant="caption" display="block" color="textSecondary">
             {currentPatient?.gender}, {currentPatient?.date_of_birth}
           </Typography>
@@ -188,30 +273,30 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
             <Grid size={{ xs: 12, md: 4 }} sx={{ borderRight: '1px solid #eee', overflowY: 'auto', p: 2, bgcolor: '#fafafa' }}>
               <Box mb={3}>
                 <Typography variant="subtitle2" gutterBottom fontWeight="bold" color="primary">Current Vitals</Typography>
-                {currentEncounter?.vitals ? (
+                {currentVitals ? (
                   <Grid container spacing={1}>
                     <Grid size={{ xs: 6 }}>
                       <Paper variant="outlined" sx={{ p: 1, textAlign: 'center' }}>
                         <Typography variant="caption" color="textSecondary">BP</Typography>
-                        <Typography variant="body2" fontWeight="bold">{currentEncounter.vitals.systolic}/{currentEncounter.vitals.diastolic}</Typography>
+                        <Typography variant="body2" fontWeight="bold">{currentVitals.systolic}/{currentVitals.diastolic}</Typography>
                       </Paper>
                     </Grid>
                     <Grid size={{ xs: 6 }}>
                       <Paper variant="outlined" sx={{ p: 1, textAlign: 'center' }}>
                         <Typography variant="caption" color="textSecondary">HR</Typography>
-                        <Typography variant="body2" fontWeight="bold">{currentEncounter.vitals.heartRate} bpm</Typography>
+                        <Typography variant="body2" fontWeight="bold">{currentVitals.heartRate} bpm</Typography>
                       </Paper>
                     </Grid>
                     <Grid size={{ xs: 6 }}>
                       <Paper variant="outlined" sx={{ p: 1, textAlign: 'center' }}>
                         <Typography variant="caption" color="textSecondary">Temp</Typography>
-                        <Typography variant="body2" fontWeight="bold">{currentEncounter.vitals.temperature}°C</Typography>
+                        <Typography variant="body2" fontWeight="bold">{currentVitals.temperature}°C</Typography>
                       </Paper>
                     </Grid>
                     <Grid size={{ xs: 6 }}>
                       <Paper variant="outlined" sx={{ p: 1, textAlign: 'center' }}>
                         <Typography variant="caption" color="textSecondary">BMI</Typography>
-                        <Typography variant="body2" fontWeight="bold">{currentEncounter.vitals.bmi}</Typography>
+                        <Typography variant="body2" fontWeight="bold">{currentVitals.bmi}</Typography>
                       </Paper>
                     </Grid>
                   </Grid>

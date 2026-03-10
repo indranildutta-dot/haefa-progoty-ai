@@ -5,6 +5,7 @@ import {
   where, 
   getDocs, 
   doc, 
+  getDoc,
   updateDoc,
   serverTimestamp,
   orderBy,
@@ -12,12 +13,19 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { QueueItem, EncounterStatus } from "../types";
+import { useAppStore } from "../store/useAppStore";
+import { logAction } from "./auditService";
 
 const QUEUE_COLLECTION = "queue";
 
-export const addToQueue = async (queueData: Omit<QueueItem, 'id' | 'created_at'>) => {
+export const addToQueue = async (queueData: Omit<QueueItem, 'id' | 'created_at' | 'country_code' | 'clinic_id'>) => {
+  const { selectedCountry, selectedClinic } = useAppStore.getState();
+  if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
+
   const docRef = await addDoc(collection(db, QUEUE_COLLECTION), {
     ...queueData,
+    country_code: selectedCountry.id,
+    clinic_id: selectedClinic.id,
     created_at: serverTimestamp()
   });
   return docRef.id;
@@ -25,30 +33,53 @@ export const addToQueue = async (queueData: Omit<QueueItem, 'id' | 'created_at'>
 
 export const updateQueueStatus = async (queueId: string, status: EncounterStatus) => {
   const docRef = doc(db, QUEUE_COLLECTION, queueId);
+  const docSnap = await getDoc(docRef);
+  
   await updateDoc(docRef, { status });
+
+  if (docSnap.exists()) {
+    const data = docSnap.data();
+    await logAction({
+      action: 'ENCOUNTER_STATUS_CHANGED',
+      encounter_id: data.encounter_id,
+      patient_id: data.patient_id
+    });
+  }
 };
 
-export const getQueueByStatus = async (status: EncounterStatus, countryId: string) => {
+export const getQueueByStatus = async (status: EncounterStatus) => {
+  const { selectedCountry, selectedClinic } = useAppStore.getState();
+  if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
+
   const q = query(
     collection(db, QUEUE_COLLECTION),
-    where("countryId", "==", countryId),
-    where("status", "==", status),
-    orderBy("timestamp", "asc")
+    where("country_code", "==", selectedCountry.id),
+    where("clinic_id", "==", selectedClinic.id)
   );
   
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({
+  const items = querySnapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data()
   })) as QueueItem[];
+
+  return items
+    .filter(item => item.status === status)
+    .sort((a, b) => {
+      const timeA = a.created_at?.toMillis() || 0;
+      const timeB = b.created_at?.toMillis() || 0;
+      return timeA - timeB;
+    });
 };
 
-export const subscribeToQueue = (status: EncounterStatus, countryId: string, callback: (items: QueueItem[]) => void) => {
+export const subscribeToQueue = (status: EncounterStatus, callback: (items: QueueItem[]) => void) => {
+  const { selectedCountry, selectedClinic } = useAppStore.getState();
+  if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
+
   const q = query(
     collection(db, QUEUE_COLLECTION),
-    where("countryId", "==", countryId),
-    where("status", "==", status),
-    orderBy("timestamp", "asc")
+    where("country_code", "==", selectedCountry.id),
+    where("clinic_id", "==", selectedClinic.id)
   );
   
   return onSnapshot(q, (snapshot) => {
@@ -56,6 +87,15 @@ export const subscribeToQueue = (status: EncounterStatus, countryId: string, cal
       id: doc.id,
       ...doc.data()
     })) as QueueItem[];
-    callback(items);
+
+    const filtered = items
+      .filter(item => item.status === status)
+      .sort((a, b) => {
+        const timeA = a.created_at?.toMillis() || 0;
+        const timeB = b.created_at?.toMillis() || 0;
+        return timeA - timeB;
+      });
+
+    callback(filtered);
   });
 };

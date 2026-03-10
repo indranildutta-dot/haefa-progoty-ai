@@ -12,19 +12,39 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { Patient } from "../types";
+import { useAppStore } from "../store/useAppStore";
+import { logAction } from "./auditService";
 
 const PATIENTS_COLLECTION = "patients";
 
-export const createPatient = async (patientData: Omit<Patient, 'id' | 'created_at'>) => {
+export const createPatient = async (patientData: Omit<Patient, 'id' | 'created_at' | 'country_code' | 'clinic_id'>) => {
+  const { selectedCountry, selectedClinic } = useAppStore.getState();
+  if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
+  
   const docRef = await addDoc(collection(db, PATIENTS_COLLECTION), {
     ...patientData,
+    country_code: selectedCountry.id,
+    clinic_id: selectedClinic.id,
     created_at: serverTimestamp()
   });
+
+  await logAction({
+    action: 'PATIENT_CREATED',
+    patient_id: docRef.id
+  });
+
   return docRef.id;
 };
 
-export const searchPatients = async (searchParams: { first_name?: string; last_name?: string; phone?: string }, country_id: string) => {
-  let q = query(collection(db, PATIENTS_COLLECTION), where("country_id", "==", country_id));
+export const searchPatients = async (searchParams: { first_name?: string; last_name?: string; phone?: string }) => {
+  const { selectedCountry, selectedClinic } = useAppStore.getState();
+  if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
+
+  let q = query(
+    collection(db, PATIENTS_COLLECTION), 
+    where("country_code", "==", selectedCountry.id),
+    where("clinic_id", "==", selectedClinic.id)
+  );
   
   if (searchParams.first_name) {
     q = query(q, where("first_name", "==", searchParams.first_name));

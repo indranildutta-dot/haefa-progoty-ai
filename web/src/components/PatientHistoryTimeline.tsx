@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Typography, 
-  Paper, 
   Divider,
   CircularProgress,
   List,
@@ -10,34 +9,46 @@ import {
   ListItemText,
   Chip
 } from '@mui/material';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
-import { Encounter } from '../types';
+import { 
+  getEncountersByPatient, 
+  getVitalsByEncounter, 
+  getDiagnosisByEncounter, 
+  getPrescriptionByEncounter 
+} from '../services/encounterService';
+import { Encounter, VitalsRecord, DiagnosisRecord, PrescriptionRecord } from '../types';
 
 interface PatientHistoryTimelineProps {
   patientId: string;
 }
 
+interface HistoryItem {
+  encounter: Encounter;
+  vitals: VitalsRecord | null;
+  diagnosis: DiagnosisRecord | null;
+  prescription: PrescriptionRecord | null;
+}
+
 const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patientId }) => {
-  const [encounters, setEncounters] = useState<Encounter[]>([]);
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchHistory = async () => {
       setLoading(true);
       try {
-        const q = query(
-          collection(db, "encounters"),
-          where("patient_id", "==", patientId),
-          where("encounter_status", "==", "completed"),
-          orderBy("created_at", "desc")
-        );
-        const querySnapshot = await getDocs(q);
-        const history = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Encounter[];
-        setEncounters(history);
+        const encounters = await getEncountersByPatient(patientId);
+        const completedEncounters = encounters.filter(e => e.encounter_status === 'COMPLETED');
+        
+        const items = await Promise.all(completedEncounters.map(async (encounter) => {
+          const [vitals, diagnosis, prescription] = await Promise.all([
+            getVitalsByEncounter(encounter.id!),
+            getDiagnosisByEncounter(encounter.id!),
+            getPrescriptionByEncounter(encounter.id!)
+          ]);
+          return { encounter, vitals, diagnosis, prescription };
+        }));
+        
+        setHistoryItems(items);
       } catch (err) {
         console.error("Error fetching history:", err);
       } finally {
@@ -50,7 +61,7 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
 
   if (loading) return <CircularProgress size={24} />;
 
-  if (encounters.length === 0) {
+  if (historyItems.length === 0) {
     return (
       <Box p={2} textAlign="center">
         <Typography color="textSecondary">No previous medical history found.</Typography>
@@ -61,14 +72,14 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
   return (
     <Box>
       <List>
-        {encounters.map((encounter, index) => (
-          <React.Fragment key={encounter.id}>
+        {historyItems.map((item, index) => (
+          <React.Fragment key={item.encounter.id}>
             <ListItem alignItems="flex-start" sx={{ px: 0 }}>
               <ListItemText
                 primary={
                   <Box display="flex" justifyContent="space-between" alignItems="center">
                     <Typography variant="subtitle2" fontWeight="bold">
-                      {encounter.created_at?.toDate().toLocaleDateString()}
+                      {item.encounter.created_at?.toDate().toLocaleDateString()}
                     </Typography>
                     <Chip label="Completed" size="small" variant="outlined" color="success" />
                   </Box>
@@ -76,16 +87,18 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
                 secondary={
                   <Box mt={1}>
                     <Typography variant="body2" color="textPrimary" sx={{ fontWeight: 'medium' }}>
-                      Diagnosis: {encounter.diagnosis || 'N/A'}
+                      Diagnosis: {item.diagnosis?.diagnosis || 'N/A'}
                     </Typography>
-                    <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 0.5 }}>
-                      Vitals: BP {encounter.vitals?.systolic}/{encounter.vitals?.diastolic} | HR {encounter.vitals?.heartRate} | Temp {encounter.vitals?.temperature}°C
-                    </Typography>
-                    {encounter.prescriptions && encounter.prescriptions.length > 0 && (
+                    {item.vitals && (
+                      <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 0.5 }}>
+                        Vitals: BP {item.vitals.systolic}/{item.vitals.diastolic} | HR {item.vitals.heartRate} | Temp {item.vitals.temperature}°C
+                      </Typography>
+                    )}
+                    {item.prescription && item.prescription.prescriptions.length > 0 && (
                       <Box mt={1}>
                         <Typography variant="caption" fontWeight="bold">Prescriptions:</Typography>
                         <Box display="flex" flexWrap="wrap" gap={0.5} mt={0.5}>
-                          {encounter.prescriptions.map((p, i) => (
+                          {item.prescription.prescriptions.map((p, i) => (
                             <Chip key={i} label={p.medicationName} size="small" />
                           ))}
                         </Box>
@@ -95,7 +108,7 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
                 }
               />
             </ListItem>
-            {index < encounters.length - 1 && <Divider component="li" />}
+            {index < historyItems.length - 1 && <Divider component="li" />}
           </React.Fragment>
         ))}
       </List>
