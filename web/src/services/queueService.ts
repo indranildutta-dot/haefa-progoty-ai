@@ -47,6 +47,11 @@ export const updateQueueStatus = async (queueId: string, status: EncounterStatus
   }
 };
 
+export const updateQueueTriage = async (queueId: string, triageData: Partial<QueueItem>) => {
+  const docRef = doc(db, QUEUE_COLLECTION, queueId);
+  await updateDoc(docRef, triageData);
+};
+
 export const getQueueByStatus = async (status: EncounterStatus) => {
   const { selectedCountry, selectedClinic } = useAppStore.getState();
   if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
@@ -66,9 +71,14 @@ export const getQueueByStatus = async (status: EncounterStatus) => {
   return items
     .filter(item => item.status === status)
     .sort((a, b) => {
+      const priorityA = a.priority_score || 0;
+      const priorityB = b.priority_score || 0;
+      if (priorityA !== priorityB) {
+        return priorityB - priorityA; // DESC
+      }
       const timeA = a.created_at?.toMillis() || 0;
       const timeB = b.created_at?.toMillis() || 0;
-      return timeA - timeB;
+      return timeA - timeB; // ASC
     });
 };
 
@@ -91,9 +101,14 @@ export const subscribeToQueue = (status: EncounterStatus, callback: (items: Queu
     const filtered = items
       .filter(item => item.status === status)
       .sort((a, b) => {
+        const priorityA = a.priority_score || 0;
+        const priorityB = b.priority_score || 0;
+        if (priorityA !== priorityB) {
+          return priorityB - priorityA; // DESC
+        }
         const timeA = a.created_at?.toMillis() || 0;
         const timeB = b.created_at?.toMillis() || 0;
-        return timeA - timeB;
+        return timeA - timeB; // ASC
       });
 
     callback(filtered);

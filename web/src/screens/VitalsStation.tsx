@@ -21,19 +21,25 @@ import {
   Alert,
   Divider,
   Card,
-  CardContent
+  CardContent,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel
 } from '@mui/material';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import MonitorWeightIcon from '@mui/icons-material/MonitorWeight';
 import ThermostatIcon from '@mui/icons-material/Thermostat';
 import FavoriteIcon from '@mui/icons-material/Favorite';
-import { subscribeToQueue, updateQueueStatus } from '../services/queueService';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import { subscribeToQueue, updateQueueStatus, updateQueueTriage } from '../services/queueService';
 import { saveVitals } from '../services/encounterService';
-import { QueueItem, Vitals, Patient } from '../types';
+import { QueueItem, Vitals, Patient, TriageLevel } from '../types';
 import { getPatientById } from '../services/patientService';
 import { auth } from '../firebase';
 import { VitalsSchema } from '../schemas/clinical';
 import { useAppStore } from '../store/useAppStore';
+import { evaluateTriage, TriageResult } from '../utils/triage';
 
 interface VitalsStationProps {
   countryId: string;
@@ -46,6 +52,10 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
   const [openVitalsDialog, setOpenVitalsDialog] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Triage State
+  const [triageResult, setTriageResult] = useState<TriageResult | null>(null);
+  const [manualTriageLevel, setManualTriageLevel] = useState<TriageLevel | null>(null);
 
   // Vitals Form State
   const [vitals, setVitals] = useState<Vitals>({
@@ -75,8 +85,25 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
     }
   }, [vitals.weight, vitals.height]);
 
+  // Evaluate Triage automatically
+  useEffect(() => {
+    const result = evaluateTriage(vitals);
+    setTriageResult(result);
+  }, [vitals]);
+
   const handleOpenVitals = (item: QueueItem) => {
     setSelectedItem(item);
+    setManualTriageLevel(null);
+    setVitals({
+      systolic: 120,
+      diastolic: 80,
+      heartRate: 72,
+      temperature: 36.5,
+      weight: 70,
+      height: 170,
+      bmi: 24.2,
+      oxygenSaturation: 98
+    });
     setOpenVitalsDialog(true);
   };
 
@@ -95,7 +122,26 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
         created_by: auth.currentUser?.uid || 'unknown'
       });
 
-      // 3. Update Queue Status
+      // 3. Update Queue Triage
+      const finalTriageLevel = manualTriageLevel || triageResult?.triage_level || 'standard';
+      const isManual = !!manualTriageLevel && manualTriageLevel !== triageResult?.triage_level;
+      
+      let finalPriorityScore = triageResult?.priority_score || 50;
+      if (isManual) {
+        if (finalTriageLevel === 'emergency') finalPriorityScore = 100;
+        else if (finalTriageLevel === 'urgent') finalPriorityScore = 75;
+        else if (finalTriageLevel === 'standard') finalPriorityScore = 50;
+        else if (finalTriageLevel === 'low') finalPriorityScore = 25;
+      }
+
+      await updateQueueTriage(selectedItem.id!, {
+        triage_level: finalTriageLevel,
+        priority_score: finalPriorityScore,
+        triage_source: isManual ? 'manual' : 'automatic',
+        triage_reason: triageResult?.triage_reason || 'Normal vitals'
+      });
+
+      // 4. Update Queue Status
       await updateQueueStatus(selectedItem.id!, 'READY_FOR_DOCTOR' as any);
 
       notify(`Vitals recorded for ${selectedItem.patient_name}`, 'success');
@@ -157,9 +203,13 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
                         </TableCell>
                         <TableCell>
                           <Chip 
-                            label="Normal" 
+                            label={item.triage_level?.toUpperCase() || 'STANDARD'} 
                             size="small" 
-                            color="default" 
+                            color={
+                              item.triage_level === 'emergency' ? 'error' :
+                              item.triage_level === 'urgent' ? 'warning' :
+                              item.triage_level === 'low' ? 'success' : 'default'
+                            } 
                           />
                         </TableCell>
                         <TableCell align="right">
@@ -316,6 +366,61 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
                 onChange={(e) => setVitals({ ...vitals, oxygenSaturation: parseInt(e.target.value) })}
                 InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
               />
+            </Grid>
+
+            {/* Triage Section */}
+            <Grid size={{ xs: 12 }}>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2" color="primary" gutterBottom fontWeight="bold">
+                Triage Assessment
+              </Typography>
+              
+              {triageResult?.isCritical && (
+                <Alert 
+                  severity="error" 
+                  icon={<WarningAmberIcon fontSize="large" />}
+                  sx={{ mb: 2, '& .MuiAlert-message': { width: '100%' } }}
+                >
+                  <Typography variant="h6" fontWeight="bold">⚠ CRITICAL VITALS DETECTED</Typography>
+                  <Typography variant="body1">Patient requires immediate doctor attention.</Typography>
+                </Alert>
+              )}
+
+              <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 2, border: '1px solid', borderColor: 'grey.200' }}>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Typography variant="body2" color="textSecondary">Suggested Triage Level:</Typography>
+                    <Typography variant="h6" sx={{ 
+                      color: triageResult?.triage_level === 'emergency' ? 'error.main' : 
+                             triageResult?.triage_level === 'urgent' ? 'warning.main' : 
+                             triageResult?.triage_level === 'standard' ? 'success.main' : 'info.main',
+                      textTransform: 'uppercase',
+                      fontWeight: 'bold'
+                    }}>
+                      {triageResult?.triage_level || 'STANDARD'}
+                    </Typography>
+                    <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 0.5 }}>
+                      Reason: {triageResult?.triage_reason || 'Normal vitals'}
+                    </Typography>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Manual Override (Optional)</InputLabel>
+                      <Select
+                        value={manualTriageLevel || ''}
+                        label="Manual Override (Optional)"
+                        onChange={(e) => setManualTriageLevel(e.target.value as TriageLevel)}
+                      >
+                        <MenuItem value=""><em>Use Suggested</em></MenuItem>
+                        <MenuItem value="emergency">Emergency</MenuItem>
+                        <MenuItem value="urgent">Urgent</MenuItem>
+                        <MenuItem value="standard">Standard</MenuItem>
+                        <MenuItem value="low">Low</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+              </Box>
             </Grid>
           </Grid>
         </DialogContent>

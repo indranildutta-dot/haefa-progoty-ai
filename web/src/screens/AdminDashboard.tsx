@@ -15,7 +15,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleIcon from '@mui/icons-material/People';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import ListAltIcon from '@mui/icons-material/ListAlt';
-import { collection, query, where, getDocs, count } from 'firebase/firestore';
+import { collection, query, where, getDocs, count, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
 
@@ -24,12 +24,53 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
-  const { selectedCountry, selectedClinic } = useAppStore();
+  const { selectedCountry, selectedClinic, notify } = useAppStore();
   const [stats, setStats] = useState({
     totalPatients: 0,
     activeEncounters: 0,
     completedToday: 0
   });
+
+  const handleSeedMedications = async () => {
+    try {
+      const meds = [
+        { name: "amoxicillin", maxDailyDose: 3000, unit: "mg" },
+        { name: "ibuprofen", maxDailyDose: 3200, unit: "mg" },
+        { name: "paracetamol", maxDailyDose: 4000, unit: "mg" },
+        { name: "lisinopril", maxDailyDose: 40, unit: "mg" },
+        { name: "aspirin", maxDailyDose: 4000, unit: "mg" },
+        { name: "warfarin", maxDailyDose: 10, unit: "mg" }
+      ];
+
+      for (const m of meds) {
+        await addDoc(collection(db, "medications"), m);
+      }
+
+      const interactions = [
+        {
+          medication1Name: "ibuprofen",
+          medication2Name: "aspirin",
+          severity: "high",
+          description: "Increased risk of bleeding and gastrointestinal toxicity."
+        },
+        {
+          medication1Name: "warfarin",
+          medication2Name: "aspirin",
+          severity: "high",
+          description: "Significantly increased risk of severe bleeding."
+        }
+      ];
+
+      for (const i of interactions) {
+        await addDoc(collection(db, "drug_interactions"), i);
+      }
+
+      notify("Medications and interactions seeded successfully!", "success");
+    } catch (err) {
+      console.error(err);
+      notify("Failed to seed medications", "error");
+    }
+  };
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -95,15 +136,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
             Clinic Overview & Management
           </Typography>
         </Box>
-        <Button 
-          variant="contained" 
-          component={Link} 
-          to="/queue" 
-          startIcon={<ListAltIcon />}
-          sx={{ borderRadius: 3, px: 3, py: 1, fontWeight: 'bold' }}
-        >
-          Open Queue Board
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button 
+            variant="outlined" 
+            onClick={handleSeedMedications}
+            sx={{ borderRadius: 3, px: 3, py: 1, fontWeight: 'bold' }}
+          >
+            Seed Medications
+          </Button>
+          <Button 
+            variant="contained" 
+            component={Link} 
+            to="/queue" 
+            startIcon={<ListAltIcon />}
+            sx={{ borderRadius: 3, px: 3, py: 1, fontWeight: 'bold' }}
+          >
+            Open Queue Board
+          </Button>
+        </Box>
       </Box>
 
       <Grid container spacing={3} sx={{ mb: 4 }}>

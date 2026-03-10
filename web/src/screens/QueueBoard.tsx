@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { QueueItem, Patient } from '../types';
@@ -34,6 +35,14 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
   const { selectedCountry, selectedClinic } = useAppStore();
   const [rawQueueItems, setRawQueueItems] = useState<QueueItem[]>([]);
   const [patientsCache, setPatientsCache] = useState<Record<string, Patient>>({});
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     // Subscribe to all active queue items for this session
@@ -55,9 +64,14 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
       const filteredAndSorted = items
         .filter(item => ["WAITING_FOR_VITALS", "READY_FOR_DOCTOR", "WAITING_FOR_PHARMACY"].includes(item.status))
         .sort((a, b) => {
+          const priorityA = a.priority_score || 0;
+          const priorityB = b.priority_score || 0;
+          if (priorityA !== priorityB) {
+            return priorityB - priorityA; // DESC
+          }
           const timeA = a.created_at?.toMillis() || 0;
           const timeB = b.created_at?.toMillis() || 0;
-          return timeA - timeB;
+          return timeA - timeB; // ASC
         });
 
       setRawQueueItems(filteredAndSorted);
@@ -101,12 +115,35 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
     patient: patientsCache[item.patient_id]
   }));
 
-  const getWaitTime = (createdAt: any) => {
-    if (!createdAt) return '0m';
+  const getWaitTimeMinutes = (createdAt: any) => {
+    if (!createdAt) return 0;
     const start = createdAt.toDate().getTime();
-    const now = Date.now();
-    const diff = Math.floor((now - start) / 60000);
-    return `${diff}m`;
+    return Math.floor((currentTime - start) / 60000);
+  };
+
+  const getWaitTime = (createdAt: any) => {
+    return `${getWaitTimeMinutes(createdAt)}m`;
+  };
+
+  const getEscalationStatus = (level: string | undefined, waitMinutes: number) => {
+    let threshold = 30; // default standard
+    switch (level) {
+      case 'emergency': threshold = 5; break;
+      case 'urgent': threshold = 15; break;
+      case 'standard': threshold = 30; break;
+      case 'low': threshold = 60; break;
+    }
+    return waitMinutes >= threshold;
+  };
+
+  const getTriageColor = (level?: string) => {
+    switch (level) {
+      case 'emergency': return '#ef4444'; // red
+      case 'urgent': return '#f97316'; // orange
+      case 'standard': return '#eab308'; // yellow
+      case 'low': return '#22c55e'; // green
+      default: return '#94a3b8'; // gray
+    }
   };
 
   const renderQueueColumn = (title: string, status: string, color: string) => {
@@ -142,30 +179,70 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
                 <Typography variant="body2">No patients waiting</Typography>
               </Box>
             ) : (
-              filteredItems.map((item) => (
-                <Card key={item.id} sx={{ mb: 1.5, borderRadius: 3, boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                  <CardContent sx={{ p: '12px !important' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <Box>
-                        <Typography variant="subtitle1" fontWeight="700" sx={{ lineHeight: 1.2 }}>
-                          {item.patient ? `${item.patient.first_name} ${item.patient.last_name}` : 'Loading...'}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                          Village: {item.patient?.village || '...'}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ textAlign: 'right' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', color: 'text.secondary' }}>
-                          <AccessTimeIcon sx={{ fontSize: 14, mr: 0.5 }} />
-                          <Typography variant="caption" fontWeight="600">
-                            {getWaitTime(item.created_at)}
-                          </Typography>
+              filteredItems.map((item) => {
+                const waitMinutes = getWaitTimeMinutes(item.created_at);
+                const isEscalated = getEscalationStatus(item.triage_level, waitMinutes);
+
+                return (
+                  <Card 
+                    key={item.id} 
+                    sx={{ 
+                      mb: 1.5, 
+                      borderRadius: 3, 
+                      boxShadow: isEscalated ? '0 0 0 2px #ef4444, 0 4px 12px rgba(239, 68, 68, 0.2)' : '0 2px 4px rgba(0,0,0,0.05)',
+                      bgcolor: isEscalated ? '#fef2f2' : 'white',
+                      transition: 'all 0.2s ease-in-out'
+                    }}
+                  >
+                    <CardContent sx={{ p: '12px !important' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ 
+                            width: 12, 
+                            height: 12, 
+                            borderRadius: '50%', 
+                            bgcolor: getTriageColor(item.triage_level),
+                            flexShrink: 0
+                          }} />
+                          <Box>
+                            <Typography variant="subtitle1" fontWeight="700" sx={{ lineHeight: 1.2 }}>
+                              {item.patient ? `${item.patient.first_name} ${item.patient.last_name}` : 'Loading...'}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                              Village: {item.patient?.village || '...'}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ textAlign: 'right' }}>
+                          <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            color: isEscalated ? 'error.main' : 'text.secondary',
+                            bgcolor: isEscalated ? 'error.light' : 'transparent',
+                            px: isEscalated ? 1 : 0,
+                            py: isEscalated ? 0.5 : 0,
+                            borderRadius: 1,
+                            fontWeight: isEscalated ? 'bold' : 'normal'
+                          }}>
+                            <AccessTimeIcon sx={{ fontSize: 14, mr: 0.5 }} />
+                            <Typography variant="caption" fontWeight="600">
+                              {waitMinutes}m
+                            </Typography>
+                          </Box>
                         </Box>
                       </Box>
-                    </Box>
-                  </CardContent>
-                </Card>
-              ))
+                      {isEscalated && (
+                        <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', color: 'error.main', gap: 0.5 }}>
+                          <WarningAmberIcon sx={{ fontSize: 16 }} />
+                          <Typography variant="caption" fontWeight="bold">
+                            Wait time exceeded
+                          </Typography>
+                        </Box>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })
             )}
           </List>
         </Paper>

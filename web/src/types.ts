@@ -32,6 +32,8 @@ export interface Patient {
   created_at: Timestamp;
 }
 
+export type TriageLevel = 'emergency' | 'urgent' | 'standard' | 'low';
+
 export interface QueueItem {
   id?: string;
   encounter_id: string;
@@ -42,6 +44,10 @@ export interface QueueItem {
   countryId?: string; // Optional for backward compatibility
   country_code: string;
   clinic_id: string;
+  triage_level?: TriageLevel;
+  priority_score?: number;
+  triage_source?: 'automatic' | 'manual';
+  triage_reason?: string;
   created_at: Timestamp;
 }
 
@@ -109,6 +115,58 @@ export interface Encounter {
   country_code: string;
   clinic_id: string;
   created_at: Timestamp;
+}
+
+export interface Medication {
+  id?: string;
+  name: string;
+  maxDailyDose?: number; // e.g., in mg
+  unit?: string;
+}
+
+export interface DrugInteraction {
+  id?: string;
+  medication1Name: string;
+  medication2Name: string;
+  severity: 'high' | 'moderate' | 'low';
+  description: string;
+}
+
+export interface PatientAllergy {
+  id?: string;
+  patient_id: string;
+  medicationName: string;
+  severity: 'high' | 'moderate' | 'low';
+  notes?: string;
+}
+
+export interface SafetyAlert {
+  type: 'allergy' | 'interaction' | 'dosage';
+  severity: 'high' | 'moderate' | 'low';
+  description: string;
+  medicationNames: string[];
+}
+
+export interface ClinicConfigDocument {
+  id?: string;
+  clinic_name: string;
+  country_code: string;
+  country_name: string;
+  timezone: string;
+  system_name: string;
+  queue_structure: string[];
+  supported_roles: string[];
+  language_settings: string[];
+  measurement_units: {
+    weight: string;
+    height: string;
+    temperature: string;
+  };
+  currency: string;
+  feature_flags: Record<string, boolean>;
+  system_limits: Record<string, number>;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export interface AuditLog {

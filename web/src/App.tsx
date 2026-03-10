@@ -29,6 +29,7 @@ import ClinicSelection from './screens/ClinicSelection';
 import { isFirebaseConfigValid } from './firebase';
 import { Alert, AlertTitle, Paper } from '@mui/material';
 import { subscribeToAuthChanges, logout, getUserProfile } from './services/authService';
+import { getOrCreateClinicConfig } from './services/clinicService';
 import { User } from 'firebase/auth';
 import { CountryConfig, ClinicConfig } from './config/countries';
 import { useAppStore } from './store/useAppStore';
@@ -86,6 +87,7 @@ const App: React.FC = () => {
     selectedCountry, 
     selectedClinic, 
     setSession,
+    setClinicConfig,
     notify 
   } = useAppStore();
   
@@ -98,24 +100,50 @@ const App: React.FC = () => {
         try {
           const profile = await getUserProfile(u.uid);
           setUser(u, profile);
+          
+          // Fetch clinic config if session is already selected
+          const state = useAppStore.getState();
+          if (state.selectedCountry && state.selectedClinic) {
+            const config = await getOrCreateClinicConfig(
+              state.selectedCountry.id,
+              state.selectedCountry.name,
+              state.selectedClinic.id,
+              state.selectedClinic.name
+            );
+            setClinicConfig(config);
+          }
         } catch (err) {
-          console.error("Failed to fetch user profile:", err);
+          console.error("Failed to fetch user profile or clinic config:", err);
           setUser(u, null);
         }
       } else {
         setUser(null, null);
+        setClinicConfig(null);
       }
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [setUser]);
+  }, [setUser, setClinicConfig]);
 
   const handleSelectCountry = (country: CountryConfig) => {
     setSession(country, null);
   };
 
-  const handleSelectClinic = (clinic: ClinicConfig) => {
+  const handleSelectClinic = async (clinic: ClinicConfig) => {
     setSession(selectedCountry, clinic);
+    if (selectedCountry) {
+      try {
+        const config = await getOrCreateClinicConfig(
+          selectedCountry.id,
+          selectedCountry.name,
+          clinic.id,
+          clinic.name
+        );
+        setClinicConfig(config);
+      } catch (err) {
+        console.error("Failed to fetch clinic config:", err);
+      }
+    }
     notify(`Switched to ${clinic.name}`, 'success');
   };
 

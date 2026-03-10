@@ -46,8 +46,11 @@ import { getPatientById } from '../services/patientService';
 import { QueueItem, Encounter, Patient, Prescription, VitalsRecord } from '../types';
 import PatientHistoryTimeline from '../components/PatientHistoryTimeline';
 import PrescriptionForm from '../components/PrescriptionForm';
+import PatientAllergies from '../components/PatientAllergies';
 import { auth } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
+import { checkPrescriptionSafety } from '../services/medicationSafetyService';
+import { SafetyAlert } from '../types';
 
 interface DoctorDashboardProps {
   countryId: string;
@@ -74,6 +77,10 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
   });
 
   const [consultationCount, setConsultationCount] = useState(0);
+
+  const [safetyAlerts, setSafetyAlerts] = useState<SafetyAlert[]>([]);
+  const [openSafetyDialog, setOpenSafetyDialog] = useState(false);
+  const [overrideJustification, setOverrideJustification] = useState('');
 
   useEffect(() => {
     const fetchConsultationCount = async () => {
@@ -124,16 +131,36 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
 
   const handleSaveConsult = async () => {
     if (!selectedItem) return;
+    
+    if (consultData.prescriptions.length > 0) {
+      const alerts = await checkPrescriptionSafety(selectedItem.patient_id, consultData.prescriptions);
+      if (alerts.length > 0) {
+        setSafetyAlerts(alerts);
+        setOpenSafetyDialog(true);
+        return;
+      }
+    }
+    
+    await executeSaveConsult();
+  };
+
+  const executeSaveConsult = async () => {
+    if (!selectedItem) return;
     try {
       const uid = auth.currentUser?.uid || 'unknown';
       
+      // If there's an override justification, we could append it to notes or save it elsewhere.
+      const finalNotes = overrideJustification 
+        ? `${consultData.notes}\n\n[Safety Override Justification]: ${overrideJustification}`
+        : consultData.notes;
+
       await saveConsultation(
         {
           encounter_id: selectedItem.encounter_id,
           patient_id: selectedItem.patient_id,
           chief_complaint: consultData.chiefComplaint,
           diagnosis: consultData.diagnosis,
-          notes: consultData.notes,
+          notes: finalNotes,
           created_by: uid
         },
         consultData.prescriptions.length > 0 ? {
@@ -162,6 +189,8 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
 
       notify(`Consultation completed for ${currentPatient?.first_name}`, 'success');
       setOpenConsultDialog(false);
+      setOpenSafetyDialog(false);
+      setOverrideJustification('');
       setSelectedItem(null);
       setConsultData({ chiefComplaint: '', diagnosis: '', notes: '', prescriptions: [] });
     } catch (err) {
@@ -226,9 +255,13 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
                         </TableCell>
                         <TableCell>
                           <Chip 
-                            label="Normal" 
+                            label={item.triage_level?.toUpperCase() || 'STANDARD'} 
                             size="small" 
-                            color="default" 
+                            color={
+                              item.triage_level === 'emergency' ? 'error' :
+                              item.triage_level === 'urgent' ? 'warning' :
+                              item.triage_level === 'low' ? 'success' : 'default'
+                            } 
                           />
                         </TableCell>
                         <TableCell align="right">
@@ -304,6 +337,12 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
               </Box>
               
               <Divider sx={{ my: 2 }} />
+
+              <Box mb={3}>
+                {currentPatient && <PatientAllergies patientId={currentPatient.id!} />}
+              </Box>
+
+              <Divider sx={{ my: 2 }} />
               
               <Box>
                 <Box display="flex" alignItems="center" mb={1}>
@@ -371,6 +410,52 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
             disabled={!consultData.diagnosis}
           >
             Complete Consultation & Send to Pharmacy
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={openSafetyDialog} onClose={() => setOpenSafetyDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ color: 'error.main', fontWeight: 'bold' }}>
+          Medication Safety Alerts
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body1" gutterBottom>
+            The following safety issues were detected with the prescribed medications:
+          </Typography>
+          <Box sx={{ mt: 2, mb: 3 }}>
+            {safetyAlerts.map((alert, idx) => (
+              <Alert key={idx} severity={alert.severity === 'high' ? 'error' : 'warning'} sx={{ mb: 1 }}>
+                <Typography variant="subtitle2" sx={{ textTransform: 'capitalize' }}>
+                  {alert.type} Alert ({alert.severity} severity)
+                </Typography>
+                <Typography variant="body2">
+                  {alert.description}
+                </Typography>
+              </Alert>
+            ))}
+          </Box>
+          <Typography variant="body2" fontWeight="bold" gutterBottom>
+            Override Justification (Required)
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            rows={3}
+            placeholder="Please provide clinical justification for overriding these safety alerts..."
+            value={overrideJustification}
+            onChange={(e) => setOverrideJustification(e.target.value)}
+            error={overrideJustification.trim() === ''}
+            helperText={overrideJustification.trim() === '' ? 'Justification is required to proceed' : ''}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenSafetyDialog(false)}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            color="error"
+            onClick={executeSaveConsult} 
+            disabled={overrideJustification.trim() === ''}
+          >
+            Override & Save
           </Button>
         </DialogActions>
       </Dialog>

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User } from 'firebase/auth';
 import { CountryConfig, ClinicConfig } from '../config/countries';
-import { UserProfile } from '../types';
+import { UserProfile, ClinicConfigDocument } from '../types';
 
 interface Notification {
   message: string;
@@ -19,7 +19,9 @@ interface AppState {
   // Session
   selectedCountry: CountryConfig | null;
   selectedClinic: ClinicConfig | null;
+  clinicConfig: ClinicConfigDocument | null;
   setSession: (country: CountryConfig | null, clinic: ClinicConfig | null) => void;
+  setClinicConfig: (config: ClinicConfigDocument | null) => void;
   
   // Notifications
   notifications: Notification[];
@@ -36,10 +38,12 @@ export const useAppStore = create<AppState>()(
       
       selectedCountry: null,
       selectedClinic: null,
+      clinicConfig: null,
       setSession: (country, clinic) => set({ 
         selectedCountry: country, 
         selectedClinic: clinic 
       }),
+      setClinicConfig: (config) => set({ clinicConfig: config }),
       
       notifications: [],
       notify: (message, type = 'info') => {
