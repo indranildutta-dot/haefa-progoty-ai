@@ -31,12 +31,10 @@ export const logAction = async (params: {
 
     const role: UserRole | 'unknown' = userProfile?.role || 'unknown'; 
 
-    const logEntry: Omit<AuditLog, 'id'> = {
+    const logEntry: any = {
       user_id: user.uid,
       role: role,
       action: params.action,
-      patient_id: params.patient_id,
-      encounter_id: params.encounter_id,
       timestamp: serverTimestamp() as any,
       device_id: getDeviceId(),
       country_code: selectedCountry.id,
@@ -44,6 +42,9 @@ export const logAction = async (params: {
       created_at: serverTimestamp() as any,
       updated_at: serverTimestamp() as any
     };
+    
+    if (params.patient_id) logEntry.patient_id = params.patient_id;
+    if (params.encounter_id) logEntry.encounter_id = params.encounter_id;
 
     await addDoc(collection(db, AUDIT_LOGS_COLLECTION), logEntry);
   } catch (error) {

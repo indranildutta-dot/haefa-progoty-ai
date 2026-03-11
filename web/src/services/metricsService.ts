@@ -36,11 +36,17 @@ export const updateMetrics = async (
   const updateData = buildUpdate(updates);
   const setOpts = { merge: true };
   
+  const countryUpdateData = { ...updateData };
+  delete countryUpdateData.clinic_id;
+  
+  const globalUpdateData = { ...countryUpdateData };
+  delete globalUpdateData.country_code;
+  
   try {
     await Promise.all([
       setDoc(clinicRef, updateData, setOpts),
-      setDoc(countryRef, { ...updateData, clinic_id: undefined }, setOpts),
-      setDoc(globalRef, { ...updateData, clinic_id: undefined, country_code: undefined }, setOpts)
+      setDoc(countryRef, countryUpdateData, setOpts),
+      setDoc(globalRef, globalUpdateData, setOpts)
     ]);
 
     // Update avg_wait_time

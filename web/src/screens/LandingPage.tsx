@@ -17,38 +17,38 @@ interface LandingPageProps {
 
 const LandingPage: React.FC<LandingPageProps> = ({ onSelectCountry }) => {
   return (
-    <Container maxWidth="lg" sx={{ py: 8 }}>
-      <Box sx={{ textAlign: 'center', mb: 6 }}>
-        <Typography variant="h3" fontWeight={800} gutterBottom color="primary">
-          HAEFA PROGOTY
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <Box sx={{ textAlign: 'center', mb: 4 }}>
+        <Typography variant="h4" fontWeight={800} gutterBottom color="primary">
+          Select Operating Country
         </Typography>
-        <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto' }}>
+        <Typography variant="subtitle1" color="text.secondary" sx={{ maxWidth: 500, mx: 'auto' }}>
           Choose your operating country to load the correct clinical workflow configuration
         </Typography>
       </Box>
 
-      <Grid container spacing={3} justifyContent="center">
+      <Grid container spacing={2} justifyContent="center">
         {countries.map((country) => (
           <Grid size={{ xs: 12, sm: 6, md: 4 }} key={country.id}>
             <Card 
               sx={{ 
-                borderRadius: 4, 
+                borderRadius: 3, 
                 border: '1px solid',
                 borderColor: 'divider',
                 transition: 'all 0.2s ease',
                 '&:hover': {
                   borderColor: 'primary.main',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
                 }
               }}
             >
-              <CardActionArea onClick={() => onSelectCountry(country)} sx={{ p: 3 }}>
+              <CardActionArea onClick={() => onSelectCountry(country)} sx={{ p: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Typography variant="h2">{country.flag}</Typography>
+                  <Typography variant="h3">{country.flag}</Typography>
                   <Box sx={{ textAlign: 'left' }}>
-                    <Typography variant="h6" fontWeight={700}>{country.name}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {country.language} • {country.currency}
+                    <Typography variant="subtitle1" fontWeight={700}>{country.name}</Typography>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      {country.id.toUpperCase()} • {country.language} • {country.currency}
                     </Typography>
                   </Box>
                 </Box>

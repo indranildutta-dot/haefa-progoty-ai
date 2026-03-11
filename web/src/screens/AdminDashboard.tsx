@@ -323,11 +323,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
   };
 
   const StatCard = ({ title, value, icon, color, delta }: any) => (
-    <Card sx={{ borderRadius: 4, height: '100%', border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: `${color}.50` }}>
-      <CardContent>
+    <Card sx={{ borderRadius: 3, height: '100%', border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: `${color}.50` }}>
+      <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-          <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'white', color: `${color}.main`, border: '1px solid', borderColor: 'divider' }}>
-            {icon}
+          <Box sx={{ p: 0.5, borderRadius: 1.5, bgcolor: 'white', color: `${color}.main`, border: '1px solid', borderColor: 'divider', display: 'flex' }}>
+            {React.cloneElement(icon, { fontSize: 'small' })}
           </Box>
           {delta && (
             <Typography variant="caption" fontWeight="bold" color={delta.startsWith('+') ? 'success.main' : 'error.main'}>
@@ -335,8 +335,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
             </Typography>
           )}
         </Box>
-        <Typography variant="h4" fontWeight="800" color={`${color}.main`}>{value}</Typography>
-        <Typography variant="body2" color="text.secondary" fontWeight="600">
+        <Typography variant="h5" fontWeight="800" color={`${color}.main`}>{value}</Typography>
+        <Typography variant="caption" color="text.secondary" fontWeight="600" sx={{ textTransform: 'uppercase' }}>
           {title}
         </Typography>
       </CardContent>
@@ -345,11 +345,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
 
   const StationCard = ({ title, data, color }: { title: string, data: any, color: string }) => {
     return (
-      <Card sx={{ borderRadius: 4, height: '100%', border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-        <CardContent>
+      <Card sx={{ borderRadius: 3, height: '100%', border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color }} />
-            <Typography variant="h6" fontWeight="800">{title}</Typography>
+            <Typography variant="subtitle1" fontWeight="800">{title}</Typography>
           </Box>
           <Grid container spacing={1}>
             <Grid size={{ xs: 6 }}>

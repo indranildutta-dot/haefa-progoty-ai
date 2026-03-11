@@ -17,7 +17,8 @@ import {
   MenuItem,
   Card,
   CardContent,
-  Divider
+  Divider,
+  Container
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
@@ -25,7 +26,7 @@ import { createPatient, searchPatients } from '../services/patientService';
 import { createEncounter } from '../services/encounterService';
 import { addToQueue } from '../services/queueService';
 import { Patient } from '../types';
-import { PatientSchema } from '../schemas/clinical';
+import { getPatientSchema } from '../schemas/clinical';
 import { useAppStore } from '../store/useAppStore';
 
 import { getCountryConfig } from '../config/useCountry';
@@ -111,18 +112,35 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
     }
   };
 
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, '');
+    if (country?.dateFormat === 'DD/MM/YYYY') {
+      if (value.length > 8) value = value.slice(0, 8);
+      if (value.length > 4) value = `${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4)}`;
+      else if (value.length > 2) value = `${value.slice(0, 2)}/${value.slice(2)}`;
+    } else {
+      if (value.length > 8) value = value.slice(0, 8);
+      if (value.length > 6) value = `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6)}`;
+      else if (value.length > 4) value = `${value.slice(0, 4)}-${value.slice(4)}`;
+    }
+    setNewPatient({ ...newPatient, date_of_birth: value });
+  };
+
   const handleRegisterAndStart = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg(null);
     try {
       // 1. Validate with Zod
+      const PatientSchema = getPatientSchema(countryId);
       const validatedPatient = PatientSchema.parse(newPatient);
 
       // 2. Create Patient
+      console.log("Calling createPatient");
       const patientId = await createPatient({
         ...validatedPatient
       });
+      console.log("Patient created:", patientId);
 
       // 3. Create Encounter
       const encounterId = await createEncounter(patientId);
@@ -161,25 +179,25 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="800" color="primary" gutterBottom>
+        <Typography variant="h4" fontWeight="900" color="primary" gutterBottom sx={{ textTransform: 'uppercase' }}>
           Registration Station
         </Typography>
         <Typography variant="subtitle1" color="text.secondary">
-          Search for existing patients or register new ones to start an encounter.
+          Search for existing patients or register a new patient
         </Typography>
       </Box>
 
-      {successMsg && <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>{successMsg}</Alert>}
-      {errorMsg && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{errorMsg}</Alert>}
+      {successMsg && <Alert severity="success" sx={{ mb: 3, borderRadius: 3 }}>{successMsg}</Alert>}
+      {errorMsg && <Alert severity="error" sx={{ mb: 3, borderRadius: 3 }}>{errorMsg}</Alert>}
 
-      <Grid container spacing={4}>
+      <Grid container spacing={3}>
         {/* Left Column: Search and Results */}
         <Grid size={{ xs: 12, md: 7 }}>
-          <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
             <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" fontWeight="700" gutterBottom display="flex" alignItems="center">
+              <Typography variant="h6" fontWeight="800" gutterBottom display="flex" alignItems="center">
                 <SearchIcon sx={{ mr: 1, color: 'primary.main' }} /> Search Existing Patient
               </Typography>
               <Grid container spacing={2} sx={{ mt: 1 }}>
@@ -193,7 +211,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                   <TextField fullWidth label="Phone" size="small" value={searchParams.phone} onChange={(e) => setSearchParams({ ...searchParams, phone: e.target.value })} />
                 </Grid>
                 <Grid size={{ xs: 12 }}>
-                  <Button variant="contained" fullWidth onClick={handleSearch} disabled={searching} sx={{ py: 1.5 }}>
+                  <Button variant="contained" fullWidth onClick={handleSearch} disabled={searching} sx={{ py: 1.5, borderRadius: 2, fontWeight: 'bold' }}>
                     {searching ? <CircularProgress size={24} /> : "Search Patient"}
                   </Button>
                 </Grid>
@@ -222,7 +240,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                               <TableCell sx={{ textTransform: 'capitalize' }}>{patient.gender}</TableCell>
                               <TableCell>{patient.phone}</TableCell>
                               <TableCell align="right">
-                                <Button variant="contained" size="small" onClick={() => startEncounter(patient.id!, `${patient.first_name} ${patient.last_name}`)} disabled={loading}>
+                                <Button variant="contained" size="small" onClick={() => startEncounter(patient.id!, `${patient.first_name} ${patient.last_name}`)} disabled={loading} sx={{ borderRadius: 2 }}>
                                   Start
                                 </Button>
                               </TableCell>
@@ -242,9 +260,9 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
 
         {/* Right Column: Registration Form */}
         <Grid size={{ xs: 12, md: 5 }}>
-          <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
             <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" fontWeight="700" gutterBottom display="flex" alignItems="center">
+              <Typography variant="h6" fontWeight="800" gutterBottom display="flex" alignItems="center">
                 <PersonAddIcon sx={{ mr: 1, color: 'primary.main' }} /> Register New Patient
               </Typography>
               <Divider sx={{ mb: 3 }} />
@@ -264,17 +282,26 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                     </TextField>
                   </Grid>
                   <Grid size={{ xs: 12, sm: 6 }}>
-                    <TextField fullWidth label="Date of Birth" type="date" required InputLabelProps={{ shrink: true }} helperText={country ? `Format: ${country.dateFormat}` : ''} value={newPatient.date_of_birth} onChange={(e) => setNewPatient({ ...newPatient, date_of_birth: e.target.value })} />
+                    <TextField 
+                      fullWidth 
+                      label="Date of Birth" 
+                      required 
+                      InputLabelProps={{ shrink: true }} 
+                      helperText={country ? `Format: ${country.dateFormat}` : ''} 
+                      value={newPatient.date_of_birth} 
+                      onChange={handleDateChange}
+                      placeholder={country?.dateFormat}
+                    />
                   </Grid>
                   <Grid size={{ xs: 12 }}>
-                    <TextField fullWidth label="Phone Number" required value={newPatient.phone} onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })} />
+                    <TextField fullWidth label="Phone Number" value={newPatient.phone} onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })} />
                   </Grid>
                   <Grid size={{ xs: 12 }}>
-                    <TextField fullWidth label="Village" required value={newPatient.village} onChange={(e) => setNewPatient({ ...newPatient, village: e.target.value })} />
+                    <TextField fullWidth label="Village" value={newPatient.village} onChange={(e) => setNewPatient({ ...newPatient, village: e.target.value })} />
                   </Grid>
                   <Grid size={{ xs: 12 }} sx={{ mt: 2 }}>
-                    <Button type="submit" variant="contained" color="primary" fullWidth size="large" disabled={loading} sx={{ py: 1.5, fontWeight: 700 }}>
-                      {loading ? <CircularProgress size={24} /> : "Register & Start Encounter"}
+                    <Button type="submit" variant="contained" color="primary" fullWidth size="large" disabled={loading} sx={{ py: 1.5, borderRadius: 2, fontWeight: 'bold' }}>
+                      {loading ? <CircularProgress size={24} /> : "Register"}
                     </Button>
                   </Grid>
                 </Grid>
@@ -283,7 +310,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
           </Card>
         </Grid>
       </Grid>
-    </Box>
+    </Container>
   );
 };
 

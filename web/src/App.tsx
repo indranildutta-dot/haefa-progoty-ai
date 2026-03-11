@@ -66,7 +66,7 @@ const NotificationSystem: React.FC = () => {
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#1e293b', // Deep Navy
+      main: '#0f172a', // Deep Navy
       light: '#334155',
     },
     secondary: {
@@ -74,12 +74,12 @@ const theme = createTheme({
       light: '#fbbf24',
     },
     background: {
-      default: '#f8fafc',
+      default: '#f1f5f9', // Slate 100
       paper: '#ffffff',
     },
     text: {
       primary: '#0f172a',
-      secondary: '#64748b',
+      secondary: '#475569',
     },
     success: { main: '#10b981' },
     warning: { main: '#f59e0b' },
@@ -88,23 +88,23 @@ const theme = createTheme({
   },
   typography: {
     fontFamily: '"Inter", "Helvetica", "Arial", sans-serif',
-    h3: { fontWeight: 800, letterSpacing: '-0.02em' },
-    h4: { fontWeight: 700, letterSpacing: '-0.01em' },
-    h6: { fontWeight: 600 },
+    h4: { fontWeight: 800, fontSize: '1.5rem', letterSpacing: '-0.02em' },
+    h6: { fontWeight: 700, fontSize: '1.1rem' },
+    subtitle1: { fontSize: '0.95rem' },
     button: { textTransform: 'none', fontWeight: 600 },
   },
   shape: {
-    borderRadius: 8,
+    borderRadius: 12, // Standardized border radius
   },
   components: {
     MuiButton: {
       styleOverrides: {
-        root: { borderRadius: 8, padding: '8px 16px' },
+        root: { borderRadius: 8, padding: '8px 16px', textTransform: 'none' },
       },
     },
     MuiCard: {
       styleOverrides: {
-        root: { borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
+        root: { borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
       },
     },
   },
@@ -135,30 +135,31 @@ const App: React.FC = () => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-        <AppBar position="sticky" elevation={0} sx={{ borderBottom: '1px solid rgba(0,0,0,0.1)', bgcolor: 'white', color: 'text.primary' }}>
+        <AppBar position="sticky" elevation={0} sx={{ borderBottom: '1px solid rgba(0,0,0,0.08)', bgcolor: 'white', color: 'text.primary' }}>
           <Container maxWidth="xl">
-            <Toolbar disableGutters sx={{ minHeight: 64 }}>
+            <Toolbar disableGutters sx={{ minHeight: 60 }}>
               <Typography
                 variant="h6"
                 noWrap
                 component="div"
-                sx={{ mr: 4, fontWeight: 800, letterSpacing: '-0.02em', color: 'primary.main' }}
+                sx={{ mr: 3, fontWeight: 800, letterSpacing: '-0.02em', color: 'primary.main' }}
               >
                 HAEFA PROGOTY
               </Typography>
               
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 4, bgcolor: 'grey.50', p: 0.5, borderRadius: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 3, borderRight: '1px solid rgba(0,0,0,0.08)', pr: 3 }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase' }}>Context:</Typography>
                 <Chip 
                   label={`${selectedCountry.name} ${selectedCountry.flag}`} 
                   onClick={handleClearCountry}
-                  sx={{ fontWeight: 600, cursor: 'pointer', bgcolor: 'white' }}
-                  variant="outlined"
+                  sx={{ fontWeight: 600, cursor: 'pointer', bgcolor: 'grey.100' }}
+                  size="small"
                 />
                 <Chip 
                   label={selectedClinic.name} 
                   onClick={handleClearClinic}
-                  sx={{ fontWeight: 600, cursor: 'pointer', bgcolor: 'white' }}
-                  variant="outlined"
+                  sx={{ fontWeight: 600, cursor: 'pointer', bgcolor: 'grey.100' }}
+                  size="small"
                   color="secondary"
                 />
               </Box>
@@ -187,9 +188,10 @@ const App: React.FC = () => {
                 ))}
               </Box>
 
-              <Box sx={{ flexGrow: 0 }}>
+              <Box sx={{ flexGrow: 0, display: 'flex', alignItems: 'center', gap: 1, borderLeft: '1px solid rgba(0,0,0,0.08)', pl: 2 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{user.email?.split('@')[0]}</Typography>
                 <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ p: 0 }}>
-                  <Avatar sx={{ bgcolor: 'primary.main' }}>
+                  <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32 }}>
                     <AccountCircle />
                   </Avatar>
                 </IconButton>
@@ -212,7 +214,7 @@ const App: React.FC = () => {
           </Container>
         </AppBar>
 
-        <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+        <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
           <Routes>
             <Route path="/admin" element={<AdminDashboard countryId={selectedCountry.id} />} />
             <Route path="/" element={<RegistrationStation countryId={selectedCountry.id} />} />

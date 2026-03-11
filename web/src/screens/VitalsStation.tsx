@@ -25,7 +25,8 @@ import {
   MenuItem,
   Select,
   FormControl,
-  InputLabel
+  InputLabel,
+  Container
 } from '@mui/material';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import MonitorWeightIcon from '@mui/icons-material/MonitorWeight';
@@ -183,9 +184,9 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="800" color="primary" gutterBottom>
+        <Typography variant="h4" fontWeight="900" color="primary" gutterBottom sx={{ textTransform: 'uppercase' }}>
           Vitals & Triage Station
         </Typography>
         <Typography variant="subtitle1" color="text.secondary">
@@ -193,16 +194,16 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
         </Typography>
       </Box>
 
-      {successMsg && <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>{successMsg}</Alert>}
-      {errorMsg && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{errorMsg}</Alert>}
+      {successMsg && <Alert severity="success" sx={{ mb: 3, borderRadius: 3 }}>{successMsg}</Alert>}
+      {errorMsg && <Alert severity="error" sx={{ mb: 3, borderRadius: 3 }}>{errorMsg}</Alert>}
 
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 9 }}>
-          <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
             <CardContent sx={{ p: 3 }}>
               <Box display="flex" alignItems="center" mb={2}>
                 <LocalHospitalIcon color="primary" sx={{ mr: 1 }} />
-                <Typography variant="h6" fontWeight="700">Patients Waiting for Vitals</Typography>
+                <Typography variant="h6" fontWeight="800">Patients Waiting for Vitals</Typography>
               </Box>
               
               <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
@@ -236,11 +237,11 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
                                 item.triage_level === 'urgent' ? 'warning' :
                                 item.triage_level === 'low' ? 'success' : 'default'
                               }
-                              sx={{ fontWeight: 700 }}
+                              sx={{ fontWeight: 700, borderRadius: 1 }}
                             />
                           </TableCell>
                           <TableCell align="right">
-                            <Button variant="contained" size="small" onClick={() => handleOpenVitals(item)}>
+                            <Button variant="contained" size="small" onClick={() => handleOpenVitals(item)} sx={{ borderRadius: 2 }}>
                               Take Vitals
                             </Button>
                           </TableCell>
@@ -255,9 +256,9 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
         </Grid>
 
         <Grid size={{ xs: 12, md: 3 }}>
-          <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
             <CardContent>
-              <Typography variant="subtitle2" color="textSecondary" gutterBottom fontWeight="bold">
+              <Typography variant="subtitle2" color="textSecondary" gutterBottom fontWeight="bold" sx={{ textTransform: 'uppercase' }}>
                 Queue Summary
               </Typography>
               <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
@@ -271,7 +272,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
 
       {/* Vitals Entry Dialog */}
       <Dialog open={openVitalsDialog} onClose={() => setOpenVitalsDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ fontWeight: '800', pb: 0 }}>Record Vitals: {selectedItem?.patient_name}</DialogTitle>
+        <DialogTitle sx={{ fontWeight: '900', pb: 0, textTransform: 'uppercase' }}>Record Vitals: {selectedItem?.patient_name}</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           <Grid container spacing={3}>
             {/* Vital Signs */}
@@ -408,12 +409,12 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpenVitalsDialog(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSaveVitals} size="large" sx={{ fontWeight: 700 }}>
+          <Button variant="contained" onClick={handleSaveVitals} size="large" sx={{ fontWeight: 700, borderRadius: 2 }}>
             Save Vitals & Send to Doctor
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </Container>
   );
 };
 

@@ -24,9 +24,9 @@ export interface Patient {
   last_name: string;
   gender: 'male' | 'female' | 'other';
   date_of_birth: string;
-  phone: string;
-  village: string;
-  country_code: string;
+  phone?: string;
+  village?: string;
+  country_id: string;
   clinic_id: string;
   latest_encounter_id?: string;
   last_visit_date?: Timestamp;
