@@ -21,6 +21,8 @@ interface AppState {
   selectedClinic: ClinicConfig | null;
   clinicConfig: ClinicConfigDocument | null;
   setSession: (country: CountryConfig | null, clinic: ClinicConfig | null) => void;
+  clearCountry: () => void;
+  clearClinic: () => void;
   setClinicConfig: (config: ClinicConfigDocument | null) => void;
   
   // Notifications
@@ -43,6 +45,8 @@ export const useAppStore = create<AppState>()(
         selectedCountry: country, 
         selectedClinic: clinic 
       }),
+      clearCountry: () => set({ selectedCountry: null, selectedClinic: null }),
+      clearClinic: () => set({ selectedClinic: null }),
       setClinicConfig: (config) => set({ clinicConfig: config }),
       
       notifications: [],

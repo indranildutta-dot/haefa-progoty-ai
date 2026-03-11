@@ -1,12 +1,29 @@
 {
   "indexes": [
     {
+      "collectionGroup": "diagnoses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clinic_id", "order": "ASCENDING" },
+        { "fieldPath": "country_code", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "queues_active",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "clinic_id", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "priority_score", "order": "DESCENDING" },
+        { "fieldPath": "created_at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "queues_active",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clinic_id", "order": "ASCENDING" },
         { "fieldPath": "created_at", "order": "ASCENDING" }
       ]
     },
@@ -24,6 +41,14 @@
       "fields": [
         { "fieldPath": "patient_id", "order": "ASCENDING" },
         { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "patients",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clinic_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "ASCENDING" }
       ]
     },
     {

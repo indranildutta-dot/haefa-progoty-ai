@@ -17,9 +17,9 @@ import {
 import RefreshIcon from '@mui/icons-material/Refresh';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, doc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { QueueItem, Patient } from '../types';
+import { QueueItem, Patient, ClinicMetrics } from '../types';
 import { getPatientById } from '../services/patientService';
 import { useAppStore } from '../store/useAppStore';
 
@@ -34,8 +34,21 @@ interface QueueItemWithPatient extends QueueItem {
 const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
   const { selectedCountry, selectedClinic } = useAppStore();
   const [rawQueueItems, setRawQueueItems] = useState<QueueItem[]>([]);
+  const [metrics, setMetrics] = useState<ClinicMetrics | null>(null);
   const [patientsCache, setPatientsCache] = useState<Record<string, Patient>>({});
   const [currentTime, setCurrentTime] = useState(Date.now());
+
+  useEffect(() => {
+    // Subscribe to clinic metrics
+    if (!selectedClinic) return;
+    const metricsRef = doc(db, "clinic_metrics", selectedClinic.id);
+    const unsubscribe = onSnapshot(metricsRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setMetrics(docSnap.data() as ClinicMetrics);
+      }
+    });
+    return () => unsubscribe();
+  }, [selectedClinic]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -259,28 +272,57 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
+    <Box sx={{ p: 3 }}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h3" fontWeight="900" sx={{ letterSpacing: '-0.03em', color: 'primary.main' }}>
-            LIVE QUEUE BOARD
+          <Typography variant="h4" fontWeight="800" color="primary" gutterBottom>
+            Queue Board
           </Typography>
           <Typography variant="subtitle1" color="text.secondary">
-            Real-time patient flow monitoring
+            Real-time patient flow monitoring.
           </Typography>
         </Box>
-        <IconButton onClick={() => window.location.reload()} sx={{ border: '1px solid', borderColor: 'divider' }}>
+        <IconButton onClick={() => window.location.reload()} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
           <RefreshIcon />
         </IconButton>
       </Box>
 
+      {metrics && (
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid size={{ xs: 12, sm: 4, md: 3 }}>
+            <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: 'primary.50' }}>
+              <CardContent sx={{ p: 2 }}>
+                <Typography variant="subtitle2" color="primary" fontWeight="bold">Registered Today</Typography>
+                <Typography variant="h4" fontWeight="800" color="primary">{metrics.patients_registered_today}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4, md: 3 }}>
+            <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: 'success.50' }}>
+              <CardContent sx={{ p: 2 }}>
+                <Typography variant="subtitle2" color="success.main" fontWeight="bold">Completed Today</Typography>
+                <Typography variant="h4" fontWeight="800" color="success.main">{metrics.completed_today}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4, md: 3 }}>
+            <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: 'warning.50' }}>
+              <CardContent sx={{ p: 2 }}>
+                <Typography variant="subtitle2" color="warning.main" fontWeight="bold">Avg Wait Time</Typography>
+                <Typography variant="h4" fontWeight="800" color="warning.main">{metrics.avg_wait_time_minutes}m</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      )}
+
       <Grid container spacing={3}>
-        {renderQueueColumn("WAITING_FOR_VITALS", "WAITING_FOR_VITALS", "#6366f1")}
-        {renderQueueColumn("READY_FOR_DOCTOR", "READY_FOR_DOCTOR", "#10b981")}
-        {renderQueueColumn("DOCTOR ROOM", "IN_CONSULTATION", "#8b5cf6")}
-        {renderQueueColumn("WAITING_FOR_PHARMACY", "WAITING_FOR_PHARMACY", "#f59e0b")}
+        {renderQueueColumn("WAITING VITALS", "WAITING_FOR_VITALS", "#3b82f6")}
+        {renderQueueColumn("READY DOCTOR", "READY_FOR_DOCTOR", "#10b981")}
+        {renderQueueColumn("IN CONSULT", "IN_CONSULTATION", "#8b5cf6")}
+        {renderQueueColumn("WAITING PHARMACY", "WAITING_FOR_PHARMACY", "#f59e0b")}
       </Grid>
-    </Container>
+    </Box>
   );
 };
 

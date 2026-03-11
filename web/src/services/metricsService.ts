@@ -48,7 +48,7 @@ export const updateMetrics = async (
       const updateAvg = async (ref: any) => {
         const snap = await getDoc(ref);
         if (snap.exists()) {
-          const data = snap.data();
+          const data = snap.data() as any;
           if (data.completed_today > 0 && data.total_wait_time > 0) {
             await setDoc(ref, { avg_wait_time: Math.floor(data.total_wait_time / data.completed_today) }, { merge: true });
           }

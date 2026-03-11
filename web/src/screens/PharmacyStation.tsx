@@ -97,78 +97,73 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
   const allDispensed = currentPrescription?.prescriptions?.every((_, i) => dispensedItems[i]) ?? false;
 
   return (
-    <Box>
-      <Typography variant="h4" gutterBottom fontWeight="bold">
-        Pharmacy Station
-      </Typography>
+    <Box sx={{ p: 3 }}>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" fontWeight="800" color="primary" gutterBottom>
+          Pharmacy Station
+        </Typography>
+        <Typography variant="subtitle1" color="text.secondary">
+          Dispense prescribed medications to patients.
+        </Typography>
+      </Box>
 
-      {successMsg && <Alert severity="success" sx={{ mb: 3 }}>{successMsg}</Alert>}
-      {errorMsg && <Alert severity="error" sx={{ mb: 3 }}>{errorMsg}</Alert>}
+      {successMsg && <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>{successMsg}</Alert>}
+      {errorMsg && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{errorMsg}</Alert>}
 
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 9 }}>
-          <Paper sx={{ p: 3, borderRadius: 2 }}>
-            <Box display="flex" alignItems="center" mb={2}>
-              <MedicationIcon color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6">Prescriptions Waiting for Dispensing</Typography>
-            </Box>
-            
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Patient Name</TableCell>
-                    <TableCell>Wait Time</TableCell>
-                    <TableCell>Priority</TableCell>
-                    <TableCell align="right">Action</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {waitingList.length === 0 ? (
+          <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box display="flex" alignItems="center" mb={2}>
+                <MedicationIcon color="primary" sx={{ mr: 1 }} />
+                <Typography variant="h6" fontWeight="700">Prescriptions Waiting for Dispensing</Typography>
+              </Box>
+              
+              <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                <Table>
+                  <TableHead sx={{ bgcolor: 'grey.50' }}>
                     <TableRow>
-                      <TableCell colSpan={4} align="center">
-                        <Typography color="textSecondary" sx={{ py: 4 }}>
-                          No patients waiting for medication.
-                        </Typography>
-                      </TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Patient Name</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Wait Time</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Priority</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
                     </TableRow>
-                  ) : (
-                    waitingList.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_name || item.patient_id}</TableCell>
-                        <TableCell>
-                          {item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : '??'} mins
-                        </TableCell>
-                        <TableCell>
-                          <Chip 
-                            label="Normal" 
-                            size="small" 
-                            color="default" 
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Button 
-                            variant="contained" 
-                            size="small" 
-                            onClick={() => handleOpenDispense(item)}
-                          >
-                            Dispense
-                          </Button>
+                  </TableHead>
+                  <TableBody>
+                    {waitingList.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} align="center">
+                          <Typography color="textSecondary" sx={{ py: 4 }}>No patients waiting for medication.</Typography>
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
+                    ) : (
+                      waitingList.map((item) => (
+                        <TableRow key={item.id} hover>
+                          <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_name || item.patient_id}</TableCell>
+                          <TableCell>{item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : '??'} mins</TableCell>
+                          <TableCell>
+                            <Chip label="Normal" size="small" color="default" sx={{ fontWeight: 700 }} />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Button variant="contained" size="small" onClick={() => handleOpenDispense(item)}>
+                              Dispense
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </Card>
         </Grid>
 
         <Grid size={{ xs: 12, md: 3 }}>
-          <Card sx={{ borderRadius: 2, mb: 3 }}>
+          <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
             <CardContent>
-              <Typography variant="subtitle2" color="textSecondary">Dispensed Today</Typography>
-              <Typography variant="h3" fontWeight="bold">42</Typography>
+              <Typography variant="subtitle2" color="textSecondary" gutterBottom fontWeight="bold">Dispensed Today</Typography>
+              <Typography variant="h4" fontWeight="800">42</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -176,43 +171,28 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
 
       {/* Dispensing Dialog */}
       <Dialog open={openDispenseDialog} onClose={() => setOpenDispenseDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 'bold' }}>
-          Dispense Medication
-        </DialogTitle>
-        <DialogContent dividers>
-          <Box mb={3}>
-            <Typography variant="subtitle2" color="textSecondary">Diagnosis</Typography>
+        <DialogTitle sx={{ fontWeight: '800', pb: 0 }}>Dispense Medication: {selectedItem?.patient_name}</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Box mb={3} sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+            <Typography variant="subtitle2" color="textSecondary" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Diagnosis</Typography>
             <Typography variant="body1" fontWeight="medium">{currentDiagnosis?.diagnosis || 'N/A'}</Typography>
           </Box>
           
           <Divider sx={{ my: 2 }} />
           
-          <Typography variant="subtitle2" color="primary" gutterBottom fontWeight="bold">
-            Prescribed Medications
-          </Typography>
+          <Typography variant="subtitle2" color="primary" gutterBottom sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prescribed Medications</Typography>
           
           {currentPrescription?.prescriptions && currentPrescription.prescriptions.length > 0 ? (
             <FormGroup>
               {currentPrescription.prescriptions.map((p, index) => (
-                <Paper key={index} variant="outlined" sx={{ p: 2, mb: 1, bgcolor: dispensedItems[index] ? '#f1f8e9' : 'white' }}>
+                <Paper key={index} variant="outlined" sx={{ p: 2, mb: 1, borderRadius: 2, bgcolor: dispensedItems[index] ? 'success.50' : 'white', borderColor: dispensedItems[index] ? 'success.main' : 'divider' }}>
                   <FormControlLabel
-                    control={
-                      <Checkbox 
-                        checked={!!dispensedItems[index]} 
-                        onChange={() => handleToggleDispense(index)} 
-                      />
-                    }
+                    control={<Checkbox checked={!!dispensedItems[index]} onChange={() => handleToggleDispense(index)} color="success" />}
                     label={
                       <Box>
                         <Typography variant="body1" fontWeight="bold">{p.medicationName}</Typography>
-                        <Typography variant="body2" color="textSecondary">
-                          {p.dosage} | {p.frequency} | {p.duration}
-                        </Typography>
-                        {p.instructions && (
-                          <Typography variant="caption" sx={{ fontStyle: 'italic', display: 'block', mt: 0.5 }}>
-                            Note: {p.instructions}
-                          </Typography>
-                        )}
+                        <Typography variant="body2" color="textSecondary">{p.dosage} | {p.frequency} | {p.duration}</Typography>
+                        {p.instructions && <Typography variant="caption" sx={{ fontStyle: 'italic', display: 'block', mt: 0.5 }}>Note: {p.instructions}</Typography>}
                       </Box>
                     }
                   />
@@ -225,13 +205,7 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpenDispenseDialog(false)}>Cancel</Button>
-          <Button 
-            variant="contained" 
-            onClick={handleCompleteDispensing} 
-            size="large"
-            startIcon={<CheckCircleIcon />}
-            disabled={!allDispensed}
-          >
+          <Button variant="contained" onClick={handleCompleteDispensing} size="large" startIcon={<CheckCircleIcon />} disabled={!allDispensed} sx={{ fontWeight: 700, borderRadius: 2 }}>
             Complete & Finalize
           </Button>
         </DialogActions>

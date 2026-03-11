@@ -66,157 +66,78 @@ const NotificationSystem: React.FC = () => {
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#0f172a',
+      main: '#1e293b', // Deep Navy
+      light: '#334155',
     },
     secondary: {
-      main: '#10b981',
+      main: '#f59e0b', // Amber
+      light: '#fbbf24',
     },
+    background: {
+      default: '#f8fafc',
+      paper: '#ffffff',
+    },
+    text: {
+      primary: '#0f172a',
+      secondary: '#64748b',
+    },
+    success: { main: '#10b981' },
+    warning: { main: '#f59e0b' },
+    error: { main: '#ef4444' },
+    info: { main: '#3b82f6' },
   },
   typography: {
     fontFamily: '"Inter", "Helvetica", "Arial", sans-serif',
+    h3: { fontWeight: 800, letterSpacing: '-0.02em' },
+    h4: { fontWeight: 700, letterSpacing: '-0.01em' },
+    h6: { fontWeight: 600 },
+    button: { textTransform: 'none', fontWeight: 600 },
   },
   shape: {
-    borderRadius: 12,
+    borderRadius: 8,
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: { borderRadius: 8, padding: '8px 16px' },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: { borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
+      },
+    },
   },
 });
 
 const App: React.FC = () => {
-  const { 
-    user, 
-    setUser, 
-    selectedCountry, 
-    selectedClinic, 
-    setSession,
-    setClinicConfig,
-    notify 
-  } = useAppStore();
-  
-  const [loading, setLoading] = useState(true);
+  const { selectedCountry, selectedClinic, clearCountry, clearClinic } = useAppStore();
+  const [user, setUser] = useState<User | null>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
   useEffect(() => {
-    const unsubscribe = subscribeToAuthChanges(async (u) => {
-      if (u) {
-        try {
-          const profile = await getUserProfile(u.uid);
-          setUser(u, profile);
-          
-          // Fetch clinic config if session is already selected
-          const state = useAppStore.getState();
-          if (state.selectedCountry && state.selectedClinic) {
-            const config = await getOrCreateClinicConfig(
-              state.selectedCountry.id,
-              state.selectedCountry.name,
-              state.selectedClinic.id,
-              state.selectedClinic.name
-            );
-            setClinicConfig(config);
-          }
-        } catch (err) {
-          console.error("Failed to fetch user profile or clinic config:", err);
-          setUser(u, null);
-        }
-      } else {
-        setUser(null, null);
-        setClinicConfig(null);
-      }
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [setUser, setClinicConfig]);
-
-  const handleSelectCountry = (country: CountryConfig) => {
-    setSession(country, null);
-  };
-
-  const handleSelectClinic = async (clinic: ClinicConfig) => {
-    setSession(selectedCountry, clinic);
-    if (selectedCountry) {
-      try {
-        const config = await getOrCreateClinicConfig(
-          selectedCountry.id,
-          selectedCountry.name,
-          clinic.id,
-          clinic.name
-        );
-        setClinicConfig(config);
-      } catch (err) {
-        console.error("Failed to fetch clinic config:", err);
-      }
-    }
-    notify(`Switched to ${clinic.name}`, 'success');
-  };
+    return subscribeToAuthChanges(setUser);
+  }, []);
 
   const handleLogout = async () => {
     await logout();
     setAnchorEl(null);
-    notify('Logged out successfully');
   };
 
-  const handleClearCountry = () => {
-    setSession(null, null);
-  };
+  const handleClearCountry = () => clearCountry();
+  const handleClearClinic = () => clearClinic();
 
-  const handleClearClinic = () => {
-    setSession(selectedCountry, null);
-  };
+  if (!user) return <LoginPage selectedCountry={selectedCountry || { id: 'default', name: 'Default', flag: '🏳️', currency: 'USD', language: 'en', dateFormat: 'MM/DD/YYYY', clinics: [] }} onBack={() => {}} />;
+  if (!selectedCountry) return <LandingPage onSelectCountry={(c) => useAppStore.getState().setSession(c, null)} />;
+  if (!selectedClinic) return <ClinicSelection selectedCountry={selectedCountry} onSelectClinic={(c) => useAppStore.getState().setSession(selectedCountry, c)} onBack={handleClearCountry} />;
 
-  const renderContent = () => {
-    if (!isFirebaseConfigValid) {
-      return (
-        <Container maxWidth="sm" sx={{ mt: 10 }}>
-          <Paper elevation={0} sx={{ p: 4, border: '1px solid', borderColor: 'divider', borderRadius: 4 }}>
-            <Alert severity="warning" variant="outlined" sx={{ borderRadius: 2 }}>
-              <AlertTitle sx={{ fontWeight: 700 }}>Configuration Required</AlertTitle>
-              Firebase API keys are missing. To use this application, you must provide your Firebase configuration in the <strong>Secrets</strong> panel.
-            </Alert>
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Please set the following environment variables:
-              </Typography>
-              <Box component="pre" sx={{ bgcolor: 'grey.50', p: 2, borderRadius: 2, fontSize: '0.75rem', overflow: 'auto' }}>
-                VITE_FIREBASE_API_KEY=...<br />
-                VITE_FIREBASE_AUTH_DOMAIN=...<br />
-                VITE_FIREBASE_PROJECT_ID=...<br />
-                VITE_FIREBASE_STORAGE_BUCKET=...<br />
-                VITE_FIREBASE_MESSAGING_SENDER_ID=...<br />
-                VITE_FIREBASE_APP_ID=...
-              </Box>
-            </Box>
-          </Paper>
-        </Container>
-      );
-    }
-
-    if (loading) {
-      return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-          <Typography variant="h6">Loading HAEFA PROGOTY...</Typography>
-        </Box>
-      );
-    }
-
-    if (!selectedCountry) {
-      return <LandingPage onSelectCountry={handleSelectCountry} />;
-    }
-
-    if (!selectedClinic) {
-      return <ClinicSelection 
-        selectedCountry={selectedCountry} 
-        onSelectClinic={handleSelectClinic} 
-        onBack={handleClearCountry} 
-      />;
-    }
-
-    if (!user) {
-      return <LoginPage selectedCountry={selectedCountry} onBack={handleClearClinic} />;
-    }
-
-    return (
-      <Box sx={{ flexGrow: 1 }}>
-        <AppBar position="static" elevation={0} sx={{ borderBottom: '1px solid rgba(0,0,0,0.1)', bgcolor: 'white', color: 'text.primary' }}>
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <AppBar position="sticky" elevation={0} sx={{ borderBottom: '1px solid rgba(0,0,0,0.1)', bgcolor: 'white', color: 'text.primary' }}>
           <Container maxWidth="xl">
-            <Toolbar disableGutters>
+            <Toolbar disableGutters sx={{ minHeight: 64 }}>
               <Typography
                 variant="h6"
                 noWrap
@@ -226,29 +147,44 @@ const App: React.FC = () => {
                 HAEFA PROGOTY
               </Typography>
               
-              <Box sx={{ display: 'flex', gap: 1, mr: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 4, bgcolor: 'grey.50', p: 0.5, borderRadius: 2 }}>
                 <Chip 
                   label={`${selectedCountry.name} ${selectedCountry.flag}`} 
                   onClick={handleClearCountry}
-                  sx={{ fontWeight: 600, cursor: 'pointer' }}
+                  sx={{ fontWeight: 600, cursor: 'pointer', bgcolor: 'white' }}
                   variant="outlined"
                 />
                 <Chip 
                   label={selectedClinic.name} 
                   onClick={handleClearClinic}
-                  sx={{ fontWeight: 600, cursor: 'pointer' }}
+                  sx={{ fontWeight: 600, cursor: 'pointer', bgcolor: 'white' }}
                   variant="outlined"
                   color="secondary"
                 />
               </Box>
 
-              <Box sx={{ flexGrow: 1, display: 'flex', gap: 1 }}>
-                <Button component={Link} to="/admin" sx={{ fontWeight: 600 }}>Admin</Button>
-                <Button component={Link} to="/" sx={{ fontWeight: 600 }}>Registration</Button>
-                <Button component={Link} to="/vitals" sx={{ fontWeight: 600 }}>Vitals</Button>
-                <Button component={Link} to="/doctor" sx={{ fontWeight: 600 }}>Doctor</Button>
-                <Button component={Link} to="/pharmacy" sx={{ fontWeight: 600 }}>Pharmacy</Button>
-                <Button component={Link} to="/queue" sx={{ fontWeight: 600, color: 'secondary.main' }}>Queue Board</Button>
+              <Box sx={{ flexGrow: 1, display: 'flex', gap: 0.5 }}>
+                {[
+                  { label: 'Admin', to: '/admin' },
+                  { label: 'Registration', to: '/' },
+                  { label: 'Vitals', to: '/vitals' },
+                  { label: 'Doctor', to: '/doctor' },
+                  { label: 'Pharmacy', to: '/pharmacy' },
+                  { label: 'Queue Board', to: '/queue' },
+                ].map((item) => (
+                  <Button 
+                    key={item.to}
+                    component={Link} 
+                    to={item.to} 
+                    sx={{ 
+                      fontWeight: 600, 
+                      color: 'text.secondary',
+                      '&.active': { color: 'primary.main', bgcolor: 'grey.100' }
+                    }}
+                  >
+                    {item.label}
+                  </Button>
+                ))}
               </Box>
 
               <Box sx={{ flexGrow: 0 }}>
@@ -288,13 +224,6 @@ const App: React.FC = () => {
           </Routes>
         </Container>
       </Box>
-    );
-  };
-
-  return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      {renderContent()}
       <NotificationSystem />
     </ThemeProvider>
   );

@@ -39,6 +39,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
   const [scope, setScope] = useState<Scope>('current_clinic');
   const [selectedScopeId, setSelectedScopeId] = useState<string>('');
   
+  const today = new Date().toISOString().split('T')[0];
+  
   const [patientsData, setPatientsData] = useState<any[]>([]);
   const [queueData, setQueueData] = useState<QueueItem[]>([]);
   const [metrics, setMetrics] = useState({
@@ -320,15 +322,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
     }
   };
 
-  const StatCard = ({ title, value, icon, color }: any) => (
-    <Card sx={{ borderRadius: 4, height: '100%', border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+  const StatCard = ({ title, value, icon, color, delta }: any) => (
+    <Card sx={{ borderRadius: 4, height: '100%', border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: `${color}.50` }}>
       <CardContent>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Box sx={{ p: 1, borderRadius: 2, bgcolor: `${color}.light`, color: `${color}.main` }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'white', color: `${color}.main`, border: '1px solid', borderColor: 'divider' }}>
             {icon}
           </Box>
+          {delta && (
+            <Typography variant="caption" fontWeight="bold" color={delta.startsWith('+') ? 'success.main' : 'error.main'}>
+              {delta}
+            </Typography>
+          )}
         </Box>
-        <Typography variant="h4" fontWeight="800">{value}</Typography>
+        <Typography variant="h4" fontWeight="800" color={`${color}.main`}>{value}</Typography>
         <Typography variant="body2" color="text.secondary" fontWeight="600">
           {title}
         </Typography>
@@ -336,46 +343,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
     </Card>
   );
 
-  const StationCard = ({ title, data }: { title: string, data: any }) => {
-    let loadColor = 'success.main';
-    let loadBg = 'success.light';
-    if (data.queue > 10) {
-      loadColor = 'error.main';
-      loadBg = 'error.light';
-    } else if (data.queue > 5) {
-      loadColor = 'warning.main';
-      loadBg = 'warning.light';
-    }
-
+  const StationCard = ({ title, data, color }: { title: string, data: any, color: string }) => {
     return (
       <Card sx={{ borderRadius: 4, height: '100%', border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
         <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color }} />
             <Typography variant="h6" fontWeight="800">{title}</Typography>
-            <Box sx={{ px: 1.5, py: 0.5, borderRadius: 2, bgcolor: loadBg, color: loadColor, fontWeight: 'bold', fontSize: '0.75rem' }}>
-              Queue: {data.queue}
-            </Box>
           </Box>
-          <Divider sx={{ mb: 2 }} />
-          <Grid container spacing={2}>
-            {data.active !== undefined && (
-              <Grid size={{ xs: 6 }}>
-                <Typography variant="caption" color="text.secondary" display="block">Active</Typography>
-                <Typography variant="body1" fontWeight="bold">{data.active}</Typography>
-              </Grid>
-            )}
-            {data.completed !== undefined && (
-              <Grid size={{ xs: 6 }}>
-                <Typography variant="caption" color="text.secondary" display="block">Completed</Typography>
-                <Typography variant="body1" fontWeight="bold">{data.completed}</Typography>
-              </Grid>
-            )}
-            {data.avgWait !== undefined && (
-              <Grid size={{ xs: 12 }}>
-                <Typography variant="caption" color="text.secondary" display="block">Avg Wait</Typography>
-                <Typography variant="body1" fontWeight="bold">{data.avgWait} mins</Typography>
-              </Grid>
-            )}
+          <Grid container spacing={1}>
+            <Grid size={{ xs: 6 }}>
+              <Typography variant="caption" color="text.secondary" display="block">Queue</Typography>
+              <Typography variant="h6" fontWeight="bold">{data.queue}</Typography>
+            </Grid>
+            <Grid size={{ xs: 6 }}>
+              <Typography variant="caption" color="text.secondary" display="block">Active</Typography>
+              <Typography variant="h6" fontWeight="bold">{data.active || 0}</Typography>
+            </Grid>
+            <Grid size={{ xs: 6 }}>
+              <Typography variant="caption" color="text.secondary" display="block">Completed</Typography>
+              <Typography variant="h6" fontWeight="bold">{data.completed}</Typography>
+            </Grid>
+            <Grid size={{ xs: 6 }}>
+              <Typography variant="caption" color="text.secondary" display="block">Avg Wait</Typography>
+              <Typography variant="h6" fontWeight="bold">{data.avgWait}m</Typography>
+            </Grid>
           </Grid>
         </CardContent>
       </Card>
@@ -532,16 +524,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
           </Typography>
           <Grid container spacing={3} sx={{ mb: 4 }}>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <StationCard title="Registration" data={metrics.stations.registration} />
+              <StationCard title="Registration" data={metrics.stations.registration} color="#64748b" />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <StationCard title="Vitals" data={metrics.stations.vitals} />
+              <StationCard title="Vitals" data={metrics.stations.vitals} color="#3b82f6" />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <StationCard title="Doctor" data={metrics.stations.doctor} />
+              <StationCard title="Doctor" data={metrics.stations.doctor} color="#8b5cf6" />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <StationCard title="Pharmacy" data={metrics.stations.pharmacy} />
+              <StationCard title="Pharmacy" data={metrics.stations.pharmacy} color="#f59e0b" />
             </Grid>
           </Grid>
         </>

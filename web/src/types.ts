@@ -205,3 +205,32 @@ export interface AuditLog {
   updated_at?: Timestamp;
   sync_status?: 'synced' | 'pending' | 'error';
 }
+
+export interface TriageAssessment {
+  id?: string;
+  encounter_id: string;
+  patient_id: string;
+  clinic_id: string;
+  country_code: string;
+  recorded_by: string;
+  created_at: Timestamp;
+  allergies: string[];
+  tobacco_use: 'none' | 'former' | 'current';
+  alcohol_use: 'none' | 'occasional' | 'regular';
+  chronic_diseases: ('diabetes' | 'hypertension' | 'asthma' | 'heart disease' | 'other')[];
+  family_medical_history: string;
+  pregnancy_status: 'yes' | 'no' | 'unknown';
+  triage_notes: string;
+}
+
+export interface ClinicMetrics {
+  clinic_id: string;
+  patients_registered_today: number;
+  waiting_for_vitals: number;
+  ready_for_doctor: number;
+  in_consultation: number;
+  waiting_for_pharmacy: number;
+  completed_today: number;
+  avg_wait_time_minutes: number;
+  last_updated: Timestamp;
+}

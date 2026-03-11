@@ -1,0 +1,40 @@
+import { 
+  collection, 
+  addDoc, 
+  query, 
+  where, 
+  getDocs, 
+  serverTimestamp,
+  limit
+} from "firebase/firestore";
+import { db } from "../firebase";
+import { TriageAssessment } from "../types";
+import { useAppStore } from "../store/useAppStore";
+
+const TRIAGE_ASSESSMENTS_COLLECTION = "triage_assessments";
+
+export const saveTriageAssessment = async (triageData: Omit<TriageAssessment, 'id' | 'created_at' | 'clinic_id' | 'country_code'>) => {
+  const { selectedCountry, selectedClinic } = useAppStore.getState();
+  if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
+
+  await addDoc(collection(db, TRIAGE_ASSESSMENTS_COLLECTION), {
+    ...triageData,
+    country_code: selectedCountry.id,
+    clinic_id: selectedClinic.id,
+    created_at: serverTimestamp()
+  });
+};
+
+export const getTriageAssessmentByEncounter = async (encounterId: string): Promise<TriageAssessment | null> => {
+  const q = query(
+    collection(db, TRIAGE_ASSESSMENTS_COLLECTION),
+    where("encounter_id", "==", encounterId),
+    limit(1)
+  );
+  const querySnapshot = await getDocs(q);
+  if (!querySnapshot.empty) {
+    const doc = querySnapshot.docs[0];
+    return { id: doc.id, ...doc.data() } as TriageAssessment;
+  }
+  return null;
+};

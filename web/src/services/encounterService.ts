@@ -24,6 +24,7 @@ import {
 } from "../types";
 import { useAppStore } from "../store/useAppStore";
 import { logAction } from "./auditService";
+import { updateQueueMetric } from "./queueMetricsService";
 
 const ENCOUNTERS_COLLECTION = "encounters";
 const ENCOUNTERS_ARCHIVE_COLLECTION = "encounters_archive";
@@ -34,6 +35,11 @@ const PRESCRIPTIONS_COLLECTION = "prescriptions";
 export const createEncounter = async (patient_id: string) => {
   const { selectedCountry, selectedClinic } = useAppStore.getState();
   if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
+
+  await updateQueueMetric(selectedClinic.id, {
+    patients_registered_today: 1,
+    waiting_for_vitals: 1
+  });
 
   const docRef = await addDoc(collection(db, ENCOUNTERS_COLLECTION), {
     patient_id,
@@ -135,6 +141,16 @@ export const saveVitals = async (vitalsData: Omit<VitalsRecord, 'id' | 'created_
   });
   
   const encounterRef = doc(db, ENCOUNTERS_COLLECTION, vitalsData.encounter_id);
+  const encounterSnap = await getDoc(encounterRef);
+  const clinicId = encounterSnap.exists() ? encounterSnap.data().clinic_id : undefined;
+
+  if (clinicId) {
+    await updateQueueMetric(clinicId, {
+      waiting_for_vitals: -1,
+      ready_for_doctor: 1
+    });
+  }
+
   await updateDoc(encounterRef, {
     encounter_status: 'READY_FOR_DOCTOR',
     current_station: 'vitals',
@@ -181,7 +197,21 @@ export const saveConsultation = async (
   }
 
   const encounterRef = doc(db, ENCOUNTERS_COLLECTION, diagnosisData.encounter_id);
+  const encounterSnap = await getDoc(encounterRef);
+  const clinicId = encounterSnap.exists() ? encounterSnap.data().clinic_id : undefined;
+
   const newStatus = prescriptionData ? 'WAITING_FOR_PHARMACY' : 'COMPLETED';
+  
+  if (clinicId) {
+    const metrics: any = { in_consultation: -1 };
+    if (newStatus === 'WAITING_FOR_PHARMACY') {
+      metrics.waiting_for_pharmacy = 1;
+    } else {
+      metrics.completed_today = 1;
+    }
+    await updateQueueMetric(clinicId, metrics);
+  }
+
   await updateDoc(encounterRef, {
     encounter_status: newStatus,
     current_station: 'doctor',
@@ -262,6 +292,16 @@ export const markPrescriptionDispensed = async (prescriptionId: string) => {
     });
     
     const encounterRef = doc(db, ENCOUNTERS_COLLECTION, data.encounter_id);
+    const encounterSnap = await getDoc(encounterRef);
+    const clinicId = encounterSnap.exists() ? encounterSnap.data().clinic_id : undefined;
+
+    if (clinicId) {
+      await updateQueueMetric(clinicId, {
+        waiting_for_pharmacy: -1,
+        completed_today: 1
+      });
+    }
+
     await updateDoc(encounterRef, { 
       encounter_status: 'COMPLETED',
       updated_at: serverTimestamp()
