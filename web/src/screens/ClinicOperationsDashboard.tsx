@@ -27,13 +27,19 @@ import { useAppStore } from '../store/useAppStore';
 import { countries } from '../config/countries';
 import { QueueItem } from '../types';
 
-interface AdminDashboardProps {
+import ClinicBottleneckPanel from '../components/admin/ClinicBottleneckPanel';
+import PatientFlowFunnel from '../components/admin/PatientFlowFunnel';
+import WaitTimeTrendChart from '../components/admin/WaitTimeTrendChart';
+import TriageDistributionPanel from '../components/admin/TriageDistributionPanel';
+import LongestWaitPanel from '../components/admin/LongestWaitPanel';
+
+interface ClinicOperationsDashboardProps {
   countryId: string;
 }
 
 type Scope = 'current_clinic' | 'clinic' | 'country' | 'global';
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
+const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ countryId }) => {
   const { selectedCountry, selectedClinic, notify } = useAppStore();
   
   const [scope, setScope] = useState<Scope>('current_clinic');
@@ -78,134 +84,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
-    let unsubscribePatients = () => {};
-    let unsubscribeQueue = () => {};
+    let pQuery = query(collection(db, 'patients'), where('created_at', '>=', startOfDay));
+    let qQuery = query(collection(db, 'queues_active'), where('created_at', '>=', startOfDay));
 
     if (scope === 'current_clinic' || scope === 'clinic') {
-      let pQuery = query(collection(db, 'patients'), where('created_at', '>=', startOfDay));
-      let qQuery = query(collection(db, 'queues_active'), where('created_at', '>=', startOfDay));
-
       pQuery = query(pQuery, where('clinic_id', '==', selectedScopeId));
       qQuery = query(qQuery, where('clinic_id', '==', selectedScopeId));
-
-      unsubscribePatients = onSnapshot(pQuery, (snapshot) => {
-        setPatientsData(snapshot.docs.map(doc => doc.data()));
-      }, (error) => console.error("Error fetching patients:", error));
-
-      unsubscribeQueue = onSnapshot(qQuery, (snapshot) => {
-        setQueueData(snapshot.docs.map(doc => doc.data() as QueueItem));
-      }, (error) => console.error("Error fetching queue:", error));
-    } else {
-      setPatientsData([]);
-      setQueueData([]);
-    }
-
-    if (scope === 'current_clinic' || scope === 'clinic') {
-      const metricsRef = doc(db, 'clinic_metrics', `${selectedScopeId}_${today}`);
-      const unsubscribeMetrics = onSnapshot(metricsRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setMetrics(prev => ({
-            ...prev,
-            totalPatientsToday: data.patients_today || 0,
-            activeQueue: data.active_queue || 0,
-            inConsultation: data.in_consultation || 0,
-            completedVisits: data.completed_today || 0,
-            averageWaitTime: data.avg_wait_time || 0
-          }));
-        } else {
-          setMetrics(prev => ({
-            ...prev,
-            totalPatientsToday: 0,
-            activeQueue: 0,
-            inConsultation: 0,
-            completedVisits: 0,
-            averageWaitTime: 0
-          }));
-        }
-      });
-      return () => {
-        unsubscribePatients();
-        unsubscribeQueue();
-        unsubscribeMetrics();
-      };
     } else if (scope === 'country') {
-      const metricsRef = doc(db, 'country_metrics', `${selectedScopeId}_${today}`);
-      const unsubscribeMetrics = onSnapshot(metricsRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setMetrics(prev => ({
-            ...prev,
-            totalPatientsToday: data.patients_today || 0,
-            activeQueue: data.active_queue || 0,
-            inConsultation: data.in_consultation || 0,
-            completedVisits: data.completed_today || 0,
-            averageWaitTime: data.avg_wait_time || 0
-          }));
-        } else {
-          setMetrics(prev => ({
-            ...prev,
-            totalPatientsToday: 0,
-            activeQueue: 0,
-            inConsultation: 0,
-            completedVisits: 0,
-            averageWaitTime: 0
-          }));
-        }
-      });
-      return () => {
-        unsubscribePatients();
-        unsubscribeQueue();
-        unsubscribeMetrics();
-      };
-    } else if (scope === 'global') {
-      const metricsRef = doc(db, 'global_metrics', `global_${today}`);
-      const unsubscribeMetrics = onSnapshot(metricsRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setMetrics(prev => ({
-            ...prev,
-            totalPatientsToday: data.patients_today || 0,
-            activeQueue: data.active_queue || 0,
-            inConsultation: data.in_consultation || 0,
-            completedVisits: data.completed_today || 0,
-            averageWaitTime: data.avg_wait_time || 0
-          }));
-        } else {
-          setMetrics(prev => ({
-            ...prev,
-            totalPatientsToday: 0,
-            activeQueue: 0,
-            inConsultation: 0,
-            completedVisits: 0,
-            averageWaitTime: 0
-          }));
-        }
-      });
-      
-      // Also fetch country breakdown for global view
-      const countryMetricsQuery = query(collection(db, 'country_metrics'), where('date', '==', today));
-      const unsubscribeCountryMetrics = onSnapshot(countryMetricsQuery, (snapshot) => {
-        const breakdown: Record<string, { patientsToday: number, activeQueue: number }> = {};
-        snapshot.docs.forEach(doc => {
-          const data = doc.data();
-          if (data.country_code) {
-            breakdown[data.country_code] = {
-              patientsToday: data.patients_today || 0,
-              activeQueue: data.active_queue || 0
-            };
-          }
-        });
-        setMetrics(prev => ({ ...prev, countryBreakdown: breakdown }));
-      });
-
-      return () => {
-        unsubscribePatients();
-        unsubscribeQueue();
-        unsubscribeMetrics();
-        unsubscribeCountryMetrics();
-      };
+      pQuery = query(pQuery, where('country_code', '==', selectedScopeId));
+      qQuery = query(qQuery, where('country_code', '==', selectedScopeId));
     }
+
+    const unsubscribePatients = onSnapshot(pQuery, (snapshot) => {
+      setPatientsData(snapshot.docs.map(doc => doc.data()));
+    }, (error) => console.error("Error fetching patients:", error));
+
+    const unsubscribeQueue = onSnapshot(qQuery, (snapshot) => {
+      setQueueData(snapshot.docs.map(doc => doc.data() as QueueItem));
+    }, (error) => console.error("Error fetching queue:", error));
 
     return () => {
       unsubscribePatients();
@@ -215,6 +111,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
 
   // Calculate metrics
   useEffect(() => {
+    let activeQueue = 0;
+    let inConsultation = 0;
+    let completedVisits = 0;
+    let totalWaitTime = 0;
+    let waitTimeCount = 0;
+
     const stations = {
       registration: { queue: 0, completed: patientsData.length },
       vitals: { queue: 0, completed: 0, active: 0, avgWait: 0, totalWait: 0 },
@@ -235,6 +137,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
       const isCompleted = item.status === 'COMPLETED';
       const waitMinutes = item.created_at ? Math.floor((Date.now() - item.created_at.toMillis()) / 60000) : 0;
       
+      if (!isCompleted) {
+        activeQueue++;
+      } else {
+        completedVisits++;
+      }
+
+      if (item.status === 'IN_CONSULTATION') {
+        inConsultation++;
+      }
+
+      if (waitMinutes > 0 && !isCompleted) {
+        totalWaitTime += waitMinutes;
+        waitTimeCount++;
+      }
+
       const cc = item.country_code;
       if (!countryBreakdown[cc]) countryBreakdown[cc] = { patientsToday: 0, activeQueue: 0 };
       if (!isCompleted) {
@@ -274,8 +191,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
     stations.doctor.avgWait = stations.doctor.queue > 0 ? Math.floor(stations.doctor.totalWait / stations.doctor.queue) : 0;
     stations.pharmacy.avgWait = stations.pharmacy.queue > 0 ? Math.floor(stations.pharmacy.totalWait / stations.pharmacy.queue) : 0;
 
+    const averageWaitTime = waitTimeCount > 0 ? Math.round(totalWaitTime / waitTimeCount) : 0;
+
     setMetrics(prev => ({
       ...prev,
+      totalPatientsToday: patientsData.length,
+      activeQueue,
+      inConsultation,
+      completedVisits,
+      averageWaitTime,
       stations,
       countryBreakdown
     }));
@@ -388,6 +312,62 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
     }
     return 'Global Operations';
   };
+
+  // Derived data for new components
+  const bottleneck = useMemo(() => {
+    const s = metrics.stations;
+    if (s.vitals.queue > 5 || s.vitals.avgWait > 30) return { station: 'Vitals', queue: s.vitals.queue, avgWait: s.vitals.avgWait };
+    if (s.doctor.queue > 5 || s.doctor.avgWait > 30) return { station: 'Doctor', queue: s.doctor.queue, avgWait: s.doctor.avgWait };
+    if (s.pharmacy.queue > 5 || s.pharmacy.avgWait > 30) return { station: 'Pharmacy', queue: s.pharmacy.queue, avgWait: s.pharmacy.avgWait };
+    return null;
+  }, [metrics.stations]);
+
+  const funnelData = useMemo(() => {
+    return {
+      registered: metrics.totalPatientsToday,
+      vitals: metrics.stations.vitals.queue + metrics.stations.vitals.active,
+      doctor: metrics.stations.doctor.queue + metrics.stations.doctor.active,
+      pharmacy: metrics.stations.pharmacy.queue + metrics.stations.pharmacy.active,
+      completed: metrics.completedVisits,
+    };
+  }, [metrics]);
+
+  const triageData = useMemo(() => {
+    const counts = { red: 0, orange: 0, yellow: 0, green: 0 };
+    queueData.forEach(q => {
+      if (q.triage_level === 'emergency') counts.red++;
+      else if (q.triage_level === 'urgent') counts.orange++;
+      else if (q.triage_level === 'standard') counts.yellow++;
+      else if (q.triage_level === 'low') counts.green++;
+    });
+    return counts;
+  }, [queueData]);
+
+  const longestWaitPatients = useMemo(() => {
+    return queueData
+      .filter(q => q.status !== 'COMPLETED' && q.created_at)
+      .map(q => {
+        const wait = Math.floor((Date.now() - q.created_at.toMillis()) / 60000);
+        let station = 'Registration';
+        if (q.status === 'WAITING_FOR_VITALS') station = 'Vitals';
+        else if (q.status === 'READY_FOR_DOCTOR' || q.status === 'IN_CONSULTATION') station = 'Doctor';
+        else if (q.status === 'WAITING_FOR_PHARMACY') station = 'Pharmacy';
+        return { name: `Patient ${q.patient_id.substring(0,4)}`, station, wait };
+      })
+      .sort((a, b) => b.wait - a.wait)
+      .slice(0, 3);
+  }, [queueData]);
+
+  const trendData = useMemo(() => {
+    // Simple mock trend based on current average wait for demonstration
+    // In a real app, this would query historical snapshots
+    const currentHour = new Date().getHours();
+    return [
+      { time: `${currentHour - 2}:00`, wait: Math.max(0, metrics.averageWaitTime - 5) },
+      { time: `${currentHour - 1}:00`, wait: Math.max(0, metrics.averageWaitTime + 2) },
+      { time: `${currentHour}:00`, wait: metrics.averageWaitTime }
+    ];
+  }, [metrics.averageWaitTime]);
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
@@ -536,6 +516,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
               <StationCard title="Pharmacy" data={metrics.stations.pharmacy} color="#f59e0b" />
             </Grid>
           </Grid>
+
+          <Typography variant="h5" fontWeight="900" sx={{ mb: 3, letterSpacing: '-0.02em' }}>
+            OPERATIONAL INSIGHTS
+          </Typography>
+          <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <ClinicBottleneckPanel bottleneck={bottleneck} />
+            </Grid>
+            <Grid size={{ xs: 12, md: 8 }}>
+              <PatientFlowFunnel data={funnelData} />
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <WaitTimeTrendChart data={trendData} />
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TriageDistributionPanel data={triageData} />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <LongestWaitPanel patients={longestWaitPatients} />
+            </Grid>
+          </Grid>
         </>
       )}
 
@@ -576,4 +577,4 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
   );
 };
 
-export default AdminDashboard;
+export default ClinicOperationsDashboard;

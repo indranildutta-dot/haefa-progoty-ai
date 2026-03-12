@@ -26,6 +26,7 @@ export interface Patient {
   date_of_birth: string;
   phone?: string;
   village?: string;
+  photo_url?: string;
   country_id: string;
   clinic_id: string;
   latest_encounter_id?: string;
@@ -233,4 +234,18 @@ export interface ClinicMetrics {
   completed_today: number;
   avg_wait_time_minutes: number;
   last_updated: Timestamp;
+}
+
+export interface QueuePatient {
+  encounterId: string;
+  queueId?: string;
+  patientId: string;
+  patientName: string;
+  age: number;
+  gender: string;
+  village?: string;
+  photoUrl?: string;
+  triageLevel?: TriageLevel;
+  encounterStatus: string;
+  createdAt: Timestamp;
 }

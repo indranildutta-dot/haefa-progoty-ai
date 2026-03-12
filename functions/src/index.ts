@@ -57,7 +57,7 @@ export const registerPatient = onCall(async (request: CallableRequest) => {
       try {
         console.log("Uploading photo for patient:", patientId);
         const bucket = storage.bucket();
-        const file = bucket.file(`patient_photos/${patientId}.jpg`);
+        const file = bucket.file(`patient_photos/${patientId}/photo.jpg`);
         const base64Data = photoBase64.split(",")[1];
         if (base64Data) {
           const buffer = Buffer.from(base64Data, "base64");

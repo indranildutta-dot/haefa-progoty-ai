@@ -38,6 +38,7 @@ import {
   getPrescriptionByEncounter, 
   markPrescriptionDispensed 
 } from '../services/encounterService';
+import { getPatientByQrToken } from '../services/qrService';
 import { 
   collection, 
   query, 
@@ -47,6 +48,7 @@ import {
 import { db } from "../firebase";
 import { QueueItem, DiagnosisRecord, PrescriptionRecord } from '../types';
 import { useAppStore } from '../store/useAppStore';
+import QrScannerModal from '../components/QrScannerModal';
 
 interface PharmacyStationProps {
   countryId: string;
@@ -164,9 +166,24 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
         <Grid size={{ xs: 12, md: 9 }}>
           <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
             <CardContent sx={{ p: 3 }}>
-              <Box display="flex" alignItems="center" mb={2}>
-                <MedicationIcon color="warning" sx={{ mr: 1 }} />
-                <Typography variant="h6" fontWeight="800">Prescriptions Waiting for Dispensing</Typography>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Box display="flex" alignItems="center">
+                  <MedicationIcon color="warning" sx={{ mr: 1 }} />
+                  <Typography variant="h6" fontWeight="800">Prescriptions Waiting for Dispensing</Typography>
+                </Box>
+                <QrScannerModal onScan={async (token) => {
+                  const patient = await getPatientByQrToken(token);
+                  if (patient) {
+                    const item = waitingList.find(i => i.patient_id === patient.id);
+                    if (item) {
+                      handleOpenDispense(item);
+                    } else {
+                      notify("Patient not found in queue.", "error");
+                    }
+                  } else {
+                    notify("Patient not found.", "error");
+                  }
+                }} />
               </Box>
               
               <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
@@ -174,6 +191,7 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
                   <TableHead sx={{ bgcolor: 'grey.50' }}>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 700 }}>Patient Name</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Registration Time</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Wait Time</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Priority</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
@@ -182,15 +200,23 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
                   <TableBody>
                     {waitingList.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} align="center">
+                        <TableCell colSpan={5} align="center">
                           <Typography color="textSecondary" sx={{ py: 4 }}>No patients waiting for medication.</Typography>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      waitingList.map((item) => (
+                      waitingList.map((item) => {
+                        const waitTime = item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : 0;
+                        const waitTimeColor = waitTime < 15 ? 'success.main' : waitTime < 30 ? 'warning.main' : 'error.main';
+                        return (
                         <TableRow key={item.id} hover>
                           <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_name || item.patient_id}</TableCell>
-                          <TableCell>{item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : '??'} mins</TableCell>
+                          <TableCell>{item.created_at?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ color: waitTimeColor, fontWeight: 'bold' }}>
+                              {waitTime} mins
+                            </Typography>
+                          </TableCell>
                           <TableCell>
                             <Chip 
                               label={item.triage_level?.toUpperCase() || 'STANDARD'} 
@@ -209,7 +235,8 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
                             </Button>
                           </TableCell>
                         </TableRow>
-                      ))
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>

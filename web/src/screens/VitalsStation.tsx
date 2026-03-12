@@ -38,10 +38,12 @@ import { saveVitals } from '../services/encounterService';
 import { saveTriageAssessment } from '../services/triageService';
 import { QueueItem, Vitals, Patient, TriageLevel } from '../types';
 import { getPatientById } from '../services/patientService';
+import { getPatientByQrToken } from '../services/qrService';
 import { auth } from '../firebase';
 import { VitalsSchema } from '../schemas/clinical';
 import { useAppStore } from '../store/useAppStore';
 import { evaluateTriage, TriageResult } from '../utils/triage';
+import QrScannerModal from '../components/QrScannerModal';
 
 interface VitalsStationProps {
   countryId: string;
@@ -201,9 +203,24 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
         <Grid size={{ xs: 12, md: 9 }}>
           <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
             <CardContent sx={{ p: 3 }}>
-              <Box display="flex" alignItems="center" mb={2}>
-                <LocalHospitalIcon color="info" sx={{ mr: 1 }} />
-                <Typography variant="h6" fontWeight="800">Patients Waiting for Vitals</Typography>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Box display="flex" alignItems="center">
+                  <LocalHospitalIcon color="info" sx={{ mr: 1 }} />
+                  <Typography variant="h6" fontWeight="800">Patients Waiting for Vitals</Typography>
+                </Box>
+                <QrScannerModal onScan={async (token) => {
+                  const patient = await getPatientByQrToken(token);
+                  if (patient) {
+                    const item = waitingList.find(i => i.patient_id === patient.id);
+                    if (item) {
+                      handleOpenVitals(item);
+                    } else {
+                      notify("Patient not found in queue.", "error");
+                    }
+                  } else {
+                    notify("Patient not found.", "error");
+                  }
+                }} />
               </Box>
               
               <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
@@ -212,6 +229,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
                     <TableRow>
                       <TableCell sx={{ fontWeight: 700 }}>Patient Name</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Registration Time</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Wait Time</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Priority</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
                     </TableRow>
@@ -219,15 +237,23 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
                   <TableBody>
                     {waitingList.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} align="center">
+                        <TableCell colSpan={5} align="center">
                           <Typography color="textSecondary" sx={{ py: 4 }}>No patients waiting for vitals.</Typography>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      waitingList.map((item) => (
+                      waitingList.map((item) => {
+                        const waitTime = item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : 0;
+                        const waitTimeColor = waitTime < 15 ? 'success.main' : waitTime < 30 ? 'warning.main' : 'error.main';
+                        return (
                         <TableRow key={item.id} hover>
                           <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_name || item.patient_id}</TableCell>
                           <TableCell>{item.created_at?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ color: waitTimeColor, fontWeight: 'bold' }}>
+                              {waitTime} mins
+                            </Typography>
+                          </TableCell>
                           <TableCell>
                             <Chip 
                               label={item.triage_level?.toUpperCase() || 'STANDARD'} 
@@ -246,7 +272,8 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
                             </Button>
                           </TableCell>
                         </TableRow>
-                      ))
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>

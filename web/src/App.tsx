@@ -22,7 +22,7 @@ import VitalsStation from './screens/VitalsStation';
 import DoctorDashboard from './screens/DoctorDashboard';
 import PharmacyStation from './screens/PharmacyStation';
 import QueueBoard from './screens/QueueBoard';
-import AdminDashboard from './screens/AdminDashboard';
+import ClinicOperationsDashboard from './screens/ClinicOperationsDashboard';
 import LandingPage from './screens/LandingPage';
 import LoginPage from './screens/LoginPage';
 import ClinicSelection from './screens/ClinicSelection';
@@ -166,7 +166,7 @@ const App: React.FC = () => {
 
               <Box sx={{ flexGrow: 1, display: 'flex', gap: 0.5 }}>
                 {[
-                  { label: 'Admin', to: '/admin' },
+                  { label: 'Operations', to: '/admin' },
                   { label: 'Registration', to: '/' },
                   { label: 'Vitals', to: '/vitals' },
                   { label: 'Doctor', to: '/doctor' },
@@ -216,7 +216,7 @@ const App: React.FC = () => {
 
         <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
           <Routes>
-            <Route path="/admin" element={<AdminDashboard countryId={selectedCountry.id} />} />
+            <Route path="/admin" element={<ClinicOperationsDashboard countryId={selectedCountry.id} />} />
             <Route path="/" element={<RegistrationStation countryId={selectedCountry.id} />} />
             <Route path="/vitals" element={<VitalsStation countryId={selectedCountry.id} />} />
             <Route path="/doctor" element={<DoctorDashboard countryId={selectedCountry.id} />} />

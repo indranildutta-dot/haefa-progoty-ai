@@ -43,12 +43,14 @@ import {
 import { getTriageAssessmentByEncounter } from '../services/triageService';
 import { updateQueueMetric } from '../services/queueMetricsService';
 import { getPatientById } from '../services/patientService';
+import { getPatientByQrToken } from '../services/qrService';
 import { QueueItem, Encounter, Patient, Prescription, VitalsRecord, TriageAssessment } from '../types';
 import PatientHistoryTimeline from '../components/PatientHistoryTimeline';
 import PatientSummaryPanel from '../components/PatientSummaryPanel';
 import ConsultationPanel from '../components/ConsultationPanel';
 import VitalsSnapshot from '../components/VitalsSnapshot';
 import AlertBanner from '../components/AlertBanner';
+import QrScannerModal from '../components/QrScannerModal';
 import { auth } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
 import { checkPrescriptionSafety } from '../services/medicationSafetyService';
@@ -466,9 +468,24 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
         <Grid size={{ xs: 12, md: 9 }}>
           <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
             <CardContent sx={{ p: 3 }}>
-              <Box display="flex" alignItems="center" mb={2}>
-                <AssignmentIcon color="primary" sx={{ mr: 1 }} />
-                <Typography variant="h6" fontWeight="800">Patients Ready for Consultation</Typography>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Box display="flex" alignItems="center">
+                  <AssignmentIcon color="primary" sx={{ mr: 1 }} />
+                  <Typography variant="h6" fontWeight="800">Patients Ready for Consultation</Typography>
+                </Box>
+                <QrScannerModal onScan={async (token) => {
+                  const patient = await getPatientByQrToken(token);
+                  if (patient) {
+                    const item = waitingList.find(i => i.patient_id === patient.id);
+                    if (item) {
+                      handleOpenConsult(item);
+                    } else {
+                      notify("Patient not found in queue.", "error");
+                    }
+                  } else {
+                    notify("Patient not found.", "error");
+                  }
+                }} />
               </Box>
               
               <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
@@ -476,6 +493,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
                   <TableHead sx={{ bgcolor: 'grey.50' }}>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 700 }}>Patient Name</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Registration Time</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Wait Time</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Priority</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
@@ -484,15 +502,23 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
                   <TableBody>
                     {waitingList.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} align="center">
+                        <TableCell colSpan={5} align="center">
                           <Typography color="textSecondary" sx={{ py: 4 }}>No patients waiting for consultation.</Typography>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      waitingList.map((item) => (
+                      waitingList.map((item) => {
+                        const waitTime = item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : 0;
+                        const waitTimeColor = waitTime < 15 ? 'success.main' : waitTime < 30 ? 'warning.main' : 'error.main';
+                        return (
                         <TableRow key={item.id} hover>
                           <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_name || item.patient_id}</TableCell>
-                          <TableCell>{item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : '??'} mins</TableCell>
+                          <TableCell>{item.created_at?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ color: waitTimeColor, fontWeight: 'bold' }}>
+                              {waitTime} mins
+                            </Typography>
+                          </TableCell>
                           <TableCell>
                             <Chip 
                               label={item.triage_level?.toUpperCase() || 'STANDARD'} 
@@ -517,7 +543,8 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
                             </Button>
                           </TableCell>
                         </TableRow>
-                      ))
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
