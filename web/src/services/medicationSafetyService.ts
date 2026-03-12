@@ -32,6 +32,21 @@ export const checkPrescriptionSafety = async (
   const medNames = prescriptions.map(p => p.medicationName.toLowerCase().trim());
 
   try {
+    // 0. Check for Duplicate Medications
+    const seenMeds = new Set<string>();
+    for (const p of prescriptions) {
+      const pName = p.medicationName.toLowerCase().trim();
+      if (seenMeds.has(pName)) {
+        alerts.push({
+          type: 'duplicate',
+          severity: 'high',
+          description: `Duplicate medication prescribed: ${p.medicationName}.`,
+          medicationNames: [p.medicationName]
+        });
+      }
+      seenMeds.add(pName);
+    }
+
     // 1. Check Allergies
     const allergiesRef = collection(db, ALLERGIES_COLLECTION);
     const allergiesQuery = query(allergiesRef, where("patient_id", "==", patientId));

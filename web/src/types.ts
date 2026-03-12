@@ -162,7 +162,7 @@ export interface PatientAllergy {
 }
 
 export interface SafetyAlert {
-  type: 'allergy' | 'interaction' | 'dosage';
+  type: 'allergy' | 'interaction' | 'dosage' | 'duplicate';
   severity: 'high' | 'moderate' | 'low';
   description: string;
   medicationNames: string[];

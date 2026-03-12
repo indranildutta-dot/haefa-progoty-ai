@@ -272,10 +272,10 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h4" fontWeight="800" color="primary" gutterBottom>
+          <Typography variant="h4" fontWeight="900" color="primary" gutterBottom sx={{ textTransform: 'uppercase' }}>
             Queue Board
           </Typography>
           <Typography variant="subtitle1" color="text.secondary">
@@ -290,25 +290,25 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
       {metrics && (
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid size={{ xs: 12, sm: 4, md: 3 }}>
-            <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: 'primary.50' }}>
+            <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: 'primary.50' }}>
               <CardContent sx={{ p: 2 }}>
-                <Typography variant="subtitle2" color="primary" fontWeight="bold">Registered Today</Typography>
+                <Typography variant="subtitle2" color="primary" fontWeight="bold" sx={{ textTransform: 'uppercase' }}>Registered Today</Typography>
                 <Typography variant="h4" fontWeight="800" color="primary">{metrics.patients_registered_today}</Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid size={{ xs: 12, sm: 4, md: 3 }}>
-            <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: 'success.50' }}>
+            <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: 'success.50' }}>
               <CardContent sx={{ p: 2 }}>
-                <Typography variant="subtitle2" color="success.main" fontWeight="bold">Completed Today</Typography>
+                <Typography variant="subtitle2" color="success.main" fontWeight="bold" sx={{ textTransform: 'uppercase' }}>Completed Today</Typography>
                 <Typography variant="h4" fontWeight="800" color="success.main">{metrics.completed_today}</Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid size={{ xs: 12, sm: 4, md: 3 }}>
-            <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: 'warning.50' }}>
+            <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: 'warning.50' }}>
               <CardContent sx={{ p: 2 }}>
-                <Typography variant="subtitle2" color="warning.main" fontWeight="bold">Avg Wait Time</Typography>
+                <Typography variant="subtitle2" color="warning.main" fontWeight="bold" sx={{ textTransform: 'uppercase' }}>Avg Wait Time</Typography>
                 <Typography variant="h4" fontWeight="800" color="warning.main">{metrics.avg_wait_time_minutes}m</Typography>
               </CardContent>
             </Card>
@@ -322,7 +322,7 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
         {renderQueueColumn("IN CONSULT", "IN_CONSULTATION", "#8b5cf6")}
         {renderQueueColumn("WAITING PHARMACY", "WAITING_FOR_PHARMACY", "#f59e0b")}
       </Grid>
-    </Box>
+    </Container>
   );
 };
 

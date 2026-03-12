@@ -18,16 +18,22 @@ import {
   Card,
   CardContent,
   Divider,
-  Container
+  Container,
+  Modal
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import { createPatient, searchPatients } from '../services/patientService';
+import PatientPhotoCapture from '../components/PatientPhotoCapture';
+import { searchPatients } from '../services/patientService';
 import { createEncounter } from '../services/encounterService';
 import { addToQueue } from '../services/queueService';
 import { Patient } from '../types';
 import { getPatientSchema } from '../schemas/clinical';
 import { useAppStore } from '../store/useAppStore';
+import { db, storage } from '../firebase';
+import { collection, doc, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import QRCode from 'qrcode';
 
 import { getCountryConfig } from '../config/useCountry';
 
@@ -37,7 +43,7 @@ interface RegistrationStationProps {
 
 const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) => {
   const country = getCountryConfig(countryId);
-  const { notify } = useAppStore();
+  const { notify, selectedClinic, selectedCountry } = useAppStore();
   
   // Search State
   const [searchParams, setSearchParams] = useState({
@@ -58,6 +64,9 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
     phone: '',
     village: ''
   });
+  const [patientPhoto, setPatientPhoto] = useState<string | File | null>(null);
+  const [badgeData, setBadgeData] = useState<{ patientId: string, name: string, photoUrl: string, qrCode: string } | null>(null);
+  const [showBadgeModal, setShowBadgeModal] = useState(false);
 
   // UI State
   const [loading, setLoading] = useState(false);
@@ -128,6 +137,11 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
 
   const handleRegisterAndStart = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedClinic || !selectedCountry) {
+      notify("Clinic or Country not selected.", "error");
+      return;
+    }
+
     setLoading(true);
     setErrorMsg(null);
     try {
@@ -135,24 +149,80 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
       const PatientSchema = getPatientSchema(countryId);
       const validatedPatient = PatientSchema.parse(newPatient);
 
-      // 2. Create Patient
-      console.log("Calling createPatient");
-      const patientId = await createPatient({
-        ...validatedPatient
+      const patientId = crypto.randomUUID();
+      const encounterId = crypto.randomUUID();
+
+      // 2. Upload photo if exists
+      let photoUrl = "";
+      if (patientPhoto && storage) {
+        try {
+          let photoBase64 = "";
+          if (patientPhoto instanceof File) {
+            photoBase64 = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(patientPhoto);
+            });
+          } else {
+            photoBase64 = patientPhoto;
+          }
+
+          if (photoBase64.includes(',')) {
+            const photoRef = ref(storage, `patient_photos/${patientId}.jpg`);
+            await uploadString(photoRef, photoBase64, 'data_url');
+            photoUrl = await getDownloadURL(photoRef);
+          }
+        } catch (photoErr) {
+          console.error("Photo upload failed:", photoErr);
+        }
+      } else if (patientPhoto && !storage) {
+        console.warn("Photo capture was performed but Firebase Storage is not configured. Skipping photo upload.");
+      }
+
+      // 3. Create Patient Document
+      await setDoc(doc(db, "patients", patientId), {
+        ...validatedPatient,
+        photoUrl,
+        country_id: selectedCountry.id,
+        clinic_id: selectedClinic.id,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
       });
-      console.log("Patient created:", patientId);
 
-      // 3. Create Encounter
-      const encounterId = await createEncounter(patientId);
+      // 4. Create Encounter Document
+      await setDoc(doc(db, "encounters", encounterId), {
+        patient_id: patientId,
+        clinic_id: selectedClinic.id,
+        country_code: selectedCountry.id,
+        status: 'WAITING_FOR_VITALS',
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
+      });
 
-      // 4. Add to Queue
-      await addToQueue({
+      // 5. Add to Queue
+      await addDoc(collection(db, "queues_active"), {
         encounter_id: encounterId,
         patient_id: patientId,
         patient_name: `${validatedPatient.first_name} ${validatedPatient.last_name}`,
         station: 'vitals',
-        status: 'WAITING_FOR_VITALS'
+        status: 'WAITING_FOR_VITALS',
+        clinic_id: selectedClinic.id,
+        country_code: selectedCountry.id,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
       });
+
+      // 6. Generate Badge Token
+      const badgeToken = crypto.randomUUID();
+      await setDoc(doc(db, "badge_tokens", badgeToken), {
+        patient_id: patientId,
+        created_at: serverTimestamp()
+      });
+
+      // 7. Generate QR Code
+      const qrCode = await QRCode.toDataURL(badgeToken);
+      setBadgeData({ patientId, name: `${validatedPatient.first_name} ${validatedPatient.last_name}`, photoUrl, qrCode });
+      setShowBadgeModal(true);
 
       notify(`Patient ${validatedPatient.first_name} registered successfully`, 'success');
       setNewPatient({
@@ -163,15 +233,12 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
         phone: '',
         village: ''
       });
+      setPatientPhoto(null);
       setSearchResults([]);
       setSearchPerformed(false);
     } catch (err: any) {
-      console.error(err);
-      if (err.errors) {
-        setErrorMsg(err.errors[0].message);
-      } else {
-        setErrorMsg("Failed to register patient.");
-      }
+      console.error("Registration error:", err);
+      setErrorMsg(`Failed to register patient: ${err.message || "Unknown error"}`);
       notify("Registration failed", "error");
     } finally {
       setLoading(false);
@@ -181,7 +248,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="900" color="primary" gutterBottom sx={{ textTransform: 'uppercase' }}>
+        <Typography variant="h4" fontWeight="900" color="success.main" gutterBottom sx={{ textTransform: 'uppercase' }}>
           Registration Station
         </Typography>
         <Typography variant="subtitle1" color="text.secondary">
@@ -198,7 +265,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
           <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" fontWeight="800" gutterBottom display="flex" alignItems="center">
-                <SearchIcon sx={{ mr: 1, color: 'primary.main' }} /> Search Existing Patient
+                <SearchIcon sx={{ mr: 1, color: 'success.main' }} /> Search Existing Patient
               </Typography>
               <Grid container spacing={2} sx={{ mt: 1 }}>
                 <Grid size={{ xs: 12, sm: 4 }}>
@@ -211,7 +278,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                   <TextField fullWidth label="Phone" size="small" value={searchParams.phone} onChange={(e) => setSearchParams({ ...searchParams, phone: e.target.value })} />
                 </Grid>
                 <Grid size={{ xs: 12 }}>
-                  <Button variant="contained" fullWidth onClick={handleSearch} disabled={searching} sx={{ py: 1.5, borderRadius: 2, fontWeight: 'bold' }}>
+                  <Button variant="contained" color="success" fullWidth onClick={handleSearch} disabled={searching} sx={{ py: 1.5, borderRadius: 2, fontWeight: 'bold' }}>
                     {searching ? <CircularProgress size={24} /> : "Search Patient"}
                   </Button>
                 </Grid>
@@ -240,7 +307,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                               <TableCell sx={{ textTransform: 'capitalize' }}>{patient.gender}</TableCell>
                               <TableCell>{patient.phone}</TableCell>
                               <TableCell align="right">
-                                <Button variant="contained" size="small" onClick={() => startEncounter(patient.id!, `${patient.first_name} ${patient.last_name}`)} disabled={loading} sx={{ borderRadius: 2 }}>
+                                <Button variant="contained" color="success" size="small" onClick={() => startEncounter(patient.id!, `${patient.first_name} ${patient.last_name}`)} disabled={loading} sx={{ borderRadius: 2 }}>
                                   Start
                                 </Button>
                               </TableCell>
@@ -263,9 +330,12 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
           <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" fontWeight="800" gutterBottom display="flex" alignItems="center">
-                <PersonAddIcon sx={{ mr: 1, color: 'primary.main' }} /> Register New Patient
+                <PersonAddIcon sx={{ mr: 1, color: 'success.main' }} /> Register New Patient
               </Typography>
               <Divider sx={{ mb: 3 }} />
+              <Box sx={{ mb: 3 }}>
+                <PatientPhotoCapture onPhotoCapture={setPatientPhoto} currentPhoto={typeof patientPhoto === 'string' ? patientPhoto : undefined} />
+              </Box>
               <form onSubmit={handleRegisterAndStart}>
                 <Grid container spacing={2}>
                   <Grid size={{ xs: 12, sm: 6 }}>
@@ -300,7 +370,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                     <TextField fullWidth label="Village" value={newPatient.village} onChange={(e) => setNewPatient({ ...newPatient, village: e.target.value })} />
                   </Grid>
                   <Grid size={{ xs: 12 }} sx={{ mt: 2 }}>
-                    <Button type="submit" variant="contained" color="primary" fullWidth size="large" disabled={loading} sx={{ py: 1.5, borderRadius: 2, fontWeight: 'bold' }}>
+                    <Button type="submit" variant="contained" color="success" fullWidth size="large" disabled={loading} sx={{ py: 1.5, borderRadius: 2, fontWeight: 'bold' }}>
                       {loading ? <CircularProgress size={24} /> : "Register"}
                     </Button>
                   </Grid>
@@ -310,6 +380,34 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
           </Card>
         </Grid>
       </Grid>
+      {/* Badge Modal */}
+      <Modal open={showBadgeModal} onClose={() => setShowBadgeModal(false)}>
+        <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', bgcolor: 'background.paper', p: 4, borderRadius: 3, width: 400 }}>
+          <Typography variant="h5" fontWeight="bold" gutterBottom>Registration Success</Typography>
+          {badgeData && (
+            <Box id="badge-to-print" sx={{ p: 2, border: '1px solid #ccc', borderRadius: 2, mt: 2 }}>
+              <Typography variant="h6">HAEFA</Typography>
+              {badgeData.photoUrl && (
+                <img src={badgeData.photoUrl} alt="Patient" style={{ width: 100, height: 100, borderRadius: '50%', margin: '10px 0' }} />
+              )}
+              <Typography variant="h6">{badgeData.name}</Typography>
+              {badgeData.qrCode && (
+                <img src={badgeData.qrCode} alt="QR Code" style={{ width: 100, height: 100 }} />
+              )}
+            </Box>
+          )}
+          <Button variant="contained" color="success" fullWidth sx={{ mt: 3 }} onClick={() => {
+            const printContent = document.getElementById('badge-to-print')?.innerHTML;
+            const printWindow = window.open('', '_blank');
+            printWindow?.document.write(`<html><body>${printContent}</body></html>`);
+            printWindow?.document.close();
+            printWindow?.print();
+            printWindow?.close();
+          }}>
+            Print Patient Card
+          </Button>
+        </Box>
+      </Modal>
     </Container>
   );
 };

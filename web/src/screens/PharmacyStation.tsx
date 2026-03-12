@@ -22,7 +22,13 @@ import {
   CardContent,
   Checkbox,
   FormControlLabel,
-  FormGroup
+  FormGroup,
+  Container,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  TextField
 } from '@mui/material';
 import MedicationIcon from '@mui/icons-material/Medication';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -32,6 +38,13 @@ import {
   getPrescriptionByEncounter, 
   markPrescriptionDispensed 
 } from '../services/encounterService';
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs 
+} from "firebase/firestore";
+import { db } from "../firebase";
 import { QueueItem, DiagnosisRecord, PrescriptionRecord } from '../types';
 import { useAppStore } from '../store/useAppStore';
 
@@ -40,14 +53,41 @@ interface PharmacyStationProps {
 }
 
 const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
-  const { notify } = useAppStore();
+  const { notify, selectedCountry, selectedClinic } = useAppStore();
   const [waitingList, setWaitingList] = useState<QueueItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<QueueItem | null>(null);
   const [currentDiagnosis, setCurrentDiagnosis] = useState<DiagnosisRecord | null>(null);
   const [currentPrescription, setCurrentPrescription] = useState<PrescriptionRecord | null>(null);
   const [openDispenseDialog, setOpenDispenseDialog] = useState(false);
   const [dispensedItems, setDispensedItems] = useState<Record<number, boolean>>({});
+  const [dispensedCount, setDispensedCount] = useState(0);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [pharmacyNote, setPharmacyNote] = useState('');
+  const [pharmacyAction, setPharmacyAction] = useState<'DISPENSE' | 'HOLD' | 'CANCEL'>('DISPENSE');
+
+  useEffect(() => {
+    const fetchDispensedCount = async () => {
+      try {
+        if (!selectedCountry || !selectedClinic) return;
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        
+        const q = query(
+          collection(db, "prescriptions"),
+          where("country_code", "==", selectedCountry.id),
+          where("clinic_id", "==", selectedClinic.id),
+          where("status", "==", "DISPENSED"),
+          where("created_at", ">=", startOfDay)
+        );
+        const snapshot = await getDocs(q);
+        setDispensedCount(snapshot.size);
+      } catch (err) {
+        console.error("Error fetching dispensed count:", err);
+      }
+    };
+    fetchDispensedCount();
+  }, [selectedCountry, selectedClinic]);
+  
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,6 +107,8 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
       setCurrentDiagnosis(diagnosis);
       setCurrentPrescription(prescription);
       setDispensedItems({});
+      setPharmacyNote('');
+      setPharmacyAction('DISPENSE');
       setOpenDispenseDialog(true);
     } catch (err) {
       console.error(err);
@@ -81,10 +123,18 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
   const handleCompleteDispensing = async () => {
     if (!currentPrescription || !selectedItem) return;
     try {
-      await markPrescriptionDispensed(currentPrescription.id!);
-      await updateQueueStatus(selectedItem.id!, 'COMPLETED' as any);
+      if (pharmacyAction === 'DISPENSE') {
+        await markPrescriptionDispensed(currentPrescription.id!);
+        await updateQueueStatus(selectedItem.id!, 'COMPLETED' as any);
+        notify(`Medication dispensed for ${selectedItem.patient_name}`, 'success');
+      } else if (pharmacyAction === 'HOLD') {
+        await updateQueueStatus(selectedItem.id!, 'WAITING_FOR_PHARMACY'); // Keep in queue
+        notify(`Prescription for ${selectedItem.patient_name} put on hold: ${pharmacyNote}`, 'info');
+      } else if (pharmacyAction === 'CANCEL') {
+        await updateQueueStatus(selectedItem.id!, 'COMPLETED' as any); // Or a specific CANCELLED status if supported
+        notify(`Prescription for ${selectedItem.patient_name} cancelled: ${pharmacyNote}`, 'warning');
+      }
       
-      notify(`Medication dispensed for ${selectedItem.patient_name}`, 'success');
       setOpenDispenseDialog(false);
       setSelectedItem(null);
     } catch (err) {
@@ -97,9 +147,9 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
   const allDispensed = currentPrescription?.prescriptions?.every((_, i) => dispensedItems[i]) ?? false;
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="800" color="primary" gutterBottom>
+        <Typography variant="h4" fontWeight="900" color="warning.main" gutterBottom sx={{ textTransform: 'uppercase' }}>
           Pharmacy Station
         </Typography>
         <Typography variant="subtitle1" color="text.secondary">
@@ -107,16 +157,16 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
         </Typography>
       </Box>
 
-      {successMsg && <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>{successMsg}</Alert>}
-      {errorMsg && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{errorMsg}</Alert>}
+      {successMsg && <Alert severity="success" sx={{ mb: 3, borderRadius: 3 }}>{successMsg}</Alert>}
+      {errorMsg && <Alert severity="error" sx={{ mb: 3, borderRadius: 3 }}>{errorMsg}</Alert>}
 
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 9 }}>
-          <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
             <CardContent sx={{ p: 3 }}>
               <Box display="flex" alignItems="center" mb={2}>
-                <MedicationIcon color="primary" sx={{ mr: 1 }} />
-                <Typography variant="h6" fontWeight="700">Prescriptions Waiting for Dispensing</Typography>
+                <MedicationIcon color="warning" sx={{ mr: 1 }} />
+                <Typography variant="h6" fontWeight="800">Prescriptions Waiting for Dispensing</Typography>
               </Box>
               
               <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
@@ -142,10 +192,19 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
                           <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_name || item.patient_id}</TableCell>
                           <TableCell>{item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : '??'} mins</TableCell>
                           <TableCell>
-                            <Chip label="Normal" size="small" color="default" sx={{ fontWeight: 700 }} />
+                            <Chip 
+                              label={item.triage_level?.toUpperCase() || 'STANDARD'} 
+                              size="small" 
+                              color={
+                                item.triage_level === 'emergency' ? 'error' :
+                                item.triage_level === 'urgent' ? 'warning' :
+                                item.triage_level === 'low' ? 'success' : 'default'
+                              }
+                              sx={{ fontWeight: 700, borderRadius: 1 }}
+                            />
                           </TableCell>
                           <TableCell align="right">
-                            <Button variant="contained" size="small" onClick={() => handleOpenDispense(item)}>
+                            <Button variant="contained" size="small" onClick={() => handleOpenDispense(item)} sx={{ borderRadius: 2 }}>
                               Dispense
                             </Button>
                           </TableCell>
@@ -160,10 +219,10 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
         </Grid>
 
         <Grid size={{ xs: 12, md: 3 }}>
-          <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: 'warning.light', color: 'warning.contrastText' }}>
             <CardContent>
-              <Typography variant="subtitle2" color="textSecondary" gutterBottom fontWeight="bold">Dispensed Today</Typography>
-              <Typography variant="h4" fontWeight="800">42</Typography>
+              <Typography variant="subtitle2" sx={{ opacity: 0.8, fontWeight: 'bold', textTransform: 'uppercase' }}>Dispensed Today</Typography>
+              <Typography variant="h4" fontWeight="800">{dispensedCount}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -171,7 +230,7 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
 
       {/* Dispensing Dialog */}
       <Dialog open={openDispenseDialog} onClose={() => setOpenDispenseDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: '800', pb: 0 }}>Dispense Medication: {selectedItem?.patient_name}</DialogTitle>
+        <DialogTitle sx={{ fontWeight: '900', pb: 0, textTransform: 'uppercase' }}>Dispense Medication: {selectedItem?.patient_name}</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           <Box mb={3} sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
             <Typography variant="subtitle2" color="textSecondary" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Diagnosis</Typography>
@@ -180,6 +239,25 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
           
           <Divider sx={{ my: 2 }} />
           
+          <Box sx={{ mb: 2 }}>
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Action</InputLabel>
+              <Select value={pharmacyAction} onChange={(e) => setPharmacyAction(e.target.value as any)} label="Action">
+                <MenuItem value="DISPENSE">Dispense</MenuItem>
+                <MenuItem value="HOLD">Put on Hold</MenuItem>
+                <MenuItem value="CANCEL">Cancel</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField 
+              fullWidth 
+              label="Pharmacy Note" 
+              value={pharmacyNote} 
+              onChange={(e) => setPharmacyNote(e.target.value)} 
+              multiline
+              rows={2}
+            />
+          </Box>
+
           <Typography variant="subtitle2" color="primary" gutterBottom sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prescribed Medications</Typography>
           
           {currentPrescription?.prescriptions && currentPrescription.prescriptions.length > 0 ? (
@@ -187,7 +265,7 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
               {currentPrescription.prescriptions.map((p, index) => (
                 <Paper key={index} variant="outlined" sx={{ p: 2, mb: 1, borderRadius: 2, bgcolor: dispensedItems[index] ? 'success.50' : 'white', borderColor: dispensedItems[index] ? 'success.main' : 'divider' }}>
                   <FormControlLabel
-                    control={<Checkbox checked={!!dispensedItems[index]} onChange={() => handleToggleDispense(index)} color="success" />}
+                    control={<Checkbox checked={!!dispensedItems[index]} onChange={() => handleToggleDispense(index)} color="success" disabled={pharmacyAction !== 'DISPENSE'} />}
                     label={
                       <Box>
                         <Typography variant="body1" fontWeight="bold">{p.medicationName}</Typography>
@@ -205,12 +283,12 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpenDispenseDialog(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleCompleteDispensing} size="large" startIcon={<CheckCircleIcon />} disabled={!allDispensed} sx={{ fontWeight: 700, borderRadius: 2 }}>
-            Complete & Finalize
+          <Button variant="contained" onClick={handleCompleteDispensing} size="large" startIcon={<CheckCircleIcon />} disabled={pharmacyAction === 'DISPENSE' && !allDispensed} sx={{ fontWeight: 700, borderRadius: 2 }}>
+            {pharmacyAction === 'DISPENSE' ? 'Complete & Finalize' : 'Submit Action'}
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </Container>
   );
 };
 

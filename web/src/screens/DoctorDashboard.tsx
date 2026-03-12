@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { 
   Typography, 
   Box, 
-  Paper, 
   Grid, 
   Table, 
   TableBody, 
@@ -19,15 +18,13 @@ import {
   DialogActions,
   TextField,
   Alert,
-  Divider,
   Card,
   CardContent,
-  Tabs,
-  Tab
+  Container,
+  Paper
 } from '@mui/material';
-import HistoryIcon from '@mui/icons-material/History';
 import AssignmentIcon from '@mui/icons-material/Assignment';
-import MedicationIcon from '@mui/icons-material/Medication';
+import WarningIcon from '@mui/icons-material/Warning';
 import { 
   collection, 
   query, 
@@ -37,19 +34,21 @@ import {
 import { db } from "../firebase";
 import { subscribeToQueue, updateQueueStatus, callNextPatient } from '../services/queueService';
 import { 
-  getLatestEncounter, 
   saveConsultation, 
   getVitalsByEncounter,
   getEncounterById,
-  updateEncounterStatus
+  updateEncounterStatus,
+  getPatientHistory
 } from '../services/encounterService';
 import { getTriageAssessmentByEncounter } from '../services/triageService';
 import { updateQueueMetric } from '../services/queueMetricsService';
 import { getPatientById } from '../services/patientService';
 import { QueueItem, Encounter, Patient, Prescription, VitalsRecord, TriageAssessment } from '../types';
 import PatientHistoryTimeline from '../components/PatientHistoryTimeline';
-import PrescriptionForm from '../components/PrescriptionForm';
-import PatientAllergies from '../components/PatientAllergies';
+import PatientSummaryPanel from '../components/PatientSummaryPanel';
+import ConsultationPanel from '../components/ConsultationPanel';
+import VitalsSnapshot from '../components/VitalsSnapshot';
+import AlertBanner from '../components/AlertBanner';
 import { auth } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
 import { checkPrescriptionSafety } from '../services/medicationSafetyService';
@@ -67,16 +66,15 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
   const [currentPatient, setCurrentPatient] = useState<Patient | null>(null);
   const [currentVitals, setCurrentVitals] = useState<VitalsRecord | null>(null);
   const [currentTriage, setCurrentTriage] = useState<TriageAssessment | null>(null);
-  const [openConsultDialog, setOpenConsultDialog] = useState(false);
-  const [tabValue, setTabValue] = useState(0);
+  const [patientHistoryCount, setPatientHistoryCount] = useState<number>(0);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Consultation Form State
   const [consultData, setConsultData] = useState({
-    chiefComplaint: '',
     diagnosis: '',
     notes: '',
+    treatmentNotes: '',
     prescriptions: [] as Prescription[]
   });
 
@@ -85,6 +83,22 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
   const [safetyAlerts, setSafetyAlerts] = useState<SafetyAlert[]>([]);
   const [openSafetyDialog, setOpenSafetyDialog] = useState(false);
   const [overrideJustification, setOverrideJustification] = useState('');
+  
+  const [consultationStartTime, setConsultationStartTime] = useState<number | null>(null);
+  const [elapsedTime, setElapsedTime] = useState<string>('00:00');
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (selectedItem && consultationStartTime) {
+      interval = setInterval(() => {
+        const diff = Math.floor((Date.now() - consultationStartTime) / 1000);
+        const mins = Math.floor(diff / 60).toString().padStart(2, '0');
+        const secs = (diff % 60).toString().padStart(2, '0');
+        setElapsedTime(`${mins}:${secs}`);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [selectedItem, consultationStartTime]);
 
   useEffect(() => {
     const fetchConsultationCount = async () => {
@@ -136,6 +150,8 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
 
   const handleOpenConsult = async (item: QueueItem) => {
     setSelectedItem(item);
+    setConsultationStartTime(Date.now());
+    setElapsedTime('00:00');
     try {
       const uid = auth.currentUser?.uid || 'unknown';
       if (item.status === 'READY_FOR_DOCTOR') {
@@ -147,24 +163,25 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
         });
       }
 
-      const [patient, encounter, vitals, triage] = await Promise.all([
+      const [patient, encounter, vitals, triage, history] = await Promise.all([
         getPatientById(item.patient_id),
         getEncounterById(item.encounter_id),
         getVitalsByEncounter(item.encounter_id),
-        getTriageAssessmentByEncounter(item.encounter_id)
+        getTriageAssessmentByEncounter(item.encounter_id),
+        getPatientHistory(item.patient_id)
       ]);
       setCurrentPatient(patient);
       setCurrentEncounter(encounter);
       setCurrentVitals(vitals);
       setCurrentTriage(triage);
-      setOpenConsultDialog(true);
+      setPatientHistoryCount(history.filter(e => e.encounter_status === 'COMPLETED').length);
     } catch (err) {
       console.error(err);
       setErrorMsg("Failed to load patient data.");
     }
   };
 
-  const handleSaveConsult = async () => {
+  const handleSaveConsult = async (forceStatus?: 'WAITING_FOR_PHARMACY' | 'COMPLETED') => {
     if (!selectedItem) return;
     
     if (consultData.prescriptions.length > 0) {
@@ -172,19 +189,21 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
       if (alerts.length > 0) {
         setSafetyAlerts(alerts);
         setOpenSafetyDialog(true);
+        // We need to store the forceStatus so it can be used after override
+        // A simple way is to just pass it to executeSaveConsult when overriding, but we don't have a state for it.
+        // Let's just use the default logic if they override.
         return;
       }
     }
     
-    await executeSaveConsult();
+    await executeSaveConsult(forceStatus);
   };
 
-  const executeSaveConsult = async () => {
+  const executeSaveConsult = async (forceStatus?: 'WAITING_FOR_PHARMACY' | 'COMPLETED') => {
     if (!selectedItem) return;
     try {
       const uid = auth.currentUser?.uid || 'unknown';
       
-      // If there's an override justification, we could append it to notes or save it elsewhere.
       const finalNotes = overrideJustification 
         ? `${consultData.notes}\n\n[Safety Override Justification]: ${overrideJustification}`
         : consultData.notes;
@@ -194,7 +213,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
         {
           encounter_id: selectedItem.encounter_id,
           patient_id: selectedItem.patient_id,
-          chief_complaint: consultData.chiefComplaint,
+          chief_complaint: consultData.treatmentNotes, // Saving treatmentNotes here for now
           diagnosis: consultData.diagnosis,
           notes: finalNotes,
           created_by: uid
@@ -207,7 +226,13 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
         } : undefined
       );
 
-      const nextStatus = hasPrescriptions ? 'WAITING_FOR_PHARMACY' : 'COMPLETED';
+      let nextStatus = forceStatus;
+      if (hasPrescriptions && nextStatus === 'COMPLETED') {
+        nextStatus = 'WAITING_FOR_PHARMACY';
+      } else if (!forceStatus) {
+        nextStatus = hasPrescriptions ? 'WAITING_FOR_PHARMACY' : 'COMPLETED';
+      }
+
       await updateQueueStatus(selectedItem.id!, nextStatus as any);
       
       // Refresh count
@@ -225,11 +250,10 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
       }
 
       notify(`Consultation completed for ${currentPatient?.first_name}`, 'success');
-      setOpenConsultDialog(false);
       setOpenSafetyDialog(false);
       setOverrideJustification('');
       setSelectedItem(null);
-      setConsultData({ chiefComplaint: '', diagnosis: '', notes: '', prescriptions: [] });
+      setConsultData({ diagnosis: '', notes: '', treatmentNotes: '', prescriptions: [] });
     } catch (err) {
       console.error(err);
       setErrorMsg("Failed to save consultation.");
@@ -237,12 +261,189 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
     }
   };
 
+  const handleCancelEncounter = async () => {
+    if (!selectedItem) return;
+    try {
+      await updateQueueStatus(selectedItem.id!, 'READY_FOR_DOCTOR');
+      await updateEncounterStatus(selectedItem.encounter_id, 'READY_FOR_DOCTOR');
+      await updateQueueMetric(selectedItem.clinic_id, {
+        ready_for_doctor: 1,
+        in_consultation: -1
+      });
+      notify("Consultation cancelled. Patient returned to queue.", "info");
+    } catch (err) {
+      console.error("Failed to cancel encounter:", err);
+      notify("Failed to cancel encounter.", "error");
+    }
+    setSelectedItem(null);
+    setConsultData({ diagnosis: '', notes: '', treatmentNotes: '', prescriptions: [] });
+    setConsultationStartTime(null);
+  };
+
+  if (selectedItem && currentPatient) {
+    const waitTime = selectedItem.created_at ? Math.floor((Date.now() - selectedItem.created_at.toDate().getTime()) / 60000) : '??';
+    
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: '#f1f5f9' }}>
+        {/* Top Patient Banner */}
+        <Paper elevation={0} sx={{ p: 2, bgcolor: 'primary.main', color: 'white', borderRadius: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <Box>
+              <Typography variant="h6" fontWeight="800">
+                {currentPatient.first_name} {currentPatient.last_name} <Typography component="span" variant="body1" sx={{ opacity: 0.8 }}>| {currentPatient.date_of_birth} {currentPatient.gender} | Village: {currentPatient.village || 'N/A'}</Typography>
+              </Typography>
+              <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                Encounter #{selectedItem.encounter_id.substring(0, 8).toUpperCase()} | Waiting {waitTime} min
+              </Typography>
+            </Box>
+            <Chip 
+              label={`TRIAGE: ${selectedItem.triage_level?.toUpperCase() || 'STANDARD'}`} 
+              size="small" 
+              sx={{ 
+                fontWeight: 800, 
+                bgcolor: selectedItem.triage_level === 'emergency' ? 'error.main' :
+                         selectedItem.triage_level === 'urgent' ? 'warning.main' :
+                         selectedItem.triage_level === 'low' ? 'success.main' : 'warning.light',
+                color: selectedItem.triage_level === 'standard' ? 'black' : 'white'
+              }} 
+            />
+          </Box>
+          <Box sx={{ textAlign: 'right' }}>
+            <Typography variant="caption" sx={{ opacity: 0.8, textTransform: 'uppercase', fontWeight: 'bold' }}>Consultation Time</Typography>
+            <Typography variant="h5" fontWeight="900" sx={{ fontFamily: 'monospace' }}>{elapsedTime}</Typography>
+          </Box>
+        </Paper>
+
+        {/* Workspace Area */}
+        <Box sx={{ flexGrow: 1, overflow: 'hidden', p: 2 }}>
+          <Grid container spacing={2} sx={{ height: '100%' }}>
+            
+            {/* Left Panel: Patient Summary */}
+            <Grid size={{ xs: 12, md: 3 }} sx={{ height: '100%' }}>
+              <Paper elevation={0} sx={{ height: '100%', borderRadius: 3, border: '1px solid', borderColor: 'divider', overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column' }}>
+                <Box sx={{ flexGrow: 1 }}>
+                  <PatientSummaryPanel patient={currentPatient} triage={currentTriage} />
+                </Box>
+                <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                  <Button fullWidth color="error" variant="outlined" onClick={handleCancelEncounter} sx={{ fontWeight: 700 }}>
+                    Cancel Encounter
+                  </Button>
+                </Box>
+              </Paper>
+            </Grid>
+
+            {/* Center Panel: Consultation Workspace */}
+            <Grid size={{ xs: 12, md: 6 }} sx={{ height: '100%' }}>
+              <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                {/* Safety Alerts */}
+                {currentTriage && currentTriage.allergies && currentTriage.allergies.length > 0 && (
+                  <AlertBanner 
+                    type="allergy" 
+                    title="Allergy Alert" 
+                    message={`Patient is allergic to: ${currentTriage.allergies.join(', ')}`} 
+                  />
+                )}
+                {selectedItem.triage_level === 'emergency' && (
+                  <AlertBanner 
+                    type="critical" 
+                    title="Critical Triage" 
+                    message="Patient was triaged as EMERGENCY. Immediate attention required." 
+                  />
+                )}
+                {currentVitals && (
+                  (currentVitals.systolic && currentVitals.systolic > 180) || 
+                  (currentVitals.diastolic && currentVitals.diastolic > 120) || 
+                  (currentVitals.heartRate && (currentVitals.heartRate > 130 || currentVitals.heartRate < 40)) || 
+                  (currentVitals.temperature && (currentVitals.temperature > 39.0 || currentVitals.temperature < 35.0)) || 
+                  (currentVitals.oxygenSaturation && currentVitals.oxygenSaturation < 90)
+                ) && (
+                  <AlertBanner 
+                    type="warning" 
+                    title="Abnormal Vitals" 
+                    message="Patient has critically abnormal vital signs. Please review immediately." 
+                  />
+                )}
+                {patientHistoryCount > 0 && currentPatient && (
+                  <AlertBanner 
+                    type="info" 
+                    title="Repeat Visit" 
+                    message={`Patient has ${patientHistoryCount} previous completed encounter(s).`} 
+                  />
+                )}
+                
+                <Paper elevation={0} sx={{ flexGrow: 1, borderRadius: 3, border: '1px solid', borderColor: 'divider', overflowY: 'auto', p: 3, display: 'flex', flexDirection: 'column' }}>
+                  <Box sx={{ flexGrow: 1 }}>
+                    <ConsultationPanel data={consultData} onChange={setConsultData} />
+                  </Box>
+                </Paper>
+              </Box>
+            </Grid>
+
+            {/* Right Panel: History Timeline */}
+            <Grid size={{ xs: 12, md: 3 }} sx={{ height: '100%' }}>
+              <Paper elevation={0} sx={{ height: '100%', borderRadius: 3, border: '1px solid', borderColor: 'divider', overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column' }}>
+                <Box sx={{ flexGrow: 1 }}>
+                  <VitalsSnapshot vitals={currentVitals} />
+                  <PatientHistoryTimeline patientId={currentPatient.id!} />
+                  
+                  {/* Future AI Hook */}
+                  <Box sx={{ mt: 4, p: 2, borderRadius: 2, border: '1px dashed', borderColor: 'secondary.main', bgcolor: 'secondary.50', textAlign: 'center' }}>
+                    <Typography variant="subtitle2" color="secondary.main" fontWeight="bold" sx={{ mb: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                      ✨ AI Clinical Insights
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary" fontStyle="italic">
+                      AI analysis will appear here based on patient history and current symptoms.
+                    </Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Button fullWidth variant="outlined" color="secondary" onClick={() => handleSaveConsult('WAITING_FOR_PHARMACY')} disabled={!consultData.diagnosis} sx={{ fontWeight: 700, borderRadius: 2 }}>
+                    Send to Pharmacy
+                  </Button>
+                  <Button fullWidth variant="contained" color="secondary" onClick={() => handleSaveConsult('COMPLETED')} disabled={!consultData.diagnosis} size="large" sx={{ fontWeight: 800, borderRadius: 2 }}>
+                    Complete Consultation
+                  </Button>
+                </Box>
+              </Paper>
+            </Grid>
+
+          </Grid>
+        </Box>
+
+        {/* Safety Override Dialog */}
+        <Dialog open={openSafetyDialog} onClose={() => setOpenSafetyDialog(false)} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ color: 'error.main', fontWeight: '900', textTransform: 'uppercase' }}>Medication Safety Alerts</DialogTitle>
+          <DialogContent dividers>
+            <Typography variant="body1" gutterBottom>The following safety issues were detected with the prescribed medications:</Typography>
+            <Box sx={{ mt: 2, mb: 3 }}>
+              {safetyAlerts.map((alert, idx) => (
+                <Alert key={idx} severity={alert.severity === 'high' ? 'error' : 'warning'} sx={{ mb: 1, borderRadius: 2 }}>
+                  <Typography variant="subtitle2" sx={{ textTransform: 'capitalize', fontWeight: 'bold' }}>{alert.type} Alert ({alert.severity} severity)</Typography>
+                  <Typography variant="body2">{alert.description}</Typography>
+                </Alert>
+              ))}
+            </Box>
+            <Typography variant="body2" fontWeight="bold" gutterBottom>Override Justification (Required)</Typography>
+            <TextField fullWidth multiline rows={3} placeholder="Please provide clinical justification for overriding these safety alerts..." value={overrideJustification} onChange={(e) => setOverrideJustification(e.target.value)} error={overrideJustification.trim() === ''} helperText={overrideJustification.trim() === '' ? 'Justification is required to proceed' : ''} />
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => setOpenSafetyDialog(false)}>Cancel</Button>
+            <Button variant="contained" color="error" onClick={() => executeSaveConsult()} disabled={overrideJustification.trim() === ''} sx={{ fontWeight: 700, borderRadius: 2 }}>
+              Override & Save
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Box>
+    );
+  }
+
+  // Initial Queue View
   return (
-    <Box sx={{ p: 3 }}>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h4" fontWeight="800" color="primary" gutterBottom>
-            Doctor Consultation
+          <Typography variant="h4" fontWeight="900" color="primary.main" gutterBottom sx={{ textTransform: 'uppercase' }}>
+            Doctor Dashboard
           </Typography>
           <Typography variant="subtitle1" color="text.secondary">
             Manage patient consultations and prescriptions.
@@ -258,16 +459,16 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
         </Box>
       </Box>
 
-      {successMsg && <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>{successMsg}</Alert>}
-      {errorMsg && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{errorMsg}</Alert>}
+      {successMsg && <Alert severity="success" sx={{ mb: 3, borderRadius: 3 }}>{successMsg}</Alert>}
+      {errorMsg && <Alert severity="error" sx={{ mb: 3, borderRadius: 3 }}>{errorMsg}</Alert>}
 
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 9 }}>
-          <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
             <CardContent sx={{ p: 3 }}>
               <Box display="flex" alignItems="center" mb={2}>
                 <AssignmentIcon color="primary" sx={{ mr: 1 }} />
-                <Typography variant="h6" fontWeight="700">Patients Ready for Consultation</Typography>
+                <Typography variant="h6" fontWeight="800">Patients Ready for Consultation</Typography>
               </Box>
               
               <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
@@ -301,7 +502,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
                                 item.triage_level === 'urgent' ? 'warning' :
                                 item.triage_level === 'low' ? 'success' : 'default'
                               }
-                              sx={{ fontWeight: 700 }}
+                              sx={{ fontWeight: 700, borderRadius: 1 }}
                             />
                           </TableCell>
                           <TableCell align="right">
@@ -310,6 +511,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
                               color={item.status === 'IN_CONSULTATION' ? "secondary" : "primary"}
                               size="small" 
                               onClick={() => handleOpenConsult(item)}
+                              sx={{ borderRadius: 2, fontWeight: 700 }}
                             >
                               {item.status === 'IN_CONSULTATION' ? 'Resume' : 'Start'}
                             </Button>
@@ -325,121 +527,15 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
         </Grid>
 
         <Grid size={{ xs: 12, md: 3 }}>
-          <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: 'primary.dark', color: 'white' }}>
+          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: 'primary.light', color: 'primary.contrastText' }}>
             <CardContent>
-              <Typography variant="subtitle2" sx={{ opacity: 0.8, fontWeight: 'bold' }}>Consultations Today</Typography>
+              <Typography variant="subtitle2" sx={{ opacity: 0.8, fontWeight: 'bold', textTransform: 'uppercase' }}>Consultations Today</Typography>
               <Typography variant="h3" fontWeight="800">{consultationCount}</Typography>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
-
-      {/* Consultation Dialog */}
-      <Dialog open={openConsultDialog} onClose={() => setOpenConsultDialog(false)} maxWidth="lg" fullWidth>
-        <DialogTitle sx={{ fontWeight: '800', bgcolor: '#f8f9fa', borderBottom: '1px solid', borderColor: 'divider' }}>
-          Consultation: {currentPatient ? `${currentPatient.first_name} ${currentPatient.last_name}` : 'Loading...'}
-          <Typography variant="caption" display="block" color="textSecondary">
-            {currentPatient?.gender}, {currentPatient?.date_of_birth}
-          </Typography>
-        </DialogTitle>
-        <DialogContent sx={{ p: 0 }}>
-          {currentTriage && currentTriage.allergies.length > 0 && (
-            <Alert severity="error" sx={{ borderRadius: 0 }}>
-              <Typography variant="subtitle2" fontWeight="bold">ALLERGY WARNING: {currentTriage.allergies.join(', ')}</Typography>
-            </Alert>
-          )}
-          <Grid container sx={{ height: '70vh' }}>
-            {/* Left Panel: Vitals & History */}
-            <Grid size={{ xs: 12, md: 4 }} sx={{ borderRight: '1px solid', borderColor: 'divider', overflowY: 'auto', p: 3, bgcolor: 'grey.50' }}>
-              <Box mb={4}>
-                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'primary.main' }}>Current Vitals</Typography>
-                {currentVitals ? (
-                  <Grid container spacing={1}>
-                    <Grid size={{ xs: 6 }}><Paper variant="outlined" sx={{ p: 1, textAlign: 'center', borderRadius: 2 }}><Typography variant="caption" color="textSecondary">BP</Typography><Typography variant="body2" fontWeight="bold">{currentVitals.systolic}/{currentVitals.diastolic}</Typography></Paper></Grid>
-                    <Grid size={{ xs: 6 }}><Paper variant="outlined" sx={{ p: 1, textAlign: 'center', borderRadius: 2 }}><Typography variant="caption" color="textSecondary">HR</Typography><Typography variant="body2" fontWeight="bold">{currentVitals.heartRate} bpm</Typography></Paper></Grid>
-                    <Grid size={{ xs: 6 }}><Paper variant="outlined" sx={{ p: 1, textAlign: 'center', borderRadius: 2 }}><Typography variant="caption" color="textSecondary">Temp</Typography><Typography variant="body2" fontWeight="bold">{currentVitals.temperature}°C</Typography></Paper></Grid>
-                    <Grid size={{ xs: 6 }}><Paper variant="outlined" sx={{ p: 1, textAlign: 'center', borderRadius: 2 }}><Typography variant="caption" color="textSecondary">BMI</Typography><Typography variant="body2" fontWeight="bold">{currentVitals.bmi}</Typography></Paper></Grid>
-                  </Grid>
-                ) : <Typography variant="caption">No vitals recorded.</Typography>}
-              </Box>
-              
-              <Box mb={4}>
-                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'primary.main' }}>Patient Safety & Background</Typography>
-                {currentTriage ? (
-                  <Box>
-                    <Typography variant="body2"><strong>Tobacco:</strong> {currentTriage.tobacco_use}</Typography>
-                    <Typography variant="body2"><strong>Alcohol:</strong> {currentTriage.alcohol_use}</Typography>
-                    <Typography variant="body2"><strong>Diseases:</strong> {currentTriage.chronic_diseases.join(', ')}</Typography>
-                    <Typography variant="body2"><strong>Pregnancy:</strong> {currentTriage.pregnancy_status}</Typography>
-                    <Typography variant="body2"><strong>Notes:</strong> {currentTriage.triage_notes}</Typography>
-                  </Box>
-                ) : <Typography variant="caption">No triage assessment recorded.</Typography>}
-              </Box>
-
-              <Box mb={4}>
-                {currentPatient && <PatientAllergies patientId={currentPatient.id!} />}
-              </Box>
-              
-              <Box>
-                <Box display="flex" alignItems="center" mb={1}>
-                  <HistoryIcon fontSize="small" color="action" sx={{ mr: 1 }} />
-                  <Typography variant="subtitle2" fontWeight="bold">Patient History</Typography>
-                </Box>
-                {currentPatient && <PatientHistoryTimeline patientId={currentPatient.id!} />}
-              </Box>
-            </Grid>
-
-            {/* Right Panel: Consultation Form */}
-            <Grid size={{ xs: 12, md: 8 }} sx={{ overflowY: 'auto', p: 4 }}>
-              <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} sx={{ mb: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
-                <Tab label="Assessment" icon={<AssignmentIcon />} iconPosition="start" sx={{ fontWeight: 700 }} />
-                <Tab label="Prescription" icon={<MedicationIcon />} iconPosition="start" sx={{ fontWeight: 700 }} />
-              </Tabs>
-
-              {tabValue === 0 && (
-                <Box>
-                  <TextField fullWidth label="Chief Complaint" multiline rows={2} variant="outlined" sx={{ mb: 3 }} value={consultData.chiefComplaint} onChange={(e) => setConsultData({ ...consultData, chiefComplaint: e.target.value })} />
-                  <TextField fullWidth label="Diagnosis" variant="outlined" sx={{ mb: 3 }} value={consultData.diagnosis} onChange={(e) => setConsultData({ ...consultData, diagnosis: e.target.value })} />
-                  <TextField fullWidth label="Clinical Notes" multiline rows={6} variant="outlined" value={consultData.notes} onChange={(e) => setConsultData({ ...consultData, notes: e.target.value })} />
-                </Box>
-              )}
-
-              {tabValue === 1 && (
-                <PrescriptionForm prescriptions={consultData.prescriptions} onChange={(p) => setConsultData({ ...consultData, prescriptions: p })} />
-              )}
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions sx={{ p: 2, bgcolor: '#f8f9fa', borderTop: '1px solid', borderColor: 'divider' }}>
-          <Button onClick={() => setOpenConsultDialog(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSaveConsult} size="large" disabled={!consultData.diagnosis} sx={{ fontWeight: 700, borderRadius: 2 }}>
-            Finish Consultation
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog open={openSafetyDialog} onClose={() => setOpenSafetyDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ color: 'error.main', fontWeight: '800' }}>Medication Safety Alerts</DialogTitle>
-        <DialogContent dividers>
-          <Typography variant="body1" gutterBottom>The following safety issues were detected with the prescribed medications:</Typography>
-          <Box sx={{ mt: 2, mb: 3 }}>
-            {safetyAlerts.map((alert, idx) => (
-              <Alert key={idx} severity={alert.severity === 'high' ? 'error' : 'warning'} sx={{ mb: 1, borderRadius: 2 }}>
-                <Typography variant="subtitle2" sx={{ textTransform: 'capitalize', fontWeight: 'bold' }}>{alert.type} Alert ({alert.severity} severity)</Typography>
-                <Typography variant="body2">{alert.description}</Typography>
-              </Alert>
-            ))}
-          </Box>
-          <Typography variant="body2" fontWeight="bold" gutterBottom>Override Justification (Required)</Typography>
-          <TextField fullWidth multiline rows={3} placeholder="Please provide clinical justification for overriding these safety alerts..." value={overrideJustification} onChange={(e) => setOverrideJustification(e.target.value)} error={overrideJustification.trim() === ''} helperText={overrideJustification.trim() === '' ? 'Justification is required to proceed' : ''} />
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenSafetyDialog(false)}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={executeSaveConsult} disabled={overrideJustification.trim() === ''} sx={{ fontWeight: 700, borderRadius: 2 }}>
-            Override & Save
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+    </Container>
   );
 };
 

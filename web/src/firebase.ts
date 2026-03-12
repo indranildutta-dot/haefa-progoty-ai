@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, initializeFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
 // These should be set in your .env file
 const firebaseConfig = {
@@ -26,13 +27,25 @@ const app = initializeApp(isFirebaseConfigValid ? firebaseConfig : dummyConfig);
 // Initialize services safely
 let dbInstance;
 let authInstance;
+let storageInstance;
 
 try {
-  dbInstance = getFirestore(app);
+  // Use initializeFirestore with experimentalForceLongPolling to bypass WebSocket blocking issues
+  dbInstance = initializeFirestore(app, {
+    experimentalForceLongPolling: true
+  });
   authInstance = getAuth(app);
+  
+  // Only initialize storage if the bucket is configured
+  if (isFirebaseConfigValid && firebaseConfig.storageBucket && firebaseConfig.storageBucket !== "placeholder") {
+    storageInstance = getStorage(app);
+  } else {
+    console.warn("Firebase Storage bucket not configured. Storage features will be unavailable.");
+  }
 } catch (error) {
   console.error("Failed to initialize Firebase services:", error);
 }
 
 export const db = dbInstance!;
 export const auth = authInstance!;
+export const storage = storageInstance; // Removed the ! to allow it to be undefined if not configured

@@ -524,10 +524,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ countryId }) => {
           </Typography>
           <Grid container spacing={3} sx={{ mb: 4 }}>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <StationCard title="Registration" data={metrics.stations.registration} color="#64748b" />
+              <StationCard title="Registration" data={metrics.stations.registration} color="#10b981" />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <StationCard title="Vitals" data={metrics.stations.vitals} color="#3b82f6" />
+              <StationCard title="Vitals" data={metrics.stations.vitals} color="#0ea5e9" />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <StationCard title="Doctor" data={metrics.stations.doctor} color="#8b5cf6" />

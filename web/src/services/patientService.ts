@@ -74,9 +74,11 @@ export const searchPatients = async (searchParams: { first_name?: string; last_n
     // Check clinic_id if available
     if (patient.clinic_id && patient.clinic_id !== selectedClinic.id) match = false;
     
-    if (searchParams.first_name && patient.first_name.toLowerCase() !== searchParams.first_name.toLowerCase()) match = false;
-    if (searchParams.last_name && patient.last_name.toLowerCase() !== searchParams.last_name.toLowerCase()) match = false;
-    if (searchParams.phone && patient.phone !== searchParams.phone) match = false;
+    if (searchParams.first_name && !patient.first_name.toLowerCase().includes(searchParams.first_name.toLowerCase())) match = false;
+    if (searchParams.last_name && !patient.last_name.toLowerCase().includes(searchParams.last_name.toLowerCase())) match = false;
+    if (searchParams.phone && patient.phone && !patient.phone.includes(searchParams.phone)) match = false;
+    else if (searchParams.phone && !patient.phone) match = false;
+    
     return match;
   });
   

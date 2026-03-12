@@ -186,7 +186,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="900" color="primary" gutterBottom sx={{ textTransform: 'uppercase' }}>
+        <Typography variant="h4" fontWeight="900" color="info.main" gutterBottom sx={{ textTransform: 'uppercase' }}>
           Vitals & Triage Station
         </Typography>
         <Typography variant="subtitle1" color="text.secondary">
@@ -202,7 +202,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
           <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
             <CardContent sx={{ p: 3 }}>
               <Box display="flex" alignItems="center" mb={2}>
-                <LocalHospitalIcon color="primary" sx={{ mr: 1 }} />
+                <LocalHospitalIcon color="info" sx={{ mr: 1 }} />
                 <Typography variant="h6" fontWeight="800">Patients Waiting for Vitals</Typography>
               </Box>
               
@@ -241,7 +241,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
                             />
                           </TableCell>
                           <TableCell align="right">
-                            <Button variant="contained" size="small" onClick={() => handleOpenVitals(item)} sx={{ borderRadius: 2 }}>
+                            <Button variant="contained" color="info" size="small" onClick={() => handleOpenVitals(item)} sx={{ borderRadius: 2 }}>
                               Take Vitals
                             </Button>
                           </TableCell>
@@ -263,7 +263,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
               </Typography>
               <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
                 <Typography variant="body1">Waiting</Typography>
-                <Typography variant="h4" fontWeight="800">{waitingList.length}</Typography>
+                <Typography variant="h4" fontWeight="800" color="info.main">{waitingList.length}</Typography>
               </Box>
             </CardContent>
           </Card>
@@ -277,7 +277,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
           <Grid container spacing={3}>
             {/* Vital Signs */}
             <Grid size={{ xs: 12 }}>
-              <Typography variant="subtitle2" color="primary" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vital Signs</Typography>
+              <Typography variant="subtitle2" color="info.main" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vital Signs</Typography>
             </Grid>
             <Grid size={{ xs: 12, sm: 4 }}>
               <TextField fullWidth label="Systolic" type="number" value={vitals.systolic} onChange={(e) => setVitals({ ...vitals, systolic: parseInt(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">mmHg</InputAdornment> }} />
@@ -307,7 +307,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
             {/* Triage & Background */}
             <Grid size={{ xs: 12 }}>
               <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle2" color="primary" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Patient Safety & Background</Typography>
+              <Typography variant="subtitle2" color="info.main" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Patient Safety & Background</Typography>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField fullWidth label="Allergies (comma separated)" value={triageAssessment.allergies} onChange={(e) => setTriageAssessment({...triageAssessment, allergies: e.target.value})} />
@@ -364,7 +364,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
             {/* Triage Assessment */}
             <Grid size={{ xs: 12 }}>
               <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle2" color="primary" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Triage Assessment</Typography>
+              <Typography variant="subtitle2" color="info.main" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Triage Assessment</Typography>
               
               {triageResult?.isCritical && (
                 <Alert severity="error" icon={<WarningAmberIcon fontSize="large" />} sx={{ mb: 2, borderRadius: 2 }}>
@@ -409,7 +409,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpenVitalsDialog(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSaveVitals} size="large" sx={{ fontWeight: 700, borderRadius: 2 }}>
+          <Button variant="contained" color="info" onClick={handleSaveVitals} size="large" sx={{ fontWeight: 700, borderRadius: 2 }}>
             Save Vitals & Send to Doctor
           </Button>
         </DialogActions>
