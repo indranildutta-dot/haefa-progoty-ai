@@ -101,7 +101,7 @@ const QueuePatientDetailDrawer: React.FC<QueuePatientDetailDrawerProps> = ({ pat
           </Box>
         ) : (
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Typography variant="subtitle2" color="primary" fontWeight="bold" gutterBottom sx={{ textTransform: 'uppercase' }}>
                 Vitals Snapshot
               </Typography>
@@ -116,7 +116,7 @@ const QueuePatientDetailDrawer: React.FC<QueuePatientDetailDrawerProps> = ({ pat
                 <Typography variant="body2" color="text.secondary" fontStyle="italic">No vitals recorded yet.</Typography>
               )}
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Typography variant="subtitle2" color="primary" fontWeight="bold" gutterBottom sx={{ textTransform: 'uppercase' }}>
                 Recent Diagnosis
               </Typography>

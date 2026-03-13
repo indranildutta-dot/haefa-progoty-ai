@@ -12,7 +12,9 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  Stack,
+  IconButton
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -21,11 +23,14 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { collection, query, where, onSnapshot, addDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
 import { countries } from '../config/countries';
 import { QueueItem } from '../types';
+import StationLayout from '../components/StationLayout';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 import ClinicBottleneckPanel from '../components/admin/ClinicBottleneckPanel';
 import PatientFlowFunnel from '../components/admin/PatientFlowFunnel';
@@ -41,6 +46,7 @@ type Scope = 'current_clinic' | 'clinic' | 'country' | 'global';
 
 const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ countryId }) => {
   const { selectedCountry, selectedClinic, notify } = useAppStore();
+  const { isMobile, isTablet } = useResponsiveLayout();
   
   const [scope, setScope] = useState<Scope>('current_clinic');
   const [selectedScopeId, setSelectedScopeId] = useState<string>('');
@@ -370,21 +376,88 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
   }, [metrics.averageWaitTime]);
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Typography variant="h4" fontWeight="900" sx={{ letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
-            {scope === 'global' ? 'GLOBAL OPERATIONS' : 'CLINIC OPERATIONS DASHBOARD'}
+    <StationLayout
+      title={scope === 'global' ? 'GLOBAL OPERATIONS' : 'CLINIC OPERATIONS DASHBOARD'}
+      stationName="Admin"
+      actions={
+        <Stack direction="row" spacing={2} alignItems="center">
+          {!isMobile && (
+            <Paper sx={{ p: 0.5, px: 1, display: 'flex', gap: 1, alignItems: 'center', borderRadius: 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <Select 
+                  value={scope} 
+                  onChange={(e) => {
+                    const newScope = e.target.value as Scope;
+                    setScope(newScope);
+                    if (newScope === 'current_clinic') setSelectedScopeId(selectedClinic?.id || '');
+                    else if (newScope === 'global') setSelectedScopeId('global');
+                    else setSelectedScopeId('');
+                  }} 
+                  variant="standard"
+                  disableUnderline
+                  sx={{ fontSize: '0.875rem' }}
+                >
+                  <MenuItem value="current_clinic">Current Clinic</MenuItem>
+                  <MenuItem value="clinic">Select Clinic</MenuItem>
+                  <MenuItem value="country">Select Country</MenuItem>
+                  <MenuItem value="global">Global View</MenuItem>
+                </Select>
+              </FormControl>
+
+              {scope === 'clinic' && (
+                <FormControl size="small" sx={{ minWidth: 150 }}>
+                  <Select 
+                    value={selectedScopeId} 
+                    onChange={(e) => setSelectedScopeId(e.target.value)}
+                    variant="standard"
+                    disableUnderline
+                    sx={{ fontSize: '0.875rem' }}
+                  >
+                    {countries.flatMap(c => c.clinics).map(clinic => (
+                      <MenuItem key={clinic.id} value={clinic.id}>{clinic.name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+
+              {scope === 'country' && (
+                <FormControl size="small" sx={{ minWidth: 150 }}>
+                  <Select 
+                    value={selectedScopeId} 
+                    onChange={(e) => setSelectedScopeId(e.target.value)}
+                    variant="standard"
+                    disableUnderline
+                    sx={{ fontSize: '0.875rem' }}
+                  >
+                    {countries.map(country => (
+                      <MenuItem key={country.id} value={country.id}>{country.name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+            </Paper>
+          )}
+          
+          <Button 
+            variant="contained" 
+            component={Link} 
+            to="/queue" 
+            startIcon={<ListAltIcon />}
+            size={isMobile ? "small" : "medium"}
+            sx={{ borderRadius: 2, fontWeight: 'bold' }}
+          >
+            {isMobile ? 'Queue' : 'Queue Board'}
+          </Button>
+        </Stack>
+      }
+    >
+      {isMobile && (
+        <Paper sx={{ p: 2, mb: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            View Scope
           </Typography>
-          <Typography variant="subtitle1" color="text.secondary">
-            Scope: {getScopeName()}
-          </Typography>
-        </Box>
-        
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Paper sx={{ p: 1, display: 'flex', gap: 2, alignItems: 'center', borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel>View Scope</InputLabel>
+          <Stack spacing={2}>
+            <FormControl size="small" fullWidth>
               <Select 
                 value={scope} 
                 onChange={(e) => {
@@ -392,9 +465,8 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
                   setScope(newScope);
                   if (newScope === 'current_clinic') setSelectedScopeId(selectedClinic?.id || '');
                   else if (newScope === 'global') setSelectedScopeId('global');
-                  else setSelectedScopeId(''); // Reset so user has to pick
+                  else setSelectedScopeId('');
                 }} 
-                label="View Scope"
               >
                 <MenuItem value="current_clinic">Current Clinic</MenuItem>
                 <MenuItem value="clinic">Select Clinic</MenuItem>
@@ -404,12 +476,10 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
             </FormControl>
 
             {scope === 'clinic' && (
-              <FormControl size="small" sx={{ minWidth: 200 }}>
-                <InputLabel>Clinic</InputLabel>
+              <FormControl size="small" fullWidth>
                 <Select 
                   value={selectedScopeId} 
-                  onChange={(e) => setSelectedScopeId(e.target.value)} 
-                  label="Clinic"
+                  onChange={(e) => setSelectedScopeId(e.target.value)}
                 >
                   {countries.flatMap(c => c.clinics).map(clinic => (
                     <MenuItem key={clinic.id} value={clinic.id}>{clinic.name}</MenuItem>
@@ -419,12 +489,10 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
             )}
 
             {scope === 'country' && (
-              <FormControl size="small" sx={{ minWidth: 200 }}>
-                <InputLabel>Country</InputLabel>
+              <FormControl size="small" fullWidth>
                 <Select 
                   value={selectedScopeId} 
-                  onChange={(e) => setSelectedScopeId(e.target.value)} 
-                  label="Country"
+                  onChange={(e) => setSelectedScopeId(e.target.value)}
                 >
                   {countries.map(country => (
                     <MenuItem key={country.id} value={country.id}>{country.name}</MenuItem>
@@ -432,35 +500,25 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
                 </Select>
               </FormControl>
             )}
-          </Paper>
+          </Stack>
+        </Paper>
+      )}
 
-          <Button 
-            variant="contained" 
-            component={Link} 
-            to="/queue" 
-            startIcon={<ListAltIcon />}
-            sx={{ borderRadius: 3, px: 3, py: 1, fontWeight: 'bold', height: 40 }}
-          >
-            Queue Board
-          </Button>
-        </Box>
-      </Box>
-
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <StatCard title="Patients Today" value={metrics.totalPatientsToday} icon={<PeopleIcon />} color="primary" />
+      <Grid container spacing={isMobile ? 2 : 3} sx={{ mb: 4 }}>
+        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
+          <StatCard title="Patients" value={metrics.totalPatientsToday} icon={<PeopleIcon />} color="primary" />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <StatCard title="Active Queue" value={metrics.activeQueue} icon={<ListAltIcon />} color="warning" />
+        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
+          <StatCard title="Active" value={metrics.activeQueue} icon={<ListAltIcon />} color="warning" />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <StatCard title="In Consultation" value={metrics.inConsultation} icon={<LocalHospitalIcon />} color="info" />
+        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
+          <StatCard title="Consult" value={metrics.inConsultation} icon={<LocalHospitalIcon />} color="info" />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <StatCard title="Completed Visits" value={metrics.completedVisits} icon={<AssessmentIcon />} color="success" />
+        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
+          <StatCard title="Done" value={metrics.completedVisits} icon={<AssessmentIcon />} color="success" />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <StatCard title="Average Wait" value={`${metrics.averageWaitTime}m`} icon={<AccessTimeIcon />} color="secondary" />
+        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
+          <StatCard title="Wait" value={`${metrics.averageWaitTime}m`} icon={<AccessTimeIcon />} color="secondary" />
         </Grid>
       </Grid>
 
@@ -502,7 +560,7 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
           <Typography variant="h5" fontWeight="900" sx={{ mb: 3, letterSpacing: '-0.02em' }}>
             STATION STATUS
           </Typography>
-          <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid container spacing={isMobile ? 2 : 3} sx={{ mb: 4 }}>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <StationCard title="Registration" data={metrics.stations.registration} color="#10b981" />
             </Grid>
@@ -520,7 +578,7 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
           <Typography variant="h5" fontWeight="900" sx={{ mb: 3, letterSpacing: '-0.02em' }}>
             OPERATIONAL INSIGHTS
           </Typography>
-          <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid container spacing={isMobile ? 2 : 3} sx={{ mb: 4 }}>
             <Grid size={{ xs: 12, md: 4 }}>
               <ClinicBottleneckPanel bottleneck={bottleneck} />
             </Grid>
@@ -540,40 +598,40 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
         </>
       )}
 
-      <Paper sx={{ p: 4, borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+      <Paper sx={{ p: isMobile ? 2 : 4, borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h6" fontWeight="800">
             Quick Actions
           </Typography>
           <Button size="small" variant="text" onClick={handleSeedMedications}>
-            Seed Medications
+            Seed
           </Button>
         </Box>
         <Divider sx={{ mb: 3 }} />
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Button fullWidth variant="outlined" component={Link} to="/" sx={{ py: 2, borderRadius: 3, fontWeight: 'bold' }}>
+          <Grid size={{ xs: 6, sm: 6, md: 3 }}>
+            <Button fullWidth variant="outlined" component={Link} to="/" sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
               Registration
             </Button>
           </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Button fullWidth variant="outlined" component={Link} to="/vitals" sx={{ py: 2, borderRadius: 3, fontWeight: 'bold' }}>
-              Vitals Station
+          <Grid size={{ xs: 6, sm: 6, md: 3 }}>
+            <Button fullWidth variant="outlined" component={Link} to="/vitals" sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+              Vitals
             </Button>
           </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Button fullWidth variant="outlined" component={Link} to="/doctor" sx={{ py: 2, borderRadius: 3, fontWeight: 'bold' }}>
-              Doctor Dashboard
+          <Grid size={{ xs: 6, sm: 6, md: 3 }}>
+            <Button fullWidth variant="outlined" component={Link} to="/doctor" sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+              Doctor
             </Button>
           </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Button fullWidth variant="outlined" component={Link} to="/pharmacy" sx={{ py: 2, borderRadius: 3, fontWeight: 'bold' }}>
-              Pharmacy Station
+          <Grid size={{ xs: 6, sm: 6, md: 3 }}>
+            <Button fullWidth variant="outlined" component={Link} to="/pharmacy" sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+              Pharmacy
             </Button>
           </Grid>
         </Grid>
       </Paper>
-    </Container>
+    </StationLayout>
   );
 };
 

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User } from 'firebase/auth';
 import { CountryConfig, ClinicConfig } from '../config/countries';
-import { UserProfile, ClinicConfigDocument } from '../types';
+import { UserProfile, ClinicConfigDocument, Patient } from '../types';
 
 interface Notification {
   message: string;
@@ -20,10 +20,12 @@ interface AppState {
   selectedCountry: CountryConfig | null;
   selectedClinic: ClinicConfig | null;
   clinicConfig: ClinicConfigDocument | null;
+  selectedPatient: Patient | null;
   setSession: (country: CountryConfig | null, clinic: ClinicConfig | null) => void;
   clearCountry: () => void;
   clearClinic: () => void;
   setClinicConfig: (config: ClinicConfigDocument | null) => void;
+  setSelectedPatient: (patient: Patient | null) => void;
   
   // Notifications
   notifications: Notification[];
@@ -41,13 +43,15 @@ export const useAppStore = create<AppState>()(
       selectedCountry: null,
       selectedClinic: null,
       clinicConfig: null,
+      selectedPatient: null,
       setSession: (country, clinic) => set({ 
         selectedCountry: country, 
         selectedClinic: clinic 
       }),
-      clearCountry: () => set({ selectedCountry: null, selectedClinic: null }),
-      clearClinic: () => set({ selectedClinic: null }),
+      clearCountry: () => set({ selectedCountry: null, selectedClinic: null, selectedPatient: null }),
+      clearClinic: () => set({ selectedClinic: null, selectedPatient: null }),
       setClinicConfig: (config) => set({ clinicConfig: config }),
+      setSelectedPatient: (patient) => set({ selectedPatient: patient }),
       
       notifications: [],
       notify: (message, type = 'info') => {

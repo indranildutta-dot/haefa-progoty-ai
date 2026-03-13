@@ -43,22 +43,25 @@ interface RegistrationStationProps {
   countryId: string;
 }
 
+import StationLayout from '../components/StationLayout';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+
 const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) => {
   const country = getCountryConfig(countryId);
   const { notify, selectedClinic, selectedCountry } = useAppStore();
+  const { isMobile, isTablet } = useResponsiveLayout();
   
-  // Search State
-  const [searchParams, setSearchParams] = useState({
-    first_name: '',
-    last_name: '',
-    phone: ''
-  });
-  const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [searching, setSearching] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [searchPerformed, setSearchPerformed] = useState(false);
-
-  // Registration Form State
-  const [currentPatientId, setCurrentPatientId] = useState<string>(crypto.randomUUID());
+  const [searchResults, setSearchResults] = useState<Patient[]>([]);
+  const [searchParams, setSearchParams] = useState({ first_name: '', last_name: '', phone: '' });
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [showBadgeModal, setShowBadgeModal] = useState(false);
+  const [badgeData, setBadgeData] = useState<{ patientId: string; name: string; qrCode: string; photoUrl?: string } | null>(null);
+  const [patientPhotoUrl, setPatientPhotoUrl] = useState<string | undefined>(undefined);
+  const [currentPatientId, setCurrentPatientId] = useState<string>(doc(collection(db, 'patients')).id);
   const [newPatient, setNewPatient] = useState({
     first_name: '',
     last_name: '',
@@ -67,58 +70,39 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
     phone: '',
     village: ''
   });
-  const [patientPhotoUrl, setPatientPhotoUrl] = useState<string>("");
-  const [badgeData, setBadgeData] = useState<{ patientId: string, name: string, photoUrl: string, qrCode: string } | null>(null);
-  const [showBadgeModal, setShowBadgeModal] = useState(false);
-
-  // UI State
-  const [loading, setLoading] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleSearch = async () => {
     if (!searchParams.first_name && !searchParams.last_name && !searchParams.phone) {
-      setErrorMsg("Please enter at least one search field.");
+      notify("Please enter at least one search criteria.", "warning");
       return;
     }
     setSearching(true);
-    setErrorMsg(null);
-    setSearchPerformed(true);
     try {
       const results = await searchPatients(searchParams);
       setSearchResults(results);
-    } catch (err) {
-      console.error(err);
-      setErrorMsg("Error searching for patient.");
+      setSearchPerformed(true);
+    } catch (error) {
+      notify("Error searching patients.", "error");
     } finally {
       setSearching(false);
     }
   };
 
   const startEncounter = async (patientId: string, patientName: string) => {
+    if (!selectedClinic) return;
     setLoading(true);
-    setErrorMsg(null);
     try {
-      // 1. Create Encounter
       const encounterId = await createEncounter(patientId);
-
-      // 2. Add to Queue
       await addToQueue({
-        encounter_id: encounterId,
         patient_id: patientId,
         patient_name: patientName,
-        station: 'vitals',
-        status: 'WAITING_FOR_VITALS'
+        encounter_id: encounterId,
+        status: 'WAITING_FOR_VITALS',
+        station: 'vitals'
       });
-
-      notify(`Encounter started for ${patientName}`, 'success');
-      setSearchResults([]);
-      setSearchParams({ first_name: '', last_name: '', phone: '' });
-      setSearchPerformed(false);
-    } catch (err) {
-      console.error(err);
-      setErrorMsg("Failed to start encounter.");
-      notify("Failed to start encounter", "error");
+      notify(`Encounter started for ${patientName}`, "success");
+    } catch (error) {
+      notify("Error starting encounter.", "error");
     } finally {
       setLoading(false);
     }
@@ -126,108 +110,79 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, '');
-    if (country?.dateFormat === 'DD/MM/YYYY') {
-      if (value.length > 8) value = value.slice(0, 8);
-      if (value.length > 4) value = `${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4)}`;
-      else if (value.length > 2) value = `${value.slice(0, 2)}/${value.slice(2)}`;
-    } else {
-      if (value.length > 8) value = value.slice(0, 8);
-      if (value.length > 6) value = `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6)}`;
-      else if (value.length > 4) value = `${value.slice(0, 4)}-${value.slice(4)}`;
+    if (value.length > 8) value = value.slice(0, 8);
+    
+    let formatted = value;
+    if (value.length > 4) {
+      formatted = `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
+    } else if (value.length > 2) {
+      // Just a simple heuristic for YYYY-MM-DD
     }
-    setNewPatient({ ...newPatient, date_of_birth: value });
+    
+    setNewPatient({ ...newPatient, date_of_birth: e.target.value });
   };
 
   const handleRegisterAndStart = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedClinic || !selectedCountry) {
-      notify("Clinic or Country not selected.", "error");
-      return;
-    }
-
+    if (!selectedClinic || !selectedCountry) return;
+    
     setLoading(true);
-    setErrorMsg(null);
     try {
-      // 1. Validate with Zod
-      const PatientSchema = getPatientSchema(countryId);
-      const validatedPatient = PatientSchema.parse(newPatient);
-
-      const patientId = currentPatientId;
-      const encounterId = crypto.randomUUID();
-
-      // 2. Create Patient Document
-      await setDoc(doc(db, "patients", patientId), {
-        ...validatedPatient,
-        photoUrl: patientPhotoUrl,
-        country_id: selectedCountry.id,
-        clinic_id: selectedClinic.id,
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp()
-      });
-
-      // 3. Create Encounter Document
-      await setDoc(doc(db, "encounters", encounterId), {
-        patient_id: patientId,
-        clinic_id: selectedClinic.id,
+      const patientData = {
+        ...newPatient,
         country_code: selectedCountry.id,
-        status: 'WAITING_FOR_VITALS',
+        photo_url: patientPhotoUrl,
         created_at: serverTimestamp(),
         updated_at: serverTimestamp()
-      });
-
-      // 5. Add to Queue
-      await addDoc(collection(db, "queues_active"), {
-        encounter_id: encounterId,
-        patient_id: patientId,
-        patient_name: `${validatedPatient.first_name} ${validatedPatient.last_name}`,
-        station: 'vitals',
-        status: 'WAITING_FOR_VITALS',
-        clinic_id: selectedClinic.id,
-        country_code: selectedCountry.id,
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp()
-      });
-
-      // 6. Generate Badge Token
-      const badgeToken = crypto.randomUUID();
-      await setDoc(doc(db, "badge_tokens", badgeToken), {
-        patient_id: patientId,
+      };
+      
+      await setDoc(doc(db, 'patients', currentPatientId), patientData);
+      
+      const qrToken = `HAEFA-${currentPatientId.slice(0, 8)}`;
+      const qrCodeDataUrl = await QRCode.toDataURL(qrToken);
+      
+      await setDoc(doc(db, 'qr_tokens', qrToken), {
+        patient_id: currentPatientId,
         created_at: serverTimestamp()
       });
 
-      // 7. Generate QR Code
-      const qrCode = await QRCode.toDataURL(badgeToken);
-      setBadgeData({ patientId, name: `${validatedPatient.first_name} ${validatedPatient.last_name}`, photoUrl: patientPhotoUrl, qrCode });
-      setShowBadgeModal(true);
-
-      notify(`Patient ${validatedPatient.first_name} registered successfully`, 'success');
-      setNewPatient({
-        first_name: '',
-        last_name: '',
-        gender: 'male',
-        date_of_birth: '',
-        phone: '',
-        village: ''
+      const encounterId = await createEncounter(currentPatientId);
+      await addToQueue({
+        patient_id: currentPatientId,
+        patient_name: `${newPatient.first_name} ${newPatient.last_name}`,
+        encounter_id: encounterId,
+        status: 'WAITING_FOR_VITALS',
+        station: 'vitals'
       });
-      setPatientPhotoUrl("");
-      setCurrentPatientId(crypto.randomUUID());
-      setSearchResults([]);
-      setSearchPerformed(false);
-    } catch (err: any) {
-      console.error("Registration error:", err);
-      setErrorMsg(`Failed to register patient: ${err.message || "Unknown error"}`);
-      notify("Registration failed", "error");
+      
+      setBadgeData({
+        patientId: currentPatientId,
+        name: `${newPatient.first_name} ${newPatient.last_name}`,
+        qrCode: qrCodeDataUrl,
+        photoUrl: patientPhotoUrl
+      });
+      
+      setShowBadgeModal(true);
+      setSuccessMsg("Patient registered and encounter started!");
+      
+      // Reset form
+      setNewPatient({ first_name: '', last_name: '', gender: 'male', date_of_birth: '', phone: '', village: '' });
+      setPatientPhotoUrl(undefined);
+      setCurrentPatientId(doc(collection(db, 'patients')).id);
+    } catch (error) {
+      notify("Error registering patient.", "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="900" color="success.main" gutterBottom sx={{ textTransform: 'uppercase' }}>
-          Registration Station
-        </Typography>
+    <StationLayout
+      title="Registration Station"
+      stationName="Registration"
+      showPatientContext={false}
+    >
+      <Box sx={{ mb: isMobile ? 2 : 4 }}>
         <Typography variant="subtitle1" color="text.secondary">
           Search for existing patients or register a new patient
         </Typography>
@@ -236,11 +191,11 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
       {successMsg && <Alert severity="success" sx={{ mb: 3, borderRadius: 3 }}>{successMsg}</Alert>}
       {errorMsg && <Alert severity="error" sx={{ mb: 3, borderRadius: 3 }}>{errorMsg}</Alert>}
 
-      <Grid container spacing={3}>
+      <Grid container spacing={isMobile ? 2 : 3}>
         {/* Left Column: Search and Results */}
-        <Grid size={{ xs: 12, md: 7 }}>
-          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-            <CardContent sx={{ p: 3 }}>
+        <Grid size={{ xs: 12, lg: 7 }}>
+          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', height: '100%' }}>
+            <CardContent sx={{ p: isMobile ? 2 : 3 }}>
               <Typography variant="h6" fontWeight="800" gutterBottom display="flex" alignItems="center">
                 <SearchIcon sx={{ mr: 1, color: 'success.main' }} /> Search Existing Patient
               </Typography>
@@ -259,13 +214,13 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
               </Box>
               <Grid container spacing={2} sx={{ mt: 1 }}>
                 <Grid size={{ xs: 12, sm: 4 }}>
-                  <TextField fullWidth label="First Name" size="small" value={searchParams.first_name} onChange={(e) => setSearchParams({ ...searchParams, first_name: e.target.value })} />
+                  <TextField fullWidth label="First Name" value={searchParams.first_name} onChange={(e) => setSearchParams({ ...searchParams, first_name: e.target.value })} />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 4 }}>
-                  <TextField fullWidth label="Last Name" size="small" value={searchParams.last_name} onChange={(e) => setSearchParams({ ...searchParams, last_name: e.target.value })} />
+                  <TextField fullWidth label="Last Name" value={searchParams.last_name} onChange={(e) => setSearchParams({ ...searchParams, last_name: e.target.value })} />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 4 }}>
-                  <TextField fullWidth label="Phone" size="small" value={searchParams.phone} onChange={(e) => setSearchParams({ ...searchParams, phone: e.target.value })} />
+                  <TextField fullWidth label="Phone" value={searchParams.phone} onChange={(e) => setSearchParams({ ...searchParams, phone: e.target.value })} />
                 </Grid>
                 <Grid size={{ xs: 12 }}>
                   <Button variant="contained" color="success" fullWidth onClick={handleSearch} disabled={searching} sx={{ py: 1.5, borderRadius: 2, fontWeight: 'bold' }}>
@@ -280,32 +235,54 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                     Search Results ({searchResults.length})
                   </Typography>
                   {searchResults.length > 0 ? (
-                    <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-                      <Table size="small">
-                        <TableHead sx={{ bgcolor: 'grey.50' }}>
-                          <TableRow>
-                            <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
-                            <TableCell sx={{ fontWeight: 700 }}>Gender</TableCell>
-                            <TableCell sx={{ fontWeight: 700 }}>Phone</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {searchResults.map((patient) => (
-                            <TableRow key={patient.id} hover>
-                              <TableCell>{patient.first_name} {patient.last_name}</TableCell>
-                              <TableCell sx={{ textTransform: 'capitalize' }}>{patient.gender}</TableCell>
-                              <TableCell>{patient.phone}</TableCell>
-                              <TableCell align="right">
-                                <Button variant="contained" color="success" size="small" onClick={() => startEncounter(patient.id!, `${patient.first_name} ${patient.last_name}`)} disabled={loading} sx={{ borderRadius: 2 }}>
-                                  Start
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {isMobile || isTablet ? (
+                        // Card layout for mobile/tablet
+                        searchResults.map((patient) => (
+                          <Card key={patient.id} variant="outlined" sx={{ borderRadius: 2 }}>
+                            <CardContent sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Box>
+                                <Typography variant="subtitle1" fontWeight="bold">{patient.first_name} {patient.last_name}</Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
+                                  {patient.gender} • {patient.phone || 'No Phone'}
+                                </Typography>
+                              </Box>
+                              <Button variant="contained" color="success" onClick={() => startEncounter(patient.id!, `${patient.first_name} ${patient.last_name}`)} disabled={loading}>
+                                Start
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        ))
+                      ) : (
+                        // Table layout for desktop
+                        <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                          <Table size="small">
+                            <TableHead sx={{ bgcolor: 'grey.50' }}>
+                              <TableRow>
+                                <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
+                                <TableCell sx={{ fontWeight: 700 }}>Gender</TableCell>
+                                <TableCell sx={{ fontWeight: 700 }}>Phone</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {searchResults.map((patient) => (
+                                <TableRow key={patient.id} hover>
+                                  <TableCell>{patient.first_name} {patient.last_name}</TableCell>
+                                  <TableCell sx={{ textTransform: 'capitalize' }}>{patient.gender}</TableCell>
+                                  <TableCell>{patient.phone}</TableCell>
+                                  <TableCell align="right">
+                                    <Button variant="contained" color="success" size="small" onClick={() => startEncounter(patient.id!, `${patient.first_name} ${patient.last_name}`)} disabled={loading} sx={{ borderRadius: 2 }}>
+                                      Start
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      )}
+                    </Box>
                   ) : (
                     <Alert severity="info" sx={{ borderRadius: 2 }}>No matching patient found. You may register a new patient.</Alert>
                   )}
@@ -316,64 +293,72 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
         </Grid>
 
         {/* Right Column: Registration Form */}
-        <Grid size={{ xs: 12, md: 5 }}>
+        <Grid size={{ xs: 12, lg: 5 }}>
           <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-            <CardContent sx={{ p: 3 }}>
+            <CardContent sx={{ p: isMobile ? 2 : 3 }}>
               <Typography variant="h6" fontWeight="800" gutterBottom display="flex" alignItems="center">
                 <PersonAddIcon sx={{ mr: 1, color: 'success.main' }} /> Register New Patient
               </Typography>
               <Divider sx={{ mb: 3 }} />
-              <Box sx={{ mb: 3 }}>
-                <PatientPhotoCapture 
-                  patientId={currentPatientId} 
-                  onPhotoUploaded={setPatientPhotoUrl} 
-                  currentPhoto={patientPhotoUrl} 
-                />
-              </Box>
-              <form onSubmit={handleRegisterAndStart}>
-                <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <TextField fullWidth label="First Name" required value={newPatient.first_name} onChange={(e) => setNewPatient({ ...newPatient, first_name: e.target.value })} />
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <TextField fullWidth label="Last Name" required value={newPatient.last_name} onChange={(e) => setNewPatient({ ...newPatient, last_name: e.target.value })} />
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <TextField fullWidth select label="Gender" required value={newPatient.gender} onChange={(e) => setNewPatient({ ...newPatient, gender: e.target.value as any })}>
-                      <MenuItem value="male">Male</MenuItem>
-                      <MenuItem value="female">Female</MenuItem>
-                      <MenuItem value="other">Other</MenuItem>
-                    </TextField>
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <TextField 
-                      fullWidth 
-                      label="Date of Birth" 
-                      required 
-                      InputLabelProps={{ shrink: true }} 
-                      helperText={country ? `Format: ${country.dateFormat}` : ''} 
-                      value={newPatient.date_of_birth} 
-                      onChange={handleDateChange}
-                      placeholder={country?.dateFormat}
+              
+              <Grid container spacing={3}>
+                <Grid size={{ xs: 12, sm: 5, md: 4, lg: 12 }}>
+                  <Box sx={{ mb: isMobile ? 3 : 0 }}>
+                    <PatientPhotoCapture 
+                      patientId={currentPatientId} 
+                      onPhotoUploaded={setPatientPhotoUrl} 
+                      currentPhoto={patientPhotoUrl} 
                     />
-                  </Grid>
-                  <Grid size={{ xs: 12 }}>
-                    <TextField fullWidth label="Phone Number" value={newPatient.phone} onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })} />
-                  </Grid>
-                  <Grid size={{ xs: 12 }}>
-                    <TextField fullWidth label="Village" value={newPatient.village} onChange={(e) => setNewPatient({ ...newPatient, village: e.target.value })} />
-                  </Grid>
-                  <Grid size={{ xs: 12 }} sx={{ mt: 2 }}>
-                    <Button type="submit" variant="contained" color="success" fullWidth size="large" disabled={loading} sx={{ py: 1.5, borderRadius: 2, fontWeight: 'bold' }}>
-                      {loading ? <CircularProgress size={24} /> : "Register"}
-                    </Button>
-                  </Grid>
+                  </Box>
                 </Grid>
-              </form>
+                <Grid size={{ xs: 12, sm: 7, md: 8, lg: 12 }}>
+                  <form onSubmit={handleRegisterAndStart}>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <TextField fullWidth label="First Name" required value={newPatient.first_name} onChange={(e) => setNewPatient({ ...newPatient, first_name: e.target.value })} />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <TextField fullWidth label="Last Name" required value={newPatient.last_name} onChange={(e) => setNewPatient({ ...newPatient, last_name: e.target.value })} />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <TextField fullWidth select label="Gender" required value={newPatient.gender} onChange={(e) => setNewPatient({ ...newPatient, gender: e.target.value as any })}>
+                          <MenuItem value="male">Male</MenuItem>
+                          <MenuItem value="female">Female</MenuItem>
+                          <MenuItem value="other">Other</MenuItem>
+                        </TextField>
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <TextField 
+                          fullWidth 
+                          label="Date of Birth" 
+                          required 
+                          InputLabelProps={{ shrink: true }} 
+                          helperText={country ? `Format: ${country.dateFormat}` : ''} 
+                          value={newPatient.date_of_birth} 
+                          onChange={handleDateChange}
+                          placeholder={country?.dateFormat}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <TextField fullWidth label="Phone Number" value={newPatient.phone} onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })} />
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <TextField fullWidth label="Village" value={newPatient.village} onChange={(e) => setNewPatient({ ...newPatient, village: e.target.value })} />
+                      </Grid>
+                      <Grid size={{ xs: 12 }} sx={{ mt: 2 }}>
+                        <Button type="submit" variant="contained" color="success" fullWidth size="large" disabled={loading} sx={{ py: 1.5, borderRadius: 2, fontWeight: 'bold' }}>
+                          {loading ? <CircularProgress size={24} /> : "Register & Start Encounter"}
+                        </Button>
+                      </Grid>
+                    </Grid>
+                  </form>
+                </Grid>
+              </Grid>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
+
       {/* Badge Modal */}
       <Modal open={showBadgeModal} onClose={() => setShowBadgeModal(false)}>
         <Box sx={{ 
@@ -382,9 +367,11 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
           left: '50%', 
           transform: 'translate(-50%, -50%)', 
           bgcolor: 'background.paper', 
-          p: 4, 
+          p: isMobile ? 2 : 4, 
           borderRadius: 4, 
-          width: 450,
+          width: isMobile ? '90%' : 450,
+          maxHeight: '90vh',
+          overflowY: 'auto',
           boxShadow: 24
         }}>
           <Typography variant="h5" fontWeight="900" gutterBottom align="center" color="success.main">
@@ -395,7 +382,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
             <Box 
               id="badge-to-print" 
               sx={{ 
-                p: 3, 
+                p: isMobile ? 2 : 3, 
                 border: '2px solid',
                 borderColor: 'divider',
                 borderRadius: 3, 
@@ -415,7 +402,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                   lineHeight: 1.1,
                   color: 'primary.main',
                   textTransform: 'uppercase',
-                  fontSize: '1.75rem'
+                  fontSize: isMobile ? '1.25rem' : '1.75rem'
                 }}
               >
                 Health and Education for all
@@ -425,8 +412,8 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                 <Avatar 
                   src={badgeData.photoUrl} 
                   sx={{ 
-                    width: 150, 
-                    height: 150, 
+                    width: isMobile ? 100 : 150, 
+                    height: isMobile ? 100 : 150, 
                     mb: 2,
                     border: '4px solid',
                     borderColor: 'primary.light',
@@ -434,12 +421,12 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                   }} 
                 />
               ) : (
-                <Avatar sx={{ width: 150, height: 150, mb: 2, bgcolor: 'grey.200', color: 'text.secondary' }}>
+                <Avatar sx={{ width: isMobile ? 100 : 150, height: isMobile ? 100 : 150, mb: 2, bgcolor: 'grey.200', color: 'text.secondary' }}>
                   No Photo
                 </Avatar>
               )}
 
-              <Typography variant="h5" fontWeight="bold" sx={{ mb: 2, color: 'text.primary' }}>
+              <Typography variant="h5" fontWeight="bold" sx={{ mb: 2, color: 'text.primary', fontSize: isMobile ? '1.1rem' : '1.5rem' }}>
                 {badgeData.name}
               </Typography>
 
@@ -448,7 +435,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                   <img 
                     src={badgeData.qrCode} 
                     alt="QR Code" 
-                    style={{ width: 140, height: 140, display: 'block' }} 
+                    style={{ width: isMobile ? 100 : 140, height: isMobile ? 100 : 140, display: 'block' }} 
                   />
                 </Box>
               )}
@@ -501,7 +488,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
           </Button>
         </Box>
       </Modal>
-    </Container>
+    </StationLayout>
   );
 };
 
