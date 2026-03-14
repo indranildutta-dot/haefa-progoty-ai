@@ -13,7 +13,7 @@ import {
   Chip
 } from '@mui/material';
 import { Logout, AccountCircle } from '@mui/icons-material';
-import { Link } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { logout } from '../services/authService';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
@@ -37,8 +37,16 @@ const TopNavigation: React.FC = () => {
           <Typography
             variant="h6"
             noWrap
-            component="div"
-            sx={{ mr: 3, fontWeight: 800, letterSpacing: '-0.02em', color: 'primary.main', flexGrow: isMobile ? 1 : 0 }}
+            component={NavLink}
+            to="/"
+            sx={{ 
+              mr: 3, 
+              fontWeight: 800, 
+              letterSpacing: '-0.02em', 
+              color: 'primary.main', 
+              flexGrow: isMobile ? 1 : 0,
+              textDecoration: 'none'
+            }}
           >
             HAEFA PROGOTY
           </Typography>
@@ -62,7 +70,16 @@ const TopNavigation: React.FC = () => {
             </Box>
           )}
 
-          <Box sx={{ flexGrow: 1, display: 'flex', gap: 0.5, overflowX: 'auto', pb: isMobile ? 1 : 0 }}>
+          <Box sx={{ 
+            flexGrow: 1, 
+            display: 'flex', 
+            gap: 1, 
+            overflowX: 'auto', 
+            pb: isMobile ? 1 : 0,
+            '&::-webkit-scrollbar': { display: 'none' },
+            msOverflowStyle: 'none',
+            scrollbarWidth: 'none',
+          }}>
             {[
               { label: 'Ops', to: '/admin' },
               { label: 'Reg', to: '/' },
@@ -73,14 +90,20 @@ const TopNavigation: React.FC = () => {
             ].map((item) => (
               <Button 
                 key={item.to}
-                component={Link} 
+                component={NavLink} 
                 to={item.to} 
                 size={isMobile ? "small" : "medium"}
                 sx={{ 
-                  fontWeight: 600, 
+                  fontWeight: 700, 
                   color: 'text.secondary',
                   whiteSpace: 'nowrap',
-                  '&.active': { color: 'primary.main', bgcolor: 'grey.100' }
+                  borderRadius: 2,
+                  px: 2,
+                  '&.active': { 
+                    color: 'white', 
+                    bgcolor: 'primary.main',
+                    '&:hover': { bgcolor: 'primary.dark' }
+                  }
                 }}
               >
                 {item.label}

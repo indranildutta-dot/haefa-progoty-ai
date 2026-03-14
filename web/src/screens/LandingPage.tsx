@@ -32,7 +32,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectCountry }) => {
       {/* Left Side: Branding & Hero */}
       <Box sx={{ 
         flex: { xs: 'none', md: 1 }, 
-        bgcolor: 'primary.main', 
+        background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`, 
         color: 'white',
         p: { xs: 4, md: 8, lg: 12 },
         display: 'flex',
@@ -61,11 +61,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectCountry }) => {
           <Typography 
             variant="overline" 
             sx={{ 
-              fontWeight: 800, 
-              letterSpacing: 4, 
-              color: 'secondary.main',
-              mb: 2,
-              display: 'block'
+              fontWeight: 900, 
+              letterSpacing: 6, 
+              color: '#4fd1c5', // Vibrant teal/cyan
+              mb: 1,
+              display: 'block',
+              fontSize: '1rem'
             }}
           >
             GLOBAL HEALTH PORTAL
@@ -74,10 +75,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectCountry }) => {
             variant="h1" 
             sx={{ 
               fontWeight: 900, 
-              fontSize: { xs: '3rem', md: '4.5rem', lg: '5.5rem' },
-              lineHeight: 0.9,
+              fontSize: { xs: '3.5rem', md: '5rem', lg: '6rem' },
+              lineHeight: 0.85,
               mb: 4,
-              letterSpacing: '-0.04em'
+              letterSpacing: '-0.05em',
+              textShadow: '0 10px 30px rgba(0,0,0,0.2)'
             }}
           >
             HAEFA <br />
@@ -87,27 +89,24 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectCountry }) => {
             variant="h6" 
             sx={{ 
               fontWeight: 400, 
-              opacity: 0.8, 
-              maxWidth: 500,
-              lineHeight: 1.6,
-              mb: 6
+              opacity: 0.9, 
+              maxWidth: 520,
+              lineHeight: 1.5,
+              mb: 8,
+              fontSize: '1.25rem'
             }}
           >
             A unified clinical operating system for high-impact healthcare delivery across borders. Select your region to begin.
           </Typography>
 
-          <Stack direction="row" spacing={4}>
+          <Stack direction="row" spacing={6}>
             <Box>
-              <Typography variant="h4" fontWeight="900">2+</Typography>
-              <Typography variant="caption" sx={{ opacity: 0.6, textTransform: 'uppercase', fontWeight: 700 }}>Countries</Typography>
+              <Typography variant="h3" fontWeight="900" sx={{ color: 'secondary.main' }}>3</Typography>
+              <Typography variant="overline" sx={{ opacity: 0.7, fontWeight: 800, letterSpacing: 2 }}>Countries</Typography>
             </Box>
             <Box>
-              <Typography variant="h4" fontWeight="900">10k+</Typography>
-              <Typography variant="caption" sx={{ opacity: 0.6, textTransform: 'uppercase', fontWeight: 700 }}>Patients</Typography>
-            </Box>
-            <Box>
-              <Typography variant="h4" fontWeight="900">24/7</Typography>
-              <Typography variant="caption" sx={{ opacity: 0.6, textTransform: 'uppercase', fontWeight: 700 }}>Operations</Typography>
+              <Typography variant="h3" fontWeight="900" sx={{ color: 'secondary.main' }}>250K+</Typography>
+              <Typography variant="overline" sx={{ opacity: 0.7, fontWeight: 800, letterSpacing: 2 }}>Patients</Typography>
             </Box>
           </Stack>
         </motion.div>
@@ -120,7 +119,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectCountry }) => {
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        bgcolor: '#f8fafc'
+        bgcolor: '#f8fafc',
+        position: 'relative',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)',
+          backgroundSize: '30px 30px',
+          opacity: 0.2,
+          pointerEvents: 'none'
+        }
       }}>
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -138,7 +150,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectCountry }) => {
 
           <Grid container spacing={3}>
             {countries.map((country, index) => (
-              <Grid item xs={12} sm={6} key={country.id}>
+              <Grid size={{ xs: 12, sm: 6 }} key={country.id}>
                 <motion.div
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -148,14 +160,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectCountry }) => {
                 >
                   <Card 
                     sx={{ 
-                      borderRadius: 4, 
-                      border: '2px solid transparent',
-                      boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
-                      transition: 'all 0.3s ease',
+                      borderRadius: 5, 
+                      border: '1px solid',
+                      borderColor: 'rgba(255, 255, 255, 0.4)',
+                      background: 'rgba(255, 255, 255, 0.7)',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.05)',
+                      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                       overflow: 'hidden',
                       '&:hover': {
                         borderColor: 'secondary.main',
-                        boxShadow: '0 12px 40px rgba(245, 158, 11, 0.15)',
+                        background: '#fff',
+                        transform: 'translateY(-8px)',
+                        boxShadow: '0 20px 40px rgba(245, 158, 11, 0.15)',
                         '& .arrow-icon': {
                           transform: 'translateX(8px)',
                           color: 'secondary.main'
@@ -206,12 +223,46 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectCountry }) => {
             ))}
           </Grid>
 
-          <Box sx={{ mt: 8, pt: 4, borderTop: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
-            <PublicIcon sx={{ color: 'text.disabled' }} />
-            <Typography variant="body2" color="text.disabled" fontWeight="500">
-              HAEFA Global Network • Secure Clinical Access
-            </Typography>
+          <Box sx={{ 
+            mt: 8, 
+            pt: 4, 
+            borderTop: '1px solid', 
+            borderColor: 'divider', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between'
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <PublicIcon sx={{ color: 'text.disabled' }} />
+              <Typography variant="body2" color="text.disabled" fontWeight="600" sx={{ letterSpacing: 0.5 }}>
+                HAEFA GLOBAL NETWORK
+              </Typography>
+            </Box>
+            
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ 
+                width: 8, 
+                height: 8, 
+                bgcolor: '#10b981', 
+                borderRadius: '50%',
+                boxShadow: '0 0 0 rgba(16, 185, 129, 0.4)',
+                animation: 'pulse 2s infinite'
+              }} />
+              <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 700, textTransform: 'uppercase' }}>
+                System Live
+              </Typography>
+            </Box>
           </Box>
+
+          <style>
+            {`
+              @keyframes pulse {
+                0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+                70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+                100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+              }
+            `}
+          </style>
         </motion.div>
       </Box>
     </Box>

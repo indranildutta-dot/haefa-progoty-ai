@@ -119,31 +119,38 @@ const theme = createTheme({
 });
 
 const App: React.FC = () => {
-  const { selectedCountry, selectedClinic, clearCountry, clearClinic } = useAppStore();
+  const { selectedCountry, selectedClinic, clearCountry, clearClinic, setUser: setStoreUser } = useAppStore();
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    return subscribeToAuthChanges(setUser);
-  }, []);
+    return subscribeToAuthChanges((u) => {
+      setUser(u);
+      setStoreUser(u);
+    });
+  }, [setStoreUser]);
 
   const handleClearCountry = () => clearCountry();
-
-  if (!selectedCountry) return <LandingPage onSelectCountry={(c) => useAppStore.getState().setSession(c, null)} />;
-  if (!user) return <LoginPage selectedCountry={selectedCountry} onBack={handleClearCountry} />;
-  if (!selectedClinic) return <ClinicSelection selectedCountry={selectedCountry} onSelectClinic={(c) => useAppStore.getState().setSession(selectedCountry, c)} onBack={handleClearCountry} />;
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Routes>
-        <Route path="/admin" element={<ClinicOperationsDashboard countryId={selectedCountry.id} />} />
-        <Route path="/" element={<RegistrationStation countryId={selectedCountry.id} />} />
-        <Route path="/vitals" element={<VitalsStation countryId={selectedCountry.id} />} />
-        <Route path="/doctor" element={<DoctorDashboard countryId={selectedCountry.id} />} />
-        <Route path="/pharmacy" element={<PharmacyStation countryId={selectedCountry.id} />} />
-        <Route path="/queue" element={<QueueBoard countryId={selectedCountry.id} />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      {!selectedCountry ? (
+        <LandingPage onSelectCountry={(c) => useAppStore.getState().setSession(c, null)} />
+      ) : !user ? (
+        <LoginPage selectedCountry={selectedCountry} onBack={handleClearCountry} />
+      ) : !selectedClinic ? (
+        <ClinicSelection selectedCountry={selectedCountry} onSelectClinic={(c) => useAppStore.getState().setSession(selectedCountry, c)} onBack={handleClearCountry} />
+      ) : (
+        <Routes>
+          <Route path="/admin" element={<ClinicOperationsDashboard countryId={selectedCountry.id} />} />
+          <Route path="/" element={<RegistrationStation countryId={selectedCountry.id} />} />
+          <Route path="/vitals" element={<VitalsStation countryId={selectedCountry.id} />} />
+          <Route path="/doctor" element={<DoctorDashboard countryId={selectedCountry.id} />} />
+          <Route path="/pharmacy" element={<PharmacyStation countryId={selectedCountry.id} />} />
+          <Route path="/queue" element={<QueueBoard countryId={selectedCountry.id} />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      )}
       <NotificationSystem />
     </ThemeProvider>
   );
