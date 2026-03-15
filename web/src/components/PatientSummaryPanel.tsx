@@ -15,8 +15,8 @@ const PatientSummaryPanel: React.FC<PatientSummaryPanelProps> = ({ patient, tria
         <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1 }}>
           Basic Information
         </Typography>
-        <Typography variant="body2" sx={{ mb: 0.5 }}><strong>Name:</strong> {patient.first_name} {patient.last_name}</Typography>
-        <Typography variant="body2" sx={{ mb: 0.5 }}><strong>Age/Gender:</strong> {patient.date_of_birth} / {patient.gender}</Typography>
+        <Typography variant="body2" sx={{ mb: 0.5 }}><strong>Name:</strong> {patient.given_name} {patient.family_name}</Typography>
+        <Typography variant="body2" sx={{ mb: 0.5 }}><strong>Age/Gender:</strong> {patient.age_years !== undefined ? `${patient.age_years} YRS` : patient.date_of_birth} / {patient.gender}</Typography>
         <Typography variant="body2" sx={{ mb: 0.5 }}><strong>Village:</strong> {patient.village || 'N/A'}</Typography>
         <Typography variant="body2" sx={{ mb: 0.5 }}><strong>Phone:</strong> {patient.phone || 'N/A'}</Typography>
       </Box>

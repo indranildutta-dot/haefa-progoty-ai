@@ -20,12 +20,26 @@ export type EncounterStatus =
 
 export interface Patient {
   id?: string;
-  first_name: string;
-  last_name: string;
+  given_name: string;
+  family_name: string;
   gender: 'male' | 'female' | 'other';
-  date_of_birth: string;
+  date_of_birth?: string;
+  age_years?: number;
+  age_months?: number;
+  age_days?: number;
   phone?: string;
+  marital_status?: 'single' | 'married' | 'divorced' | 'widowed' | 'separated';
+  patient_type?: string;
+  national_id?: string;
+  rohingya_number?: string;
+  bhutanese_refugee_number?: string;
+  address_type?: 'home' | 'refugee camp';
+  address_line?: string;
   village?: string;
+  thana?: string;
+  post_code?: string;
+  district?: string;
+  country?: string;
   photo_url?: string;
   country_id: string;
   clinic_id: string;

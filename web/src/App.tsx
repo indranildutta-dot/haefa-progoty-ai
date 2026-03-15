@@ -19,6 +19,7 @@ import { User } from 'firebase/auth';
 import { useAppStore } from './store/useAppStore';
 import { Snackbar, Alert as MuiAlert } from '@mui/material';
 import StationLayout from './components/StationLayout';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const NotificationSystem: React.FC = () => {
   const { notifications, removeNotification } = useAppStore();
@@ -134,23 +135,25 @@ const App: React.FC = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      {!selectedCountry ? (
-        <LandingPage onSelectCountry={(c) => useAppStore.getState().setSession(c, null)} />
-      ) : !user ? (
-        <LoginPage selectedCountry={selectedCountry} onBack={handleClearCountry} />
-      ) : !selectedClinic ? (
-        <ClinicSelection selectedCountry={selectedCountry} onSelectClinic={(c) => useAppStore.getState().setSession(selectedCountry, c)} onBack={handleClearCountry} />
-      ) : (
-        <Routes>
-          <Route path="/admin" element={<ClinicOperationsDashboard countryId={selectedCountry.id} />} />
-          <Route path="/" element={<RegistrationStation countryId={selectedCountry.id} />} />
-          <Route path="/vitals" element={<VitalsStation countryId={selectedCountry.id} />} />
-          <Route path="/doctor" element={<DoctorDashboard countryId={selectedCountry.id} />} />
-          <Route path="/pharmacy" element={<PharmacyStation countryId={selectedCountry.id} />} />
-          <Route path="/queue" element={<QueueBoard countryId={selectedCountry.id} />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      )}
+      <ErrorBoundary>
+        {!selectedCountry ? (
+          <LandingPage onSelectCountry={(c) => useAppStore.getState().setSession(c, null)} />
+        ) : !user ? (
+          <LoginPage selectedCountry={selectedCountry} onBack={handleClearCountry} />
+        ) : !selectedClinic ? (
+          <ClinicSelection selectedCountry={selectedCountry} onSelectClinic={(c) => useAppStore.getState().setSession(selectedCountry, c)} onBack={handleClearCountry} />
+        ) : (
+          <Routes>
+            <Route path="/admin" element={<ClinicOperationsDashboard countryId={selectedCountry.id} />} />
+            <Route path="/" element={<RegistrationStation countryId={selectedCountry.id} />} />
+            <Route path="/vitals" element={<VitalsStation countryId={selectedCountry.id} />} />
+            <Route path="/doctor" element={<DoctorDashboard countryId={selectedCountry.id} />} />
+            <Route path="/pharmacy" element={<PharmacyStation countryId={selectedCountry.id} />} />
+            <Route path="/queue" element={<QueueBoard countryId={selectedCountry.id} />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        )}
+      </ErrorBoundary>
       <NotificationSystem />
     </ThemeProvider>
   );

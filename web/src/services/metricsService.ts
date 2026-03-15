@@ -1,5 +1,6 @@
 import { doc, setDoc, increment, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { handleFirestoreError, OperationType } from '../utils/firestoreError';
 
 export const updateMetrics = async (
   clinicId: string,
@@ -23,6 +24,7 @@ export const updateMetrics = async (
       last_updated: serverTimestamp(),
       clinic_id: clinicId,
       country_code: countryCode,
+      country_id: countryCode,
       date: today
     };
     if (u.patients_today) res.patients_today = increment(u.patients_today);
@@ -44,9 +46,9 @@ export const updateMetrics = async (
   
   try {
     await Promise.all([
-      setDoc(clinicRef, updateData, setOpts),
-      setDoc(countryRef, countryUpdateData, setOpts),
-      setDoc(globalRef, globalUpdateData, setOpts)
+      setDoc(clinicRef, updateData, setOpts).catch(e => handleFirestoreError(e, OperationType.WRITE, 'clinic_metrics')),
+      setDoc(countryRef, countryUpdateData, setOpts).catch(e => handleFirestoreError(e, OperationType.WRITE, 'country_metrics')),
+      setDoc(globalRef, globalUpdateData, setOpts).catch(e => handleFirestoreError(e, OperationType.WRITE, 'global_metrics'))
     ]);
 
     // Update avg_wait_time

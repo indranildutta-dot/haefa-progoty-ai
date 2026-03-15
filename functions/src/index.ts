@@ -76,7 +76,7 @@ export const registerPatient = onCall(async (request: CallableRequest) => {
     const sanitizedPatientData = sanitizeData(patientData);
     await db.collection("patients").doc(patientId).set({
       ...sanitizedPatientData,
-      photoUrl: photoUrl || "",
+      photo_url: photoUrl || "",
       created_at: new Date()
     });
 
@@ -92,9 +92,9 @@ export const registerPatient = onCall(async (request: CallableRequest) => {
 
     // 4. Add to Queue
     console.log("Adding to queue.");
-    const firstName = patientData.first_name || '';
-    const lastName = patientData.last_name || '';
-    const fullName = `${firstName} ${lastName}`.trim() || 'Unknown Patient';
+    const givenName = patientData.given_name || '';
+    const familyName = patientData.family_name || '';
+    const fullName = `${givenName} ${familyName}`.trim() || 'Unknown Patient';
 
     await db.collection("queues_active").add({
       encounter_id: encounterId,

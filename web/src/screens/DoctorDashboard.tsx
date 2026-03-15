@@ -254,7 +254,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
         setConsultationCount(snapshot.size);
       }
 
-      notify(`Consultation completed for ${currentPatient?.first_name}`, 'success');
+      notify(`Consultation completed for ${currentPatient?.given_name}`, 'success');
       setOpenSafetyDialog(false);
       setOverrideJustification('');
       setSelectedItem(null);

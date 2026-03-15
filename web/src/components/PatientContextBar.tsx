@@ -9,9 +9,11 @@ const PatientContextBar: React.FC = () => {
 
   if (!selectedPatient) return null;
 
-  const age = selectedPatient.date_of_birth 
-    ? new Date().getFullYear() - new Date(selectedPatient.date_of_birth).getFullYear() 
-    : 'Unknown';
+  const age = selectedPatient.age_years !== undefined 
+    ? selectedPatient.age_years 
+    : (selectedPatient.date_of_birth 
+        ? new Date().getFullYear() - new Date(selectedPatient.date_of_birth).getFullYear() 
+        : 'Unknown');
 
   return (
     <Paper 
@@ -32,12 +34,12 @@ const PatientContextBar: React.FC = () => {
         src={selectedPatient.photo_url} 
         sx={{ width: 48, height: 48, border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
       >
-        {selectedPatient.first_name[0]}{selectedPatient.last_name[0]}
+        {selectedPatient.given_name[0]}{selectedPatient.family_name[0]}
       </Avatar>
       
       <Box sx={{ minWidth: 0 }}>
         <Typography variant="h6" noWrap sx={{ lineHeight: 1.2, fontSize: isMobile ? '1rem' : '1.1rem' }}>
-          {selectedPatient.first_name} {selectedPatient.last_name}
+          {selectedPatient.given_name} {selectedPatient.family_name}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
           <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>

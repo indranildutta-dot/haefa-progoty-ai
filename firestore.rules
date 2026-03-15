@@ -14,6 +14,9 @@ service cloud.firestore {
     match /encounters/{encounterId} {
       allow read, write: if request.auth != null;
     }
+    match /encounters_archive/{encounterId} {
+      allow read, write: if request.auth != null;
+    }
     match /queues_active/{queueId} {
       allow read, write: if request.auth != null;
     }
@@ -23,15 +26,29 @@ service cloud.firestore {
     match /vitals/{vitalsId} {
       allow read, write: if request.auth != null;
     }
+    match /diagnoses/{diagnosisId} {
+      allow read, write: if request.auth != null;
+    }
+    match /prescriptions/{prescriptionId} {
+      allow read, write: if request.auth != null;
+    }
     match /triage_assessments/{triageId} {
       allow read, write: if request.auth != null;
     }
     match /audit_logs/{logId} {
-      allow create: if request.auth != null;
-      allow read: if request.auth != null;
+      allow create, read: if request.auth != null;
     }
-    match /clinic_metrics/{clinicId} {
-      allow read: if request.auth != null;
+    match /clinic_metrics/{metricId} {
+      allow read, write: if request.auth != null;
+    }
+    match /country_metrics/{metricId} {
+      allow read, write: if request.auth != null;
+    }
+    match /global_metrics/{metricId} {
+      allow read, write: if request.auth != null;
+    }
+    match /qr_tokens/{tokenId} {
+      allow read: if true;
       allow write: if request.auth != null;
     }
     match /badge_tokens/{tokenId} {

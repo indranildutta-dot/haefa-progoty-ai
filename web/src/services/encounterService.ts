@@ -26,6 +26,8 @@ import { useAppStore } from "../store/useAppStore";
 import { logAction } from "./auditService";
 import { updateQueueMetric } from "./queueMetricsService";
 
+import { handleFirestoreError, OperationType } from "../utils/firestoreError";
+
 const ENCOUNTERS_COLLECTION = "encounters";
 const ENCOUNTERS_ARCHIVE_COLLECTION = "encounters_archive";
 const VITALS_COLLECTION = "vitals";
@@ -41,16 +43,23 @@ export const createEncounter = async (patient_id: string) => {
     waiting_for_vitals: 1
   });
 
-  const docRef = await addDoc(collection(db, ENCOUNTERS_COLLECTION), {
-    patient_id,
-    encounter_status: 'WAITING_FOR_VITALS',
-    status: 'WAITING_FOR_VITALS',
-    current_station: 'registration',
-    country_code: selectedCountry.id,
-    clinic_id: selectedClinic.id,
-    created_at: serverTimestamp(),
-    updated_at: serverTimestamp()
-  });
+  let docRef;
+  try {
+    docRef = await addDoc(collection(db, ENCOUNTERS_COLLECTION), {
+      patient_id,
+      encounter_status: 'WAITING_FOR_VITALS',
+      status: 'WAITING_FOR_VITALS',
+      current_station: 'registration',
+      country_code: selectedCountry.id,
+      country_id: selectedCountry.id,
+      clinic_id: selectedClinic.id,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp()
+    });
+  } catch (e) {
+    handleFirestoreError(e, OperationType.WRITE, ENCOUNTERS_COLLECTION);
+    throw e; // Re-throw so caller knows it failed
+  }
 
   const patientRef = doc(db, "patients", patient_id);
   await updateDoc(patientRef, {
@@ -135,6 +144,7 @@ export const saveVitals = async (vitalsData: Omit<VitalsRecord, 'id' | 'created_
   await addDoc(collection(db, VITALS_COLLECTION), {
     ...vitalsData,
     country_code: selectedCountry.id,
+    country_id: selectedCountry.id,
     clinic_id: selectedClinic.id,
     created_at: serverTimestamp(),
     updated_at: serverTimestamp()
@@ -180,6 +190,7 @@ export const saveConsultation = async (
   await addDoc(collection(db, DIAGNOSES_COLLECTION), {
     ...diagnosisData,
     country_code: selectedCountry.id,
+    country_id: selectedCountry.id,
     clinic_id: selectedClinic.id,
     created_at: serverTimestamp(),
     updated_at: serverTimestamp()
@@ -190,6 +201,7 @@ export const saveConsultation = async (
       ...prescriptionData,
       status: 'PENDING',
       country_code: selectedCountry.id,
+      country_id: selectedCountry.id,
       clinic_id: selectedClinic.id,
       created_at: serverTimestamp(),
       updated_at: serverTimestamp()

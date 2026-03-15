@@ -1,5 +1,6 @@
 import { doc, updateDoc, increment, serverTimestamp, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import { handleFirestoreError, OperationType } from "../utils/firestoreError";
 
 const METRICS_COLLECTION = "clinic_metrics";
 
@@ -24,19 +25,27 @@ export const updateQueueMetric = async (clinicId: string, updates: {
   });
 
   if (!metricsSnap.exists()) {
-    await setDoc(metricsRef, {
-      clinic_id: clinicId,
-      patients_registered_today: 0,
-      waiting_for_vitals: 0,
-      ready_for_doctor: 0,
-      in_consultation: 0,
-      waiting_for_pharmacy: 0,
-      completed_today: 0,
-      avg_wait_time_minutes: 0,
-      ...Object.fromEntries(Object.entries(updates).map(([key, value]) => [key, value])),
-      last_updated: serverTimestamp()
-    });
+    try {
+      await setDoc(metricsRef, {
+        clinic_id: clinicId,
+        patients_registered_today: 0,
+        waiting_for_vitals: 0,
+        ready_for_doctor: 0,
+        in_consultation: 0,
+        waiting_for_pharmacy: 0,
+        completed_today: 0,
+        avg_wait_time_minutes: 0,
+        ...Object.fromEntries(Object.entries(updates).map(([key, value]) => [key, value])),
+        last_updated: serverTimestamp()
+      });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, METRICS_COLLECTION);
+    }
   } else {
-    await updateDoc(metricsRef, updateData);
+    try {
+      await updateDoc(metricsRef, updateData);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, METRICS_COLLECTION);
+    }
   }
 };

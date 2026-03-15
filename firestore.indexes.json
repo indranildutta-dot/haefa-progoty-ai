@@ -55,9 +55,9 @@
       "collectionGroup": "patients",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "country_code", "order": "ASCENDING" },
-        { "fieldPath": "last_name", "order": "ASCENDING" },
-        { "fieldPath": "first_name", "order": "ASCENDING" }
+        { "fieldPath": "country_id", "order": "ASCENDING" },
+        { "fieldPath": "family_name", "order": "ASCENDING" },
+        { "fieldPath": "given_name", "order": "ASCENDING" }
       ]
     }
   ],

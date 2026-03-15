@@ -11,13 +11,16 @@ import {
   orderBy,
   onSnapshot,
   deleteDoc,
-  setDoc
+  setDoc,
+  or,
+  and
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { QueueItem, EncounterStatus } from "../types";
 import { useAppStore } from "../store/useAppStore";
 import { logAction } from "./auditService";
 import { updateMetrics } from "./metricsService";
+import { handleFirestoreError, OperationType } from "../utils/firestoreError";
 
 const QUEUE_ACTIVE_COLLECTION = "queues_active";
 const QUEUE_ARCHIVE_COLLECTION = "queues_archive";
@@ -26,13 +29,20 @@ export const addToQueue = async (queueData: Omit<QueueItem, 'id' | 'created_at' 
   const { selectedCountry, selectedClinic } = useAppStore.getState();
   if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
 
-  const docRef = await addDoc(collection(db, QUEUE_ACTIVE_COLLECTION), {
-    ...queueData,
-    country_code: selectedCountry.id,
-    clinic_id: selectedClinic.id,
-    created_at: serverTimestamp(),
-    updated_at: serverTimestamp()
-  });
+  let docRef;
+  try {
+    docRef = await addDoc(collection(db, QUEUE_ACTIVE_COLLECTION), {
+      ...queueData,
+      country_code: selectedCountry.id,
+      country_id: selectedCountry.id,
+      clinic_id: selectedClinic.id,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp()
+    });
+  } catch (e) {
+    handleFirestoreError(e, OperationType.WRITE, QUEUE_ACTIVE_COLLECTION);
+    throw e;
+  }
 
   await updateMetrics(selectedClinic.id, selectedCountry.id, {
     active_queue: 1
@@ -143,8 +153,13 @@ export const getQueueByStatus = async (status: EncounterStatus) => {
 
   const q = query(
     collection(db, QUEUE_ACTIVE_COLLECTION),
-    where("country_code", "==", selectedCountry.id),
-    where("clinic_id", "==", selectedClinic.id)
+    and(
+      or(
+        where("country_code", "==", selectedCountry.id),
+        where("country_id", "==", selectedCountry.id)
+      ),
+      where("clinic_id", "==", selectedClinic.id)
+    )
   );
   
   const querySnapshot = await getDocs(q);
@@ -173,8 +188,13 @@ export const subscribeToQueue = (status: EncounterStatus | EncounterStatus[], ca
 
   const q = query(
     collection(db, QUEUE_ACTIVE_COLLECTION),
-    where("country_code", "==", selectedCountry.id),
-    where("clinic_id", "==", selectedClinic.id)
+    and(
+      or(
+        where("country_code", "==", selectedCountry.id),
+        where("country_id", "==", selectedCountry.id)
+      ),
+      where("clinic_id", "==", selectedClinic.id)
+    )
   );
   
   return onSnapshot(q, (snapshot) => {

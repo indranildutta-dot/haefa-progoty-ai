@@ -2,20 +2,26 @@ import { z } from 'zod';
 import { countries } from '../config/countries';
 
 export const getPatientSchema = (countryId?: string) => {
-  const country = countries.find(c => c.id === countryId);
-  const dateFormat = country?.dateFormat || 'YYYY-MM-DD';
-  
-  const dateRegex = dateFormat === 'DD/MM/YYYY' 
-    ? /^\d{2}\/\d{2}\/\d{4}$/ 
-    : /^\d{4}-\d{2}-\d{2}$/;
-    
   return z.object({
-    first_name: z.string().min(2, "First name is too short"),
-    last_name: z.string().min(2, "Last name is too short"),
+    given_name: z.string().min(2, "Given name is too short"),
+    family_name: z.string().min(2, "Family name is too short"),
     gender: z.enum(['male', 'female', 'other']),
-    date_of_birth: z.string().regex(dateRegex, `Invalid date format (${dateFormat})`),
+    date_of_birth: z.string().optional(),
+    age_years: z.number().optional(),
+    age_months: z.number().optional(),
+    age_days: z.number().optional(),
     phone: z.string().optional(),
+    marital_status: z.enum(['single', 'married', 'divorced', 'widowed', 'separated']).optional(),
+    national_id: z.string().optional(),
+    rohingya_number: z.string().optional(),
+    bhutanese_refugee_number: z.string().optional(),
+    address_type: z.enum(['home', 'refugee camp']).optional(),
+    address_line: z.string().optional(),
     village: z.string().optional(),
+    thana: z.string().optional(),
+    post_code: z.string().optional(),
+    district: z.string().optional(),
+    country: z.string().optional(),
     country_id: z.string().optional(),
   });
 };
