@@ -1,18 +1,24 @@
 import { 
   onAuthStateChanged, 
-  signInWithEmailAndPassword, 
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut,
   User
 } from "firebase/auth";
 import { auth } from "../firebase";
 import { UserProfile } from "../types";
 
+const provider = new GoogleAuthProvider();
+provider.setCustomParameters({
+  hd: 'haefa.org'
+});
+
 export const subscribeToAuthChanges = (callback: (user: User | null) => void) => {
   return onAuthStateChanged(auth, callback);
 };
 
-export const login = async (email: string, pass: string) => {
-  return signInWithEmailAndPassword(auth, email, pass);
+export const loginWithGoogle = async () => {
+  return signInWithPopup(auth, provider);
 };
 
 export const logout = async () => {

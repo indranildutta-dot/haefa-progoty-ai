@@ -22,8 +22,11 @@ export const countries: CountryConfig[] = [
     language: 'Bengali',
     flag: '🇧🇩',
     clinics: [
-      { id: 'BD-01', name: 'Dhaka Central Clinic' },
-      { id: 'BD-02', name: 'Chittagong Health Center' }
+      { id: 'BD-01', name: 'Dhaka' },
+      { id: 'BD-02', name: 'Cox\'s Bazar' },
+      { id: 'BD-03', name: 'Noakhali' },
+      { id: 'BD-04', name: 'Kurigram' },
+      { id: 'BD-05', name: 'Gazipur' }
     ]
   },
   {

@@ -3,11 +3,80 @@ import { onSchedule, ScheduledEvent } from "firebase-functions/v2/scheduler";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import { getAuth } from "firebase-admin/auth";
 import * as crypto from "crypto";
 
 initializeApp();
 const db = getFirestore();
 const storage = getStorage();
+
+export const syncUserPermissions = onCall(async (request: CallableRequest) => {
+  // 1. Check if the caller is an admin (Global Admin or Country Admin)
+  if (!request.auth || !request.auth.token.role || (request.auth.token.role !== 'global_admin' && request.auth.token.role !== 'country_admin')) {
+    throw new HttpsError("permission-denied", "Only admins can sync permissions.");
+  }
+
+  const { email, role, assignedClinicIds, assignedCountryId, name } = request.data;
+
+  if (!email || !role) {
+    throw new HttpsError("invalid-argument", "Missing email or role.");
+  }
+
+  // 2. Get user by email
+  const user = await getAuth().getUserByEmail(email);
+
+  // 3. Set custom claims
+  await getAuth().setCustomUserClaims(user.uid, {
+    role,
+    assignedClinicIds: assignedClinicIds || [],
+    assignedCountryId: assignedCountryId || null
+  });
+
+  // 4. Update/Create user profile in Firestore
+  await db.collection("users").doc(user.uid).set({
+    email,
+    name: name || email,
+    role,
+    assignedClinicIds: assignedClinicIds || [],
+    assignedCountryId: assignedCountryId || null,
+    updated_at: new Date()
+  }, { merge: true });
+
+  // 5. Trigger Welcome Email (Placeholder for Trigger Email Extension)
+  await db.collection("mail").add({
+    to: email,
+    message: {
+      subject: 'Welcome to HAEFA PROGOTY',
+      text: 'Your account has been set up. Click here to login: https://haefa-progoty-538194362811.us-west1.run.app',
+      html: 'Your account has been set up. Click <a href="https://haefa-progoty-538194362811.us-west1.run.app">here</a> to login.',
+    },
+  });
+
+  return { success: true };
+});
+
+export const bootstrapAdmins = onCall(async (request: CallableRequest) => {
+  const admins = [
+    { email: 'indranil_dutta@haefa.org', name: 'Indranil Dutta' },
+    { email: 'ruhul_abid@haefa.org', name: 'Ruhul Abid' }
+  ];
+
+  for (const admin of admins) {
+    try {
+      const user = await getAuth().getUserByEmail(admin.email);
+      await getAuth().setCustomUserClaims(user.uid, { role: 'global_admin' });
+      await db.collection("users").doc(user.uid).set({
+        email: admin.email,
+        name: admin.name,
+        role: 'global_admin',
+        updated_at: new Date()
+      }, { merge: true });
+    } catch (error) {
+      console.error(`Failed to bootstrap admin ${admin.email}:`, error);
+    }
+  }
+  return { success: true };
+});
 
 const generateId = () => {
   try {

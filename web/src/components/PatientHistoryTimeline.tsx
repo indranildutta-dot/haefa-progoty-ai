@@ -18,7 +18,12 @@ import {
   getDiagnosisByEncounter, 
   getPrescriptionByEncounter 
 } from '../services/encounterService';
-import { Encounter, VitalsRecord, DiagnosisRecord, PrescriptionRecord } from '../types';
+import { getTriageAssessmentByEncounter } from '../services/triageService';
+import { getPatientById } from '../services/patientService';
+import { Encounter, VitalsRecord, DiagnosisRecord, PrescriptionRecord, TriageAssessment, Patient } from '../types';
+import PrescriptionPrintView from './PrescriptionPrintView';
+import LocalPrintshopIcon from '@mui/icons-material/LocalPrintshop';
+import { useAppStore } from '../store/useAppStore';
 
 interface PatientHistoryTimelineProps {
   patientId: string;
@@ -29,30 +34,39 @@ interface HistoryItem {
   vitals: VitalsRecord | null;
   diagnosis: DiagnosisRecord | null;
   prescription: PrescriptionRecord | null;
+  triage: TriageAssessment | null;
 }
 
 const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patientId }) => {
+  const { selectedCountry, selectedClinic } = useAppStore();
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [fullHistoryItems, setFullHistoryItems] = useState<HistoryItem[]>([]);
+  const [patient, setPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingFull, setLoadingFull] = useState(false);
   const [openFullHistory, setOpenFullHistory] = useState(false);
+  const [printItem, setPrintItem] = useState<HistoryItem | null>(null);
 
   useEffect(() => {
     const fetchHistory = async () => {
       setLoading(true);
       try {
-        const encounters = await getPatientHistory(patientId);
+        const [encounters, patientData] = await Promise.all([
+          getPatientHistory(patientId),
+          getPatientById(patientId)
+        ]);
+        setPatient(patientData);
         const completedEncounters = encounters
           .filter(e => e.encounter_status === 'COMPLETED');
         
         const items = await Promise.all(completedEncounters.slice(0, 5).map(async (encounter) => {
-          const [vitals, diagnosis, prescription] = await Promise.all([
+          const [vitals, diagnosis, prescription, triage] = await Promise.all([
             getVitalsByEncounter(encounter.id!),
             getDiagnosisByEncounter(encounter.id!),
-            getPrescriptionByEncounter(encounter.id!)
+            getPrescriptionByEncounter(encounter.id!),
+            getTriageAssessmentByEncounter(encounter.id!)
           ]);
-          return { encounter, vitals, diagnosis, prescription };
+          return { encounter, vitals, diagnosis, prescription, triage };
         }));
         
         setHistoryItems(items);
@@ -77,12 +91,13 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
         .filter(e => e.encounter_status === 'COMPLETED');
       
       const items = await Promise.all(completedEncounters.map(async (encounter) => {
-        const [vitals, diagnosis, prescription] = await Promise.all([
+        const [vitals, diagnosis, prescription, triage] = await Promise.all([
           getVitalsByEncounter(encounter.id!),
           getDiagnosisByEncounter(encounter.id!),
-          getPrescriptionByEncounter(encounter.id!)
+          getPrescriptionByEncounter(encounter.id!),
+          getTriageAssessmentByEncounter(encounter.id!)
         ]);
-        return { encounter, vitals, diagnosis, prescription };
+        return { encounter, vitals, diagnosis, prescription, triage };
       }));
       
       setFullHistoryItems(items);
@@ -91,6 +106,14 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
     } finally {
       setLoadingFull(false);
     }
+  };
+
+  const handlePrint = (item: HistoryItem) => {
+    setPrintItem(item);
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => setPrintItem(null), 1000);
+    }, 100);
   };
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress size={24} /></Box>;
@@ -115,9 +138,20 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
         return (
           <Card key={item.encounter.id} sx={{ mb: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
             <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-              <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                {dateStr}
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle2" fontWeight="bold">
+                  {dateStr}
+                </Typography>
+                <Button 
+                  size="small" 
+                  variant="outlined" 
+                  startIcon={<LocalPrintshopIcon />}
+                  onClick={() => handlePrint(item)}
+                  sx={{ py: 0, px: 1, minWidth: 'auto' }}
+                >
+                  Print
+                </Button>
+              </Box>
               <Typography variant="body2" sx={{ mb: 0.5 }}>
                 <strong>Diagnosis:</strong> {item.diagnosis?.diagnosis || 'N/A'}
               </Typography>
@@ -151,7 +185,17 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
               const dateStr = item.encounter.created_at?.toDate().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
               return (
                 <Box key={item.encounter.id} sx={{ mb: 3 }}>
-                  <Typography variant="h6" fontWeight="bold" color="primary.main">{dateStr}</Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h6" fontWeight="bold" color="primary.main">{dateStr}</Typography>
+                    <Button 
+                      size="small" 
+                      variant="outlined" 
+                      startIcon={<LocalPrintshopIcon />}
+                      onClick={() => handlePrint(item)}
+                    >
+                      Print
+                    </Button>
+                  </Box>
                   <Typography variant="body2" color="textSecondary" gutterBottom>Encounter ID: {item.encounter.id}</Typography>
                   
                   <Box sx={{ pl: 2, borderLeft: '2px solid', borderColor: 'primary.main', mb: 2 }}>
@@ -191,6 +235,22 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
           <Button onClick={() => setOpenFullHistory(false)} variant="contained" sx={{ borderRadius: 2, fontWeight: 700 }}>Close</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Hidden Print View */}
+      {printItem && patient && (
+        <Box sx={{ display: 'none', '@media print': { display: 'block' } }}>
+          <PrescriptionPrintView 
+            patient={patient}
+            encounter={printItem.encounter}
+            vitals={printItem.vitals}
+            diagnosis={printItem.diagnosis}
+            prescription={printItem.prescription}
+            triage={printItem.triage}
+            countryCode={selectedCountry?.id || 'BD'}
+            clinicName={selectedClinic?.name}
+          />
+        </Box>
+      )}
     </Box>
   );
 };

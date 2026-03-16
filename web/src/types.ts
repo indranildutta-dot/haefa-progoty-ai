@@ -115,6 +115,9 @@ export interface DiagnosisRecord {
   chief_complaint: string;
   diagnosis: string;
   notes: string;
+  clinicalAssessment?: any;
+  labInvestigations?: string[];
+  referrals?: string[];
   country_code: string;
   clinic_id: string;
   created_at: Timestamp;

@@ -1,59 +1,48 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+    
+    // Helper functions
+    function isAuthenticated() { return request.auth != null; }
+    function getRole() { return request.auth.token.role; }
+    function getClinicId() { return request.auth.token.assignedClinicId; }
+    function getCountryId() { return request.auth.token.assignedCountryId; }
+    
+    function isGlobalAdmin() { return isAuthenticated() && getRole() == 'global_admin'; }
+    function isCountryAdmin(countryId) { return isAuthenticated() && getRole() == 'country_admin' && getCountryId() == countryId; }
+    function isClinicStaff(clinicId) { return isAuthenticated() && (getRole() == 'nurse' || getRole() == 'doctor' || getRole() == 'pharmacist') && getClinicId() == clinicId; }
+    function isCountryReader(countryId) { return isAuthenticated() && getRole() == 'country_reader' && getCountryId() == countryId; }
+    function isGlobalReader() { return isAuthenticated() && getRole() == 'global_reader'; }
+
+    // Domain Validators
+    function isValidPatient(data) {
+      return data.registeredClinicId is string && data.registeredClinicId.size() > 0 &&
+             data.countryCode is string && data.countryCode.size() > 0;
     }
-    match /countries/{countryId} {
-      allow read: if true;
-    }
+
+    // Access control for patients
     match /patients/{patientId} {
-      allow read, write: if request.auth != null;
+      allow read: if isGlobalAdmin() || 
+                     isCountryAdmin(resource.data.countryCode) || 
+                     isClinicStaff(resource.data.registeredClinicId) ||
+                     isCountryReader(resource.data.countryCode) ||
+                     isGlobalReader();
+      allow create: if (isGlobalAdmin() || 
+                        isCountryAdmin(request.resource.data.countryCode) || 
+                        isClinicStaff(request.resource.data.registeredClinicId)) &&
+                        isValidPatient(request.resource.data);
+      allow update: if (isGlobalAdmin() || 
+                        isCountryAdmin(request.resource.data.countryCode) || 
+                        isClinicStaff(request.resource.data.registeredClinicId)) &&
+                        isValidPatient(request.resource.data);
     }
-    match /encounters/{encounterId} {
-      allow read, write: if request.auth != null;
+    
+    // Access control for users
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isGlobalAdmin() || isCountryAdmin(getCountryId()) || request.auth.uid == userId);
+      allow write: if isAuthenticated() && (isGlobalAdmin() || isCountryAdmin(getCountryId()) || request.auth.uid == userId);
     }
-    match /encounters_archive/{encounterId} {
-      allow read, write: if request.auth != null;
-    }
-    match /queues_active/{queueId} {
-      allow read, write: if request.auth != null;
-    }
-    match /queues_archive/{queueId} {
-      allow read, write: if request.auth != null;
-    }
-    match /vitals/{vitalsId} {
-      allow read, write: if request.auth != null;
-    }
-    match /diagnoses/{diagnosisId} {
-      allow read, write: if request.auth != null;
-    }
-    match /prescriptions/{prescriptionId} {
-      allow read, write: if request.auth != null;
-    }
-    match /triage_assessments/{triageId} {
-      allow read, write: if request.auth != null;
-    }
-    match /audit_logs/{logId} {
-      allow create, read: if request.auth != null;
-    }
-    match /clinic_metrics/{metricId} {
-      allow read, write: if request.auth != null;
-    }
-    match /country_metrics/{metricId} {
-      allow read, write: if request.auth != null;
-    }
-    match /global_metrics/{metricId} {
-      allow read, write: if request.auth != null;
-    }
-    match /qr_tokens/{tokenId} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-    match /badge_tokens/{tokenId} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
+    
+    // ...
   }
 }

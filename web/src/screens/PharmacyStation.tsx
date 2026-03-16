@@ -39,8 +39,12 @@ import { subscribeToQueue, updateQueueStatus } from '../services/queueService';
 import { 
   getDiagnosisByEncounter, 
   getPrescriptionByEncounter, 
-  markPrescriptionDispensed 
+  markPrescriptionDispensed,
+  getVitalsByEncounter,
+  getEncounterById
 } from '../services/encounterService';
+import { getTriageAssessmentByEncounter } from '../services/triageService';
+import { getPatientById } from '../services/patientService';
 import { getPatientByQrToken } from '../services/qrService';
 import { 
   collection, 
@@ -49,11 +53,13 @@ import {
   getDocs 
 } from "firebase/firestore";
 import { db } from "../firebase";
-import { QueueItem, DiagnosisRecord, PrescriptionRecord } from '../types';
+import { QueueItem, DiagnosisRecord, PrescriptionRecord, Patient, VitalsRecord, TriageAssessment, Encounter } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import QrScannerModal from '../components/QrScannerModal';
 import StationLayout from '../components/StationLayout';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import PrescriptionPrintView from '../components/PrescriptionPrintView';
+import LocalPrintshopIcon from '@mui/icons-material/LocalPrintshop';
 
 interface PharmacyStationProps {
   countryId: string;
@@ -66,6 +72,10 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
   const [selectedItem, setSelectedItem] = useState<QueueItem | null>(null);
   const [currentDiagnosis, setCurrentDiagnosis] = useState<DiagnosisRecord | null>(null);
   const [currentPrescription, setCurrentPrescription] = useState<PrescriptionRecord | null>(null);
+  const [currentPatient, setCurrentPatient] = useState<Patient | null>(null);
+  const [currentVitals, setCurrentVitals] = useState<VitalsRecord | null>(null);
+  const [currentTriage, setCurrentTriage] = useState<TriageAssessment | null>(null);
+  const [currentEncounter, setCurrentEncounter] = useState<Encounter | null>(null);
   const [openDispenseDialog, setOpenDispenseDialog] = useState(false);
   const [dispensedItems, setDispensedItems] = useState<Record<number, boolean>>({});
   const [dispensedCount, setDispensedCount] = useState(0);
@@ -108,12 +118,20 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
   const handleOpenDispense = async (item: QueueItem) => {
     setSelectedItem(item);
     try {
-      const [diagnosis, prescription] = await Promise.all([
+      const [diagnosis, prescription, patient, vitals, triage, encounter] = await Promise.all([
         getDiagnosisByEncounter(item.encounter_id),
-        getPrescriptionByEncounter(item.encounter_id)
+        getPrescriptionByEncounter(item.encounter_id),
+        getPatientById(item.patient_id),
+        getVitalsByEncounter(item.encounter_id),
+        getTriageAssessmentByEncounter(item.encounter_id),
+        getEncounterById(item.encounter_id)
       ]);
       setCurrentDiagnosis(diagnosis);
       setCurrentPrescription(prescription);
+      setCurrentPatient(patient);
+      setCurrentVitals(vitals);
+      setCurrentTriage(triage);
+      setCurrentEncounter(encounter);
       setDispensedItems({});
       setPharmacyNote('');
       setPharmacyAction('DISPENSE');
@@ -431,21 +449,47 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
             <Typography color="textSecondary">No medications prescribed.</Typography>
           )}
         </DialogContent>
-        <DialogActions sx={{ p: 2, bgcolor: 'grey.50' }}>
-          <Button onClick={() => setOpenDispenseDialog(false)} color="inherit">
-            Cancel
-          </Button>
+        <DialogActions sx={{ p: 2, bgcolor: 'grey.50', justifyContent: 'space-between' }}>
           <Button 
-            variant="contained" 
-            onClick={handleCompleteDispensing} 
-            startIcon={<CheckCircleIcon />} 
-            disabled={pharmacyAction === 'DISPENSE' && !allDispensed} 
-            sx={{ fontWeight: 700, borderRadius: 2, px: 3 }}
+            variant="outlined" 
+            onClick={() => window.print()} 
+            startIcon={<LocalPrintshopIcon />} 
+            sx={{ fontWeight: 700, borderRadius: 2 }}
           >
-            {pharmacyAction === 'DISPENSE' ? 'Finalize Dispensing' : 'Submit Action'}
+            Print Prescription
           </Button>
+          <Box>
+            <Button onClick={() => setOpenDispenseDialog(false)} color="inherit" sx={{ mr: 1 }}>
+              Cancel
+            </Button>
+            <Button 
+              variant="contained" 
+              onClick={handleCompleteDispensing} 
+              startIcon={<CheckCircleIcon />} 
+              disabled={pharmacyAction === 'DISPENSE' && !allDispensed} 
+              sx={{ fontWeight: 700, borderRadius: 2, px: 3 }}
+            >
+              {pharmacyAction === 'DISPENSE' ? 'Finalize Dispensing' : 'Submit Action'}
+            </Button>
+          </Box>
         </DialogActions>
       </Dialog>
+
+      {/* Hidden Print View */}
+      {currentPatient && currentEncounter && (
+        <Box sx={{ display: 'none', '@media print': { display: 'block' } }}>
+          <PrescriptionPrintView 
+            patient={currentPatient}
+            encounter={currentEncounter}
+            vitals={currentVitals}
+            diagnosis={currentDiagnosis}
+            prescription={currentPrescription}
+            triage={currentTriage}
+            countryCode={selectedCountry?.id || 'BD'}
+            clinicName={selectedClinic?.name}
+          />
+        </Box>
+      )}
     </StationLayout>
   );
 };

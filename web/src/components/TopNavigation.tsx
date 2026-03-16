@@ -34,22 +34,21 @@ const TopNavigation: React.FC = () => {
     <AppBar position="sticky" elevation={0} sx={{ borderBottom: '1px solid rgba(0,0,0,0.08)', bgcolor: 'white', color: 'text.primary' }}>
       <Container maxWidth="xl">
         <Toolbar disableGutters sx={{ minHeight: 60, flexWrap: isMobile ? 'wrap' : 'nowrap', py: isMobile ? 1 : 0 }}>
-          <Typography
-            variant="h6"
-            noWrap
-            component={NavLink}
-            to="/"
-            sx={{ 
-              mr: 3, 
-              fontWeight: 800, 
-              letterSpacing: '-0.02em', 
-              color: 'primary.main', 
-              flexGrow: isMobile ? 1 : 0,
-              textDecoration: 'none'
-            }}
-          >
-            HAEFA PROGOTY
-          </Typography>
+          <Box component={NavLink} to="/" sx={{ display: 'flex', alignItems: 'center', mr: 3, textDecoration: 'none' }}>
+            <img src="/logo.png" alt="HAEFA Logo" style={{ height: 40, marginRight: 12 }} />
+            <Typography
+              variant="h6"
+              noWrap
+              sx={{ 
+                fontWeight: 800, 
+                letterSpacing: '-0.02em', 
+                color: 'primary.main', 
+                flexGrow: isMobile ? 1 : 0,
+              }}
+            >
+              HAEFA PROGOTY
+            </Typography>
+          </Box>
           
           {!isMobile && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 3, borderRight: '1px solid rgba(0,0,0,0.08)', pr: 3 }}>
@@ -57,14 +56,14 @@ const TopNavigation: React.FC = () => {
               <Chip 
                 label={`${selectedCountry.name} ${selectedCountry.flag}`} 
                 onClick={clearCountry}
-                sx={{ fontWeight: 600, cursor: 'pointer', bgcolor: 'grey.100' }}
-                size="small"
+                sx={{ fontWeight: 800, cursor: 'pointer', bgcolor: 'primary.light', color: 'primary.contrastText', px: 1, fontSize: '0.875rem' }}
+                size="medium"
               />
               <Chip 
                 label={selectedClinic.name} 
                 onClick={clearClinic}
-                sx={{ fontWeight: 600, cursor: 'pointer', bgcolor: 'grey.100' }}
-                size="small"
+                sx={{ fontWeight: 800, cursor: 'pointer', bgcolor: 'secondary.light', color: 'secondary.contrastText', px: 1, fontSize: '0.875rem' }}
+                size="medium"
                 color="secondary"
               />
             </Box>

@@ -35,7 +35,6 @@ import FavoriteIcon from '@mui/icons-material/Favorite';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { subscribeToQueue, updateQueueStatus, updateQueueTriage } from '../services/queueService';
 import { saveVitals } from '../services/encounterService';
-import { saveTriageAssessment } from '../services/triageService';
 import { QueueItem, Vitals, Patient, TriageLevel } from '../types';
 import { getPatientById } from '../services/patientService';
 import { getPatientByQrToken } from '../services/qrService';
@@ -63,15 +62,6 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
   // Triage State
   const [triageResult, setTriageResult] = useState<TriageResult | null>(null);
   const [manualTriageLevel, setManualTriageLevel] = useState<TriageLevel | null>(null);
-  const [triageAssessment, setTriageAssessment] = useState({
-    allergies: '',
-    tobaccoUse: 'none' as 'none' | 'former' | 'current',
-    alcoholUse: 'none' as 'none' | 'occasional' | 'regular',
-    chronicDiseases: [] as string[],
-    familyMedicalHistory: '',
-    pregnancyStatus: 'no' as 'yes' | 'no' | 'unknown',
-    triageNotes: ''
-  });
 
   // Vitals Form State
   const [vitals, setVitals] = useState<Vitals>({
@@ -150,21 +140,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
         created_by: auth.currentUser?.uid || 'unknown'
       });
 
-      // 3. Save Triage Assessment
-      await saveTriageAssessment({
-        encounter_id: selectedQueueItem.encounter_id,
-        patient_id: selectedQueueItem.patient_id,
-        recorded_by: auth.currentUser?.uid || 'unknown',
-        allergies: triageAssessment.allergies.split(',').map(a => a.trim()).filter(a => a !== ''),
-        tobacco_use: triageAssessment.tobaccoUse,
-        alcohol_use: triageAssessment.alcoholUse,
-        chronic_diseases: triageAssessment.chronicDiseases as any,
-        family_medical_history: triageAssessment.familyMedicalHistory,
-        pregnancy_status: triageAssessment.pregnancyStatus,
-        triage_notes: triageAssessment.triageNotes
-      });
-
-      // 4. Update Queue Triage
+      // 3. Update Queue Triage
       const finalTriageLevel = manualTriageLevel || triageResult?.triage_level || 'standard';
       const isManual = !!manualTriageLevel && manualTriageLevel !== triageResult?.triage_level;
       
@@ -356,30 +332,6 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
                 </Grid>
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <TextField fullWidth label="SpO2" type="number" value={vitals.oxygenSaturation} onChange={(e) => setVitals({ ...vitals, oxygenSaturation: parseInt(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }} />
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-
-          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-            <CardContent sx={{ p: isMobile ? 2 : 3 }}>
-              <Typography variant="h6" fontWeight="800" gutterBottom color="info.main">BACKGROUND & HISTORY</Typography>
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField fullWidth label="Allergies" value={triageAssessment.allergies} onChange={(e) => setTriageAssessment({...triageAssessment, allergies: e.target.value})} />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <FormControl fullWidth>
-                    <InputLabel>Tobacco Use</InputLabel>
-                    <Select value={triageAssessment.tobaccoUse} label="Tobacco Use" onChange={(e) => setTriageAssessment({...triageAssessment, tobaccoUse: e.target.value as any})}>
-                      <MenuItem value="none">None</MenuItem>
-                      <MenuItem value="former">Former</MenuItem>
-                      <MenuItem value="current">Current</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid size={{ xs: 12 }}>
-                  <TextField fullWidth label="Triage Notes" multiline rows={3} value={triageAssessment.triageNotes} onChange={(e) => setTriageAssessment({...triageAssessment, triageNotes: e.target.value})} />
                 </Grid>
               </Grid>
             </CardContent>

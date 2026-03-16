@@ -9,7 +9,8 @@ import {
   updateDoc,
   serverTimestamp,
   Timestamp,
-  or
+  or,
+  and
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { Patient } from "../types";
@@ -83,12 +84,15 @@ export const searchPatients = async (searchParams: {
     countryIds.push('Solomon Islands');
   }
 
-  // Use OR query to catch both country_id and country_code
+  // Use AND query to combine country filter OR and clinic filter
   const q = query(
     collection(db, PATIENTS_COLLECTION), 
-    or(
-      where("country_id", "in", countryIds),
-      where("country_code", "in", countryIds)
+    and(
+      or(
+        where("country_id", "in", countryIds),
+        where("country_code", "in", countryIds)
+      ),
+      where("clinic_id", "==", selectedClinic.id)
     )
   );
   
@@ -101,16 +105,11 @@ export const searchPatients = async (searchParams: {
   const results = allPatients.filter(patient => {
     let match = true;
     
-    // Clinic filter
+    // Clinic filter (legacy check)
     // If patient has a clinic_id, it must match selected clinic
     // If they don't have one, we include them (legacy data)
-    if (patient.clinic_id && patient.clinic_id !== selectedClinic.id) {
-      // Also check if clinic_id matches the clinic name (legacy data)
-      if (patient.clinic_id !== selectedClinic.name) {
-        match = false;
-      } else {
-        match = true; // Matches by name
-      }
+    if (patient.clinic_id && patient.clinic_id !== selectedClinic.id && patient.clinic_id !== selectedClinic.name) {
+      match = false;
     }
     
     // Name filters - check both given_name/first_name and family_name/last_name

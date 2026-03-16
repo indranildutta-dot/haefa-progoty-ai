@@ -5,6 +5,8 @@ import {
   ThemeProvider,
   createTheme,
 } from '@mui/material';
+import AdminDashboard from './screens/AdminDashboard';
+import AdminUserManagement from './screens/AdminUserManagement';
 import RegistrationStation from './screens/RegistrationStation';
 import VitalsStation from './screens/VitalsStation';
 import DoctorDashboard from './screens/DoctorDashboard';
@@ -120,8 +122,10 @@ const theme = createTheme({
 });
 
 const App: React.FC = () => {
-  const { selectedCountry, selectedClinic, clearCountry, clearClinic, setUser: setStoreUser } = useAppStore();
+  const { selectedCountry, selectedClinic, clearCountry, clearClinic, setUser: setStoreUser, userProfile } = useAppStore();
   const [user, setUser] = useState<User | null>(null);
+
+  const isAdmin = userProfile?.role === 'global_admin' || userProfile?.role === 'country_admin';
 
   useEffect(() => {
     return subscribeToAuthChanges((u) => {
@@ -140,11 +144,13 @@ const App: React.FC = () => {
           <LandingPage onSelectCountry={(c) => useAppStore.getState().setSession(c, null)} />
         ) : !user ? (
           <LoginPage selectedCountry={selectedCountry} onBack={handleClearCountry} />
-        ) : !selectedClinic ? (
+        ) : (!selectedClinic && !isAdmin) ? (
           <ClinicSelection selectedCountry={selectedCountry} onSelectClinic={(c) => useAppStore.getState().setSession(selectedCountry, c)} onBack={handleClearCountry} />
         ) : (
           <Routes>
-            <Route path="/admin" element={<ClinicOperationsDashboard countryId={selectedCountry.id} />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/users" element={<AdminUserManagement />} />
+            <Route path="/clinic-dashboard" element={<ClinicOperationsDashboard countryId={selectedCountry.id} />} />
             <Route path="/" element={<RegistrationStation countryId={selectedCountry.id} />} />
             <Route path="/vitals" element={<VitalsStation countryId={selectedCountry.id} />} />
             <Route path="/doctor" element={<DoctorDashboard countryId={selectedCountry.id} />} />

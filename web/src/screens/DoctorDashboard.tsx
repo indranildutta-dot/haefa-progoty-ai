@@ -65,6 +65,8 @@ interface DoctorDashboardProps {
 import StationLayout from '../components/StationLayout';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
+import { initialClinicalAssessment } from '../components/ClinicalAssessmentPanel';
+
 const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
   const { notify, selectedCountry, selectedClinic, selectedPatient, setSelectedPatient } = useAppStore();
   const { isMobile, isTablet } = useResponsiveLayout();
@@ -83,7 +85,10 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
     diagnosis: '',
     notes: '',
     treatmentNotes: '',
-    prescriptions: [] as Prescription[]
+    prescriptions: [] as Prescription[],
+    clinicalAssessment: initialClinicalAssessment,
+    labInvestigations: [] as string[],
+    referrals: [] as string[]
   });
 
   const [consultationCount, setConsultationCount] = useState(0);
@@ -222,6 +227,9 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
           chief_complaint: consultData.treatmentNotes,
           diagnosis: consultData.diagnosis,
           notes: finalNotes,
+          clinicalAssessment: consultData.clinicalAssessment,
+          labInvestigations: consultData.labInvestigations,
+          referrals: consultData.referrals,
           created_by: uid
         },
         hasPrescriptions ? {
@@ -259,7 +267,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
       setOverrideJustification('');
       setSelectedItem(null);
       setSelectedPatient(null);
-      setConsultData({ diagnosis: '', notes: '', treatmentNotes: '', prescriptions: [] });
+      setConsultData({ diagnosis: '', notes: '', treatmentNotes: '', prescriptions: [], clinicalAssessment: initialClinicalAssessment, labInvestigations: [], referrals: [] });
     } catch (err) {
       console.error(err);
       setErrorMsg("Failed to save consultation.");
@@ -283,7 +291,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
     }
     setSelectedItem(null);
     setSelectedPatient(null);
-    setConsultData({ diagnosis: '', notes: '', treatmentNotes: '', prescriptions: [] });
+    setConsultData({ diagnosis: '', notes: '', treatmentNotes: '', prescriptions: [], clinicalAssessment: initialClinicalAssessment, labInvestigations: [], referrals: [] });
     setConsultationStartTime(null);
   };
 

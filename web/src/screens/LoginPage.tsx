@@ -4,15 +4,13 @@ import {
   Paper, 
   Typography, 
   Box, 
-  TextField, 
   Button, 
   Alert,
   CircularProgress,
-  IconButton,
-  InputAdornment
+  IconButton
 } from '@mui/material';
-import { Visibility, VisibilityOff, ArrowBack } from '@mui/icons-material';
-import { login } from '../services/authService';
+import { ArrowBack, Google } from '@mui/icons-material';
+import { loginWithGoogle } from '../services/authService';
 import { CountryConfig } from '../config/countries';
 
 interface LoginPageProps {
@@ -21,21 +19,17 @@ interface LoginPageProps {
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ selectedCountry, onBack }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async () => {
     setLoading(true);
     setError(null);
     try {
-      await login(email, password);
+      await loginWithGoogle();
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Failed to login. Please check your credentials.');
+      setError(err.message || 'Failed to login with Google.');
     } finally {
       setLoading(false);
     }
@@ -60,54 +54,17 @@ const LoginPage: React.FC<LoginPageProps> = ({ selectedCountry, onBack }) => {
 
         {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
-        <form onSubmit={handleSubmit}>
-          <TextField
-            fullWidth
-            label="Email Address"
-            variant="outlined"
-            margin="normal"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-          />
-          <TextField
-            fullWidth
-            label="Password"
-            type={showPassword ? 'text' : 'password'}
-            variant="outlined"
-            margin="normal"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
-                    {showPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              )
-            }}
-          />
-          <Button
-            fullWidth
-            variant="contained"
-            size="large"
-            type="submit"
-            disabled={loading}
-            sx={{ mt: 4, py: 1.5, fontWeight: 700, borderRadius: 2 }}
-          >
-            {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign In'}
-          </Button>
-        </form>
-
-        <Box sx={{ mt: 4, textAlign: 'center' }}>
-          <Typography variant="body2" color="text.secondary">
-            Default credentials for testing: <strong>admin@haefa.org</strong> / <strong>password</strong>
-          </Typography>
-        </Box>
+        <Button
+          fullWidth
+          variant="contained"
+          size="large"
+          onClick={handleLogin}
+          disabled={loading}
+          startIcon={<Google />}
+          sx={{ mt: 4, py: 2, fontWeight: 700, borderRadius: 2, fontSize: '1.1rem' }}
+        >
+          {loading ? <CircularProgress size={24} color="inherit" /> : 'Login with Haefa.org'}
+        </Button>
       </Paper>
     </Container>
   );

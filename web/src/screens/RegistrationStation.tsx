@@ -77,7 +77,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [showBadgeModal, setShowBadgeModal] = useState(false);
-  const [badgeData, setBadgeData] = useState<{ patientId: string; name: string; qrCode: string; photoUrl?: string } | null>(null);
+  const [badgeData, setBadgeData] = useState<{ patientId: string; name: string; qrCode: string; photoUrl?: string; clinicName?: string } | null>(null);
   const [patientPhotoUrl, setPatientPhotoUrl] = useState<string | undefined>(undefined);
   const [currentPatientId, setCurrentPatientId] = useState<string>(doc(collection(db, 'patients')).id);
   const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
@@ -311,7 +311,8 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
           patientId: currentPatientId,
           name: `${newPatient.given_name} ${newPatient.family_name}`,
           qrCode: qrCodeDataUrl,
-          photoUrl: patientPhotoUrl
+          photoUrl: patientPhotoUrl,
+          clinicName: selectedClinic?.name
         });
         setShowBadgeModal(true);
       } else {
@@ -725,8 +726,8 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
           overflowY: 'auto',
           boxShadow: 24
         }}>
-          <Typography variant="h5" fontWeight="900" gutterBottom align="center" color="success.main">
-            Registration Success
+          <Typography variant="h5" fontWeight="900" gutterBottom align="center" color="primary.main">
+            Patient Health Card
           </Typography>
           
           {badgeData && (
@@ -745,6 +746,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                 bgcolor: '#fff'
               }}
             >
+              <Box component="img" src="/logo.png" sx={{ width: 80, mb: 2 }} />
               <Typography 
                 variant="h4" 
                 fontWeight="900" 
@@ -756,7 +758,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                   fontSize: isMobile ? '1.25rem' : '1.75rem'
                 }}
               >
-                Health and Education for all
+                Health and Education for All, USA
               </Typography>
 
               {badgeData.photoUrl ? (
@@ -791,9 +793,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                 </Box>
               )}
               
-              <Typography variant="caption" sx={{ mt: 1, color: 'text.secondary', fontWeight: 500 }}>
-                Patient ID: {badgeData.patientId.slice(0, 8)}...
-              </Typography>
+              <Box sx={{ mt: 1 }} />
             </Box>
           )}
 
@@ -812,18 +812,29 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                       <title>Patient Card - ${badgeData?.name}</title>
                       <style>
                         body { font-family: sans-serif; display: flex; justify-content: center; padding: 20px; }
-                        #badge { width: 350px; border: 2px solid #eee; padding: 30px; border-radius: 20px; text-align: center; }
-                        h1 { font-size: 24px; font-weight: 900; margin-bottom: 20px; text-transform: uppercase; color: #1976d2; }
-                        img.photo { width: 150px; height: 150px; border-radius: 50%; border: 4px solid #e3f2fd; margin-bottom: 15px; object-fit: cover; }
-                        h2 { font-size: 22px; margin-bottom: 15px; }
-                        img.qr { width: 140px; height: 140px; }
+                        #badge { width: 400px; border: 2px solid #333; padding: 20px; border-radius: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; align-items: center; }
+                        .header { grid-column: span 2; display: flex; align-items: center; gap: 10px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+                        .logo { width: 60px; }
+                        .title { font-size: 16px; font-weight: 800; color: #333; text-transform: uppercase; }
+                        .photo { width: 120px; height: 120px; border-radius: 10px; object-fit: cover; }
+                        .info { display: flex; flex-direction: column; gap: 5px; }
+                        .name { font-size: 20px; font-weight: 700; }
+                        .clinic { font-size: 14px; color: #444; margin-top: 5px; }
+                        .id { font-size: 14px; color: #666; }
+                        .qr { width: 120px; height: 120px; }
                       </style>
                     </head>
                     <body>
                       <div id="badge">
-                        <h1>Health and Education for all</h1>
+                        <div class="header">
+                          <img src="/logo.png" class="logo" />
+                          <div class="title">HEALTH AND EDUCATION FOR ALL, USA<br>Health Card</div>
+                        </div>
                         ${badgeData?.photoUrl ? `<img class="photo" src="${badgeData.photoUrl}">` : ''}
-                        <h2>${badgeData?.name}</h2>
+                        <div class="info">
+                          <div class="name">${badgeData?.name}</div>
+                          <div class="clinic">${badgeData?.clinicName || ''}</div>
+                        </div>
                         ${badgeData?.qrCode ? `<img class="qr" src="${badgeData.qrCode}">` : ''}
                       </div>
                       <script>window.onload = () => { window.print(); window.close(); }</script>

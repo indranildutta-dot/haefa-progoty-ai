@@ -64,8 +64,8 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
 
   return (
     <Box>
-      <Typography variant="subtitle2" color="secondary" fontWeight="800" sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', mb: 2 }}>
-        Prescription Builder
+      <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', mb: 2 }}>
+        Section 4 — Prescribed Medicines
       </Typography>
 
       <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 3, bgcolor: 'grey.50' }}>
