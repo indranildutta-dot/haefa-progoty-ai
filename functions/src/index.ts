@@ -53,6 +53,49 @@ export const syncUserPermissions = onCall(
   }
 );
 
+export const migrateUsers = onCall(
+  {
+    region: "us-central1",
+    maxInstances: 10,
+  },
+  async (request: CallableRequest) => {
+    // 1. Security Guard: Only allow global admins
+    if (!request.auth || request.auth.token.role !== 'global_admin') {
+      throw new HttpsError("permission-denied", "Only global admins can execute this function.");
+    }
+
+    try {
+      const usersSnapshot = await db.collection("users").get();
+      const batch = db.batch();
+      let count = 0;
+
+      usersSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        // Skip if already migrated
+        if (data.isApproved !== undefined) return;
+
+        batch.update(doc.ref, {
+          countryCode: data.countryId || null,
+          assignedCountries: [],
+          assignedClinics: [],
+          isApproved: false,
+          lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+        });
+        count++;
+      });
+
+      if (count > 0) {
+        await batch.commit();
+      }
+
+      return { success: true, message: `Migrated ${count} users.` };
+    } catch (error: any) {
+      console.error("Error migrating users:", error);
+      throw new HttpsError("internal", error.message || "Failed to migrate users.");
+    }
+  }
+);
+
 // --- Restored Functions ---
 export const bootstrapAdmins = onCall(async (request: CallableRequest) => {
   const admins = [

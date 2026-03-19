@@ -1,13 +1,17 @@
 import { Timestamp } from "firebase/firestore";
 
-export type UserRole = 'registration' | 'nurse' | 'doctor' | 'pharmacy' | 'admin';
+export type UserRole = 'global_admin' | 'country_admin' | 'doctor' | 'nurse';
 
 export interface UserProfile {
   uid: string;
   email: string;
   role: UserRole;
   name: string;
-  countryId?: string;
+  countryCode?: string;
+  assignedCountries?: string[];
+  assignedClinics?: string[];
+  isApproved: boolean;
+  lastUpdated?: Timestamp;
 }
 
 export type EncounterStatus = 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { 
   CssBaseline,
@@ -16,8 +16,7 @@ import ClinicOperationsDashboard from './screens/ClinicOperationsDashboard';
 import LandingPage from './screens/LandingPage';
 import LoginPage from './screens/LoginPage';
 import ClinicSelection from './screens/ClinicSelection';
-import { subscribeToAuthChanges } from './services/authService';
-import { User } from 'firebase/auth';
+import { useAuth } from './hooks/useAuth';
 import { useAppStore } from './store/useAppStore';
 import { Snackbar, Alert as MuiAlert } from '@mui/material';
 import StationLayout from './components/StationLayout';
@@ -122,19 +121,20 @@ const theme = createTheme({
 });
 
 const App: React.FC = () => {
-  const { selectedCountry, selectedClinic, clearCountry, clearClinic, setUser: setStoreUser, userProfile } = useAppStore();
-  const [user, setUser] = useState<User | null>(null);
+  const { selectedCountry, selectedClinic, clearCountry, clearClinic, setUser: setStoreUser } = useAppStore();
+  const { user, userProfile, loading } = useAuth();
+
+  useEffect(() => {
+    setStoreUser(user, userProfile);
+  }, [user, userProfile, setStoreUser]);
 
   const isAdmin = userProfile?.role === 'global_admin' || userProfile?.role === 'country_admin';
 
-  useEffect(() => {
-    return subscribeToAuthChanges((u) => {
-      setUser(u);
-      setStoreUser(u);
-    });
-  }, [setStoreUser]);
-
   const handleClearCountry = () => clearCountry();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <ThemeProvider theme={theme}>
