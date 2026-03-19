@@ -19,6 +19,20 @@ const AdminDashboard = () => {
     }
   };
 
+  const runMigration = async () => {
+    const functions = getFunctions();
+    const migrate = httpsCallable(functions, 'migrateUsers');
+    try {
+      console.log("Running migrateUsers...");
+      const result = await migrate();
+      console.log("Migration result:", result.data);
+      alert('Migration successful! Check console for details.');
+    } catch (e) {
+      console.error("Migration error:", e);
+      alert('Migration failed. Check console for details.');
+    }
+  };
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Typography variant="h4" gutterBottom>Admin Dashboard</Typography>
@@ -33,6 +47,9 @@ const AdminDashboard = () => {
           </Button>
           <Button onClick={runBootstrap} variant="outlined" color="secondary">
             Run Bootstrap Admins
+          </Button>
+          <Button onClick={runMigration} variant="outlined" color="warning">
+            Run Migration
           </Button>
         </Box>
       </Paper>
