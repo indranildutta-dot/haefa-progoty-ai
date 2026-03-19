@@ -6,7 +6,7 @@ import * as crypto from "crypto";
 
 admin.initializeApp();
 const db = admin.firestore();
-const storage = admin.storage();
+//  const storage = admin.storage().bucket();
 
 // --- RBAC syncUserPermissions ---
 export const syncUserPermissions = onCall(
@@ -126,7 +126,7 @@ export const registerPatient = onCall(async (request: CallableRequest) => {
     if (photoBase64 && typeof photoBase64 === 'string' && photoBase64.includes(",")) {
       try {
         console.log("Uploading photo for patient:", patientId);
-        const bucket = storage.bucket();
+        const bucket = admin.storage().bucket();
         const file = bucket.file(`patient_photos/${patientId}/photo.jpg`);
         const base64Data = photoBase64.split(",")[1];
         if (base64Data) {
@@ -215,24 +215,24 @@ export const generateBadgeToken = onCall(async (request: CallableRequest) => {
   }
 });
 
-export const archiveOldData = onSchedule("every 24 hours", async (event: ScheduledEvent) => {
-  console.log("archiveOldData started");
-  const ninetyDaysAgo = new Date();
-  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-
-  const collections = ['encounters', 'vitals', 'diagnoses', 'prescriptions'];
-
-  for (const collectionName of collections) {
-    const snapshot = await db.collection(collectionName)
-      .where('created_at', '<', Timestamp.fromDate(ninetyDaysAgo))
-      .get();
-
-    const batch = db.batch();
-    snapshot.docs.forEach(doc => {
-      batch.create(db.collection(`${collectionName}_archive`).doc(doc.id), doc.data());
-      batch.delete(doc.ref);
-    });
-    await batch.commit();
-    console.log(`Archived ${snapshot.size} documents from ${collectionName}`);
-  }
-});
+// export const archiveOldData = onSchedule("every 24 hours", async (event: ScheduledEvent) => {
+// console.log("archiveOldData started");
+//  const ninetyDaysAgo = new Date();
+//  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+//
+//  const collections = ['encounters', 'vitals', 'diagnoses', 'prescriptions'];
+//
+//  for (const collectionName of collections) {
+//    const snapshot = await db.collection(collectionName)
+//      .where('created_at', '<', Timestamp.fromDate(ninetyDaysAgo))
+//      .get();
+//
+//  const batch = db.batch();
+//  snapshot.docs.forEach(doc => {
+//    batch.create(db.collection(`${collectionName}_archive`).doc(doc.id), doc.data());
+//    batch.delete(doc.ref);
+//  });
+//  await batch.commit();
+//  console.log(`Archived ${snapshot.size} documents from ${collectionName}`);
+// }
+// });
