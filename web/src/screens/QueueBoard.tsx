@@ -2,15 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Typography, 
   Box, 
-  IconButton,
-  Grid,
-  Stack
+  IconButton
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import DashboardIcon from '@mui/icons-material/Dashboard';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';
-import { QueuePatient, Patient, QueueItem } from '../types';
+import { db, handleFirestoreError } from '../firebase';
+import { QueuePatient, Patient, QueueItem, OperationType } from '../types';
 import { getPatientById } from '../services/patientService';
 import { useAppStore } from '../store/useAppStore';
 import QueueColumn from '../components/queue/QueueColumn';
@@ -24,7 +21,7 @@ interface QueueBoardProps {
 
 const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
   const { selectedCountry, selectedClinic } = useAppStore();
-  const { isMobile, isTablet } = useResponsiveLayout();
+  const { isMobile } = useResponsiveLayout();
   const [queuePatients, setQueuePatients] = useState<QueuePatient[]>([]);
   const [patientsCache, setPatientsCache] = useState<Record<string, Patient>>({});
   const [selectedPatient, setSelectedPatient] = useState<QueuePatient | null>(null);
@@ -33,8 +30,9 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
   useEffect(() => {
     if (!selectedCountry || !selectedClinic) return;
     
+    const path = "queues_active";
     const q = query(
-      collection(db, "queues_active"),
+      collection(db, path),
       where("country_code", "==", selectedCountry.id),
       where("clinic_id", "==", selectedClinic.id),
       where("status", "!=", "COMPLETED")
@@ -93,7 +91,7 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
         setLoading(false);
       }
     }, (error) => {
-      console.error("Queue snapshot error:", error);
+      handleFirestoreError(error, OperationType.LIST, path);
       setLoading(false);
     });
 
