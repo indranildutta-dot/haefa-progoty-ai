@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Typography, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Select, MenuItem, FormControl, InputLabel, OutlinedInput, Chip } from '@mui/material';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Box, Typography, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Select, MenuItem, FormControl, InputLabel, OutlinedInput, Chip, Switch, FormControlLabel } from '@mui/material';
 import { collection, query, getDocs } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../firebase';
@@ -11,6 +11,8 @@ const AdminUserManagement = () => {
   const [role, setRole] = useState('nurse');
   const [selectedClinicIds, setSelectedClinicIds] = useState<string[]>([]);
   const [selectedCountryId, setSelectedCountryId] = useState('');
+  const [isApproved, setIsApproved] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchUsers();
@@ -22,6 +24,13 @@ const AdminUserManagement = () => {
     setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
   };
 
+  const filteredUsers = useMemo(() => {
+    return users.filter(user => 
+      user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.role?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [users, searchTerm]);
+
   const selectedCountry = countries.find(c => c.id === selectedCountryId);
   const availableClinics = selectedCountry ? selectedCountry.clinics : [];
 
@@ -32,12 +41,11 @@ const AdminUserManagement = () => {
       await syncUserPermissions({ 
         email, 
         role, 
-        assignedClinicIds: selectedClinicIds, 
-        assignedCountryId: selectedCountryId 
+        assignedClinics: selectedClinicIds, 
+        countryCode: selectedCountryId,
+        isApproved
       });
-      // Placeholder for sending welcome email
-      console.log(`Sending welcome email to ${email} with link to app.`);
-      alert('User permissions synced and welcome email triggered!');
+      alert('User permissions synced!');
       fetchUsers();
     } catch (error) {
       console.error('Error syncing permissions:', error);
@@ -89,9 +97,24 @@ const AdminUserManagement = () => {
             <MenuItem value="global_admin">Global Admin</MenuItem>
           </Select>
         </FormControl>
+
+        <FormControlLabel
+          control={<Switch checked={isApproved} onChange={(e) => setIsApproved(e.target.checked)} />}
+          label="Is Approved"
+        />
         
-        <Button variant="contained" onClick={handleSync} sx={{ mt: 2 }}>Save & Send Welcome Email</Button>
+        <Box sx={{ mt: 2 }}>
+          <Button variant="contained" onClick={handleSync}>Save Permissions</Button>
+        </Box>
       </Box>
+
+      <TextField 
+        label="Search Users" 
+        value={searchTerm} 
+        onChange={(e) => setSearchTerm(e.target.value)} 
+        fullWidth 
+        margin="normal" 
+      />
 
       <TableContainer component={Paper}>
         <Table>
@@ -101,15 +124,17 @@ const AdminUserManagement = () => {
               <TableCell>Role</TableCell>
               <TableCell>Clinics</TableCell>
               <TableCell>Country ID</TableCell>
+              <TableCell>Approved</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {users.map((user) => (
+            {filteredUsers.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>{user.email}</TableCell>
                 <TableCell>{user.role}</TableCell>
-                <TableCell>{Array.isArray(user.assignedClinicIds) ? user.assignedClinicIds.join(', ') : user.assignedClinicId}</TableCell>
-                <TableCell>{user.assignedCountryId}</TableCell>
+                <TableCell>{Array.isArray(user.assignedClinics) ? user.assignedClinics.join(', ') : ''}</TableCell>
+                <TableCell>{user.countryCode}</TableCell>
+                <TableCell>{user.isApproved ? 'Yes' : 'No'}</TableCell>
               </TableRow>
             ))}
           </TableBody>
