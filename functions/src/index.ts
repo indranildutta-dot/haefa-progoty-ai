@@ -15,15 +15,15 @@ export const syncUserPermissions = onCall(
     maxInstances: 10,
   },
   async (request: CallableRequest) => {
-    // 1. Security Guard: Only allow users with the global_admin claim
+    // 1. Security Guard: Only allow global admins
     if (!request.auth || request.auth.token.role !== 'global_admin') {
       throw new HttpsError("permission-denied", "Only global admins can execute this function.");
     }
 
-    const { email, role, assignedCountry, assignedClinicId } = request.data;
+    const { email, role, countryCode, assignedCountries, assignedClinics, isApproved } = request.data;
 
-    if (!email || !role || !assignedCountry || !assignedClinicId) {
-      throw new HttpsError("invalid-argument", "Missing required fields: email, role, assignedCountry, or assignedClinicId.");
+    if (!email || !role) {
+      throw new HttpsError("invalid-argument", "Missing required fields: email or role.");
     }
 
     try {
@@ -31,19 +31,17 @@ export const syncUserPermissions = onCall(
       const userRecord = await admin.auth().getUserByEmail(email);
       const uid = userRecord.uid;
 
-      // 3. Set custom claims
-      await admin.auth().setCustomUserClaims(uid, {
-        role,
-        assignedCountry,
-        assignedClinicId
-      });
+      // 3. Update Firestore user document
+      // We keep the high-level role in Custom Claims for fast security rule checks
+      await admin.auth().setCustomUserClaims(uid, { role });
 
-      // 4. Update Firestore user document
       await db.collection("users").doc(uid).set({
         email,
         role,
-        assignedCountry,
-        assignedClinicId,
+        countryCode: countryCode || null,
+        assignedCountries: assignedCountries || [],
+        assignedClinics: assignedClinics || [],
+        isApproved: isApproved ?? false,
         lastUpdated: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
 

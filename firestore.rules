@@ -1,48 +1,35 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper functions
-    function isAuthenticated() { return request.auth != null; }
-    function getRole() { return request.auth.token.role; }
-    function getClinicId() { return request.auth.token.assignedClinicId; }
-    function getCountryId() { return request.auth.token.assignedCountryId; }
-    
-    function isGlobalAdmin() { return isAuthenticated() && getRole() == 'global_admin'; }
-    function isCountryAdmin(countryId) { return isAuthenticated() && getRole() == 'country_admin' && getCountryId() == countryId; }
-    function isClinicStaff(clinicId) { return isAuthenticated() && (getRole() == 'nurse' || getRole() == 'doctor' || getRole() == 'pharmacist') && getClinicId() == clinicId; }
-    function isCountryReader(countryId) { return isAuthenticated() && getRole() == 'country_reader' && getCountryId() == countryId; }
-    function isGlobalReader() { return isAuthenticated() && getRole() == 'global_reader'; }
 
-    // Domain Validators
-    function isValidPatient(data) {
-      return data.registeredClinicId is string && data.registeredClinicId.size() > 0 &&
-             data.countryCode is string && data.countryCode.size() > 0;
+    // Helper: Fetches user document once and caches it for the request
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
-    // Access control for patients
+    // Helper: Check if user is a global admin
+    function isGlobalAdmin() {
+      return request.auth != null && request.auth.token.role == 'global_admin';
+    }
+
     match /patients/{patientId} {
-      allow read: if isGlobalAdmin() || 
-                     isCountryAdmin(resource.data.countryCode) || 
-                     isClinicStaff(resource.data.registeredClinicId) ||
-                     isCountryReader(resource.data.countryCode) ||
-                     isGlobalReader();
-      allow create: if (isGlobalAdmin() || 
-                        isCountryAdmin(request.resource.data.countryCode) || 
-                        isClinicStaff(request.resource.data.registeredClinicId)) &&
-                        isValidPatient(request.resource.data);
-      allow update: if (isGlobalAdmin() || 
-                        isCountryAdmin(request.resource.data.countryCode) || 
-                        isClinicStaff(request.resource.data.registeredClinicId)) &&
-                        isValidPatient(request.resource.data);
+      // 1. Global Admin has full access
+      // 2. Doctors/Nurses can read if clinicId matches their assignedClinics
+      allow read: if request.auth != null && (
+        isGlobalAdmin() || 
+        resource.data.clinicId in getUserData().assignedClinics
+      );
+      
+      // Only allow write if user is approved and assigned to the clinic
+      allow write: if request.auth != null && 
+                      getUserData().isApproved == true &&
+                      request.resource.data.clinicId in getUserData().assignedClinics;
     }
     
     // Access control for users
     match /users/{userId} {
-      allow read: if isAuthenticated() && (isGlobalAdmin() || isCountryAdmin(getCountryId()) || request.auth.uid == userId);
-      allow write: if isAuthenticated() && (isGlobalAdmin() || isCountryAdmin(getCountryId()) || request.auth.uid == userId);
+      allow read: if request.auth != null && (isGlobalAdmin() || request.auth.uid == userId);
+      allow write: if request.auth != null && (isGlobalAdmin() || request.auth.uid == userId);
     }
-    
-    // ...
   }
 }
