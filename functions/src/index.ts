@@ -4,7 +4,9 @@ import * as admin from "firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import * as crypto from "crypto";
 
-admin.initializeApp();
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 const db = admin.firestore();
 //  const storage = admin.storage().bucket();
 
