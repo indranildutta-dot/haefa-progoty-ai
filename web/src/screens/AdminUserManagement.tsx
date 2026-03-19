@@ -34,6 +34,22 @@ const AdminUserManagement = () => {
   const selectedCountry = countries.find(c => c.id === selectedCountryId);
   const availableClinics = selectedCountry ? selectedCountry.clinics : [];
 
+  const handleEditUser = (user: any) => {
+    setEmail(user.email);
+    setRole(user.role);
+    setSelectedClinicIds(user.assignedClinics || []);
+    setSelectedCountryId(user.countryCode || '');
+    setIsApproved(user.isApproved || false);
+  };
+
+  const handleClear = () => {
+    setEmail('');
+    setRole('nurse');
+    setSelectedClinicIds([]);
+    setSelectedCountryId('');
+    setIsApproved(false);
+  };
+
   const handleSync = async () => {
     const functions = getFunctions();
     const syncUserPermissions = httpsCallable(functions, 'syncUserPermissions');
@@ -47,6 +63,7 @@ const AdminUserManagement = () => {
       });
       alert('User permissions synced!');
       fetchUsers();
+      handleClear();
     } catch (error) {
       console.error('Error syncing permissions:', error);
       alert('Failed to sync permissions.');
@@ -103,8 +120,9 @@ const AdminUserManagement = () => {
           label="Is Approved"
         />
         
-        <Box sx={{ mt: 2 }}>
+        <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
           <Button variant="contained" onClick={handleSync}>Save Permissions</Button>
+          <Button variant="outlined" onClick={handleClear}>Clear Form</Button>
         </Box>
       </Box>
 
@@ -125,6 +143,7 @@ const AdminUserManagement = () => {
               <TableCell>Clinics</TableCell>
               <TableCell>Country ID</TableCell>
               <TableCell>Approved</TableCell>
+              <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -135,6 +154,9 @@ const AdminUserManagement = () => {
                 <TableCell>{Array.isArray(user.assignedClinics) ? user.assignedClinics.join(', ') : ''}</TableCell>
                 <TableCell>{user.countryCode}</TableCell>
                 <TableCell>{user.isApproved ? 'Yes' : 'No'}</TableCell>
+                <TableCell>
+                  <Button size="small" onClick={() => handleEditUser(user)}>Edit</Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
