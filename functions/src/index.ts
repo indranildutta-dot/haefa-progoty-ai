@@ -28,7 +28,18 @@ export const syncUserPermissions = onCall(
 
     try {
       // 2. Find target user's UID
-      const userRecord = await admin.auth().getUserByEmail(email);
+      let userRecord;
+      try {
+        userRecord = await admin.auth().getUserByEmail(email);
+      } catch (error: any) {
+        console.error("Error in getUserByEmail:", error);
+        if (error.code === 'auth/user-not-found') {
+          // Create user if not found
+          userRecord = await admin.auth().createUser({ email });
+        } else {
+          throw error;
+        }
+      }
       const uid = userRecord.uid;
 
       // 3. Update Firestore user document
