@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Box, Typography, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Select, MenuItem, FormControl, InputLabel, OutlinedInput, Chip, Switch, FormControlLabel } from '@mui/material';
+import { Box, Typography, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Select, MenuItem, FormControl, InputLabel, OutlinedInput, Chip, Switch, FormControlLabel, IconButton } from '@mui/material';
 import { collection, query, getDocs } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { useNavigate } from 'react-router-dom';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { db } from '../firebase';
 import { countries } from '../config/countries';
 
 const AdminUserManagement = () => {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<any[]>([]);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('nurse');
@@ -72,7 +75,12 @@ const AdminUserManagement = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>User Management</Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+        <IconButton onClick={() => navigate('/admin')} sx={{ mr: 2 }}>
+          <ArrowBackIcon />
+        </IconButton>
+        <Typography variant="h4">User Management</Typography>
+      </Box>
       
       <Box sx={{ mb: 4, p: 2, border: '1px solid #ccc', borderRadius: 2 }}>
         <Typography variant="h6">Invite/Update Staff</Typography>

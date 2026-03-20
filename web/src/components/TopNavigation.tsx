@@ -59,13 +59,15 @@ const TopNavigation: React.FC = () => {
                 sx={{ fontWeight: 800, cursor: 'pointer', bgcolor: 'primary.light', color: 'primary.contrastText', px: 1, fontSize: '0.875rem' }}
                 size="medium"
               />
-              <Chip 
-                label={selectedClinic.name} 
-                onClick={clearClinic}
-                sx={{ fontWeight: 800, cursor: 'pointer', bgcolor: 'secondary.light', color: 'secondary.contrastText', px: 1, fontSize: '0.875rem' }}
-                size="medium"
-                color="secondary"
-              />
+              {selectedClinic && (
+                <Chip 
+                  label={selectedClinic.name} 
+                  onClick={clearClinic}
+                  sx={{ fontWeight: 800, cursor: 'pointer', bgcolor: 'secondary.light', color: 'secondary.contrastText', px: 1, fontSize: '0.875rem' }}
+                  size="medium"
+                  color="secondary"
+                />
+              )}
             </Box>
           )}
 

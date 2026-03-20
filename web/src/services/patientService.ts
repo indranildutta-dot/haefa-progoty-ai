@@ -14,7 +14,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { Patient } from "../types";
-import { useAppStore } from "../store/useAppStore";
+import { getSession } from "../utils/session";
 import { logAction } from "./auditService";
 
 import { updateMetrics } from "./metricsService";
@@ -22,8 +22,8 @@ import { updateMetrics } from "./metricsService";
 const PATIENTS_COLLECTION = "patients";
 
 export const createPatient = async (patientData: Omit<Patient, 'id' | 'created_at' | 'country_id' | 'clinic_id'>) => {
-  const { selectedCountry, selectedClinic } = useAppStore.getState();
-  if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
+  const { selectedCountry, selectedClinic } = getSession();
+  if (!selectedClinic) throw new Error("Clinic not selected");
   
   console.log("Creating patient:", patientData, selectedCountry.id, selectedClinic.id);
   
@@ -64,8 +64,8 @@ export const searchPatients = async (searchParams: {
   nepal_id?: string;
   patient_type?: string;
 }) => {
-  const { selectedCountry, selectedClinic } = useAppStore.getState();
-  if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
+  const { selectedCountry, selectedClinic } = getSession();
+  if (!selectedClinic) throw new Error("Clinic not selected");
 
   console.log("Searching patients:", searchParams, selectedCountry.id, selectedClinic.id);
 

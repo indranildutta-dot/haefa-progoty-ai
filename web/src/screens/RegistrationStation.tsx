@@ -57,7 +57,7 @@ import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) => {
   const countryConfig = getCountryConfig(countryId);
-  const { notify, selectedClinic, selectedCountry } = useAppStore();
+  const { notify, selectedClinic, selectedCountry, userProfile } = useAppStore();
   const { isMobile, isTablet } = useResponsiveLayout();
   
   const [searching, setSearching] = useState(false);
@@ -81,6 +81,19 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
   const [patientPhotoUrl, setPatientPhotoUrl] = useState<string | undefined>(undefined);
   const [currentPatientId, setCurrentPatientId] = useState<string>(doc(collection(db, 'patients')).id);
   const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
+
+  if (userProfile && !userProfile.isApproved) {
+    return (
+      <StationLayout title="Registration Station" stationName="Registration" showPatientContext={false}>
+        <Box sx={{ p: 3, textAlign: 'center' }}>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Account Pending Approval: Your account must be approved by an administrator before you can register patients.
+          </Alert>
+          <Typography variant="body1">Please contact your country or global administrator for approval.</Typography>
+        </Box>
+      </StationLayout>
+    );
+  }
 
   const initialPatientState = {
     given_name: '',
@@ -298,9 +311,11 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
         }
         
         try {
-          await setDoc(doc(db, 'qr_tokens', qrToken), {
+          await setDoc(doc(db, 'badge_tokens', qrToken), {
             patient_id: currentPatientId,
-            created_at: serverTimestamp()
+            created_at: serverTimestamp(),
+            clinic_id: selectedClinic.id,
+            country_code: selectedCountry.id
           });
         } catch (e) {
           // Non-critical if QR token fails to save, but let's log it
@@ -430,7 +445,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                     </Grid>
                   </>
                 )}
-                <Grid size={{ xs: 12 }}>
+                <Grid size={12}>
                   <Button variant="contained" color="success" fullWidth onClick={handleSearch} disabled={searching} sx={{ py: 1.5, borderRadius: 2, fontWeight: 'bold' }}>
                     {searching ? <CircularProgress size={24} /> : "Search Patient"}
                   </Button>
@@ -525,7 +540,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
               
               <form onSubmit={handleRegisterOrUpdate}>
                 <Grid container spacing={2}>
-                  <Grid size={{ xs: 12 }}>
+                  <Grid size={12}>
                     <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
                       <PatientPhotoCapture 
                         patientId={currentPatientId} 
@@ -542,21 +557,20 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                     <TextField fullWidth label="Family Name" required value={newPatient.family_name} onChange={(e) => setNewPatient({ ...newPatient, family_name: e.target.value })} />
                   </Grid>
 
-                  <Grid size={{ xs: 12 }}>
+                  <Grid size={12}>
                     <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>Age (Year / Month / Day)</Typography>
                     <Grid container spacing={1}>
-                      <Grid size={{ xs: 4 }}>
+                      <Grid size={4}>
                         <TextField fullWidth label="Year" type="number" value={newPatient.age_years} onChange={(e) => setNewPatient({ ...newPatient, age_years: e.target.value })} />
                       </Grid>
-                      <Grid size={{ xs: 4 }}>
+                      <Grid size={4}>
                         <TextField fullWidth label="Month" type="number" value={newPatient.age_months} onChange={(e) => setNewPatient({ ...newPatient, age_months: e.target.value })} />
                       </Grid>
-                      <Grid size={{ xs: 4 }}>
+                      <Grid size={4}>
                         <TextField fullWidth label="Day" type="number" value={newPatient.age_days} onChange={(e) => setNewPatient({ ...newPatient, age_days: e.target.value })} />
                       </Grid>
                     </Grid>
                   </Grid>
-
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <TextField 
                       fullWidth 
@@ -574,7 +588,6 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                       <MenuItem value="other">Other</MenuItem>
                     </TextField>
                   </Grid>
-
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <TextField fullWidth label="Contact No." value={newPatient.phone} onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })} />
                   </Grid>
@@ -658,7 +671,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                     </>
                   )}
 
-                  <Grid size={{ xs: 12 }}>
+                  <Grid size={12}>
                     <Divider sx={{ my: 1 }}>
                       <Chip label="Address Information" size="small" />
                     </Divider>
@@ -685,11 +698,11 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <TextField fullWidth label="District" value={newPatient.district} onChange={(e) => setNewPatient({ ...newPatient, district: e.target.value })} />
                   </Grid>
-                  <Grid size={{ xs: 12 }}>
+                  <Grid size={12}>
                     <TextField fullWidth label="Country" value={newPatient.country} onChange={(e) => setNewPatient({ ...newPatient, country: e.target.value })} />
                   </Grid>
 
-                  <Grid size={{ xs: 12 }} sx={{ mt: 2 }}>
+                  <Grid size={12} sx={{ mt: 2 }}>
                     <Button type="submit" variant="contained" color="success" fullWidth size="large" disabled={loading || !!validationErrors.national_id || !!validationErrors.rohingya_number || !!validationErrors.nepal_id} sx={{ py: 1.5, borderRadius: 2, fontWeight: 'bold' }}>
                       {loading ? <CircularProgress size={24} /> : (editingPatientId ? "Update & Start Encounter" : "Register & Start Encounter")}
                     </Button>

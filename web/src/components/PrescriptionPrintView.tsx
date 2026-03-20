@@ -81,7 +81,7 @@ const PrescriptionPrintView: React.FC<PrescriptionPrintViewProps> = ({
       {/* Main Content */}
       <Grid container spacing={0}>
         {/* Left Column */}
-        <Grid item xs={4} sx={{ borderRight: '1px solid black', pr: 2 }}>
+        <Grid size={4} sx={{ borderRight: '1px solid black', pr: 2 }}>
           {/* Complaints */}
           <Box sx={{ mb: 2 }}>
             <Typography fontWeight="bold" sx={{ borderBottom: '1px solid black', mb: 1 }}>{labels.complaints}</Typography>
@@ -129,7 +129,7 @@ const PrescriptionPrintView: React.FC<PrescriptionPrintViewProps> = ({
         </Grid>
 
         {/* Right Column */}
-        <Grid item xs={8} sx={{ pl: 2 }}>
+        <Grid size={8} sx={{ pl: 2 }}>
           {/* Rx */}
           <Box sx={{ mb: 4 }}>
             <Typography fontWeight="bold" variant="h6" sx={{ mb: 1 }}>{labels.rx}</Typography>

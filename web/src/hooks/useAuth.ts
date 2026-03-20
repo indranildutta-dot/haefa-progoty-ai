@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { UserProfile } from '../types';
 
@@ -19,7 +19,24 @@ export const useAuth = () => {
           if (userDoc.exists()) {
             setUserProfile(userDoc.data() as UserProfile);
           } else {
-            setUserProfile(null);
+            // Self-provisioning for default admin
+            const defaultAdmins = ['indranil_dutta@haefa.org', 'ruhul_abid@haefa.org'];
+            if (user.email && defaultAdmins.includes(user.email)) {
+              const newProfile: UserProfile = {
+                uid: user.uid,
+                email: user.email,
+                name: user.displayName || user.email.split('@')[0],
+                role: 'global_admin',
+                isApproved: true,
+                countryCode: 'BD', // Default
+                assignedCountries: ['BD'],
+                assignedClinics: []
+              };
+              await setDoc(doc(db, 'users', user.uid), newProfile);
+              setUserProfile(newProfile);
+            } else {
+              setUserProfile(null);
+            }
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);

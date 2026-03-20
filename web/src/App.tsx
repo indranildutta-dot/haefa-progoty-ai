@@ -144,7 +144,7 @@ const App: React.FC = () => {
           <LandingPage onSelectCountry={(c) => useAppStore.getState().setSession(c, null)} />
         ) : !user ? (
           <LoginPage selectedCountry={selectedCountry} onBack={handleClearCountry} />
-        ) : (!selectedClinic && !isAdmin) ? (
+        ) : !selectedClinic ? (
           <ClinicSelection selectedCountry={selectedCountry} onSelectClinic={(c) => useAppStore.getState().setSession(selectedCountry, c)} onBack={handleClearCountry} />
         ) : (
           <Routes>

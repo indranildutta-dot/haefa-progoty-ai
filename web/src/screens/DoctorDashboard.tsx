@@ -68,7 +68,7 @@ import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import { initialClinicalAssessment } from '../components/ClinicalAssessmentPanel';
 
 const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
-  const { notify, selectedCountry, selectedClinic, selectedPatient, setSelectedPatient } = useAppStore();
+  const { notify, selectedCountry, selectedClinic, selectedPatient, setSelectedPatient, userProfile } = useAppStore();
   const { isMobile, isTablet } = useResponsiveLayout();
   const [waitingList, setWaitingList] = useState<QueueItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<QueueItem | null>(null);
@@ -79,6 +79,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
   const [patientHistoryCount, setPatientHistoryCount] = useState<number>(0);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [permissionError, setPermissionError] = useState<boolean>(false);
 
   // Consultation Form State
   const [consultData, setConsultData] = useState({
@@ -136,11 +137,26 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
   }, [selectedCountry, selectedClinic]);
 
   useEffect(() => {
-    const unsubscribe = subscribeToQueue(['READY_FOR_DOCTOR', 'IN_CONSULTATION'] as any, (items) => {
-      setWaitingList(items);
-    });
+    if (!userProfile?.isApproved || !selectedClinic) {
+      setWaitingList([]);
+      return;
+    }
+
+    setPermissionError(false);
+    const unsubscribe = subscribeToQueue(
+      ['READY_FOR_DOCTOR', 'IN_CONSULTATION'] as any, 
+      (items) => {
+        setWaitingList(items);
+      },
+      (error) => {
+        console.error("Queue subscription error:", error);
+        if (error.code === 'permission-denied' || error.message?.includes('permission')) {
+          setPermissionError(true);
+        }
+      }
+    );
     return () => unsubscribe();
-  }, []);
+  }, [userProfile?.isApproved, selectedClinic]);
 
   const handleCallNextPatient = async () => {
     const readyPatients = waitingList.filter(p => p.status === 'READY_FOR_DOCTOR');
@@ -295,111 +311,87 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
     setConsultationStartTime(null);
   };
 
-  const renderQueueView = () => (
-    <Box>
-      <Box sx={{ mb: isMobile ? 2 : 4, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexDirection: isMobile ? 'column' : 'row', gap: 2 }}>
-        <Box sx={{ display: 'flex', gap: 2, width: isMobile ? '100%' : 'auto' }}>
-          <Button variant="contained" color="primary" onClick={handleCallNextPatient} disabled={waitingList.length === 0} fullWidth={isMobile} sx={{ fontWeight: 700, borderRadius: 2 }}>
-            Call Next Patient
-          </Button>
+  const renderQueueView = () => {
+    if (!userProfile?.isApproved) {
+      return (
+        <Alert severity="warning" sx={{ borderRadius: 3, mb: 3 }}>
+          <Typography variant="subtitle2" fontWeight="bold">Account Pending Approval</Typography>
+          Your account must be approved by a Global Administrator before you can access the patient queue.
+        </Alert>
+      );
+    }
+
+    if (permissionError) {
+      return (
+        <Alert severity="error" sx={{ borderRadius: 3, mb: 3 }}>
+          <Typography variant="subtitle2" fontWeight="bold">Permission Error</Typography>
+          You do not have permission to view the patient queue for this clinic. 
+          Please contact your administrator to ensure your clinic assignments and security rules are correctly configured.
+        </Alert>
+      );
+    }
+
+    return (
+      <Box>
+        <Box sx={{ mb: isMobile ? 2 : 4, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexDirection: isMobile ? 'column' : 'row', gap: 2 }}>
+          <Box sx={{ display: 'flex', gap: 2, width: isMobile ? '100%' : 'auto' }}>
+            <Button variant="contained" color="primary" onClick={handleCallNextPatient} disabled={waitingList.length === 0} fullWidth={isMobile} sx={{ fontWeight: 700, borderRadius: 2 }}>
+              Call Next Patient
+            </Button>
+          </Box>
         </Box>
-      </Box>
 
-      {successMsg && <Alert severity="success" sx={{ mb: 3, borderRadius: 3 }}>{successMsg}</Alert>}
-      {errorMsg && <Alert severity="error" sx={{ mb: 3, borderRadius: 3 }}>{errorMsg}</Alert>}
+        {successMsg && <Alert severity="success" sx={{ mb: 3, borderRadius: 3 }}>{successMsg}</Alert>}
+        {errorMsg && <Alert severity="error" sx={{ mb: 3, borderRadius: 3 }}>{errorMsg}</Alert>}
 
-      <Grid container spacing={3}>
-        <Grid size={{ xs: 12, lg: 9 }}>
-          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-            <CardContent sx={{ p: isMobile ? 2 : 3 }}>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexDirection={isMobile ? 'column' : 'row'} gap={2}>
-                <Box display="flex" alignItems="center">
-                  <AssignmentIcon color="primary" sx={{ mr: 1 }} />
-                  <Typography variant="h6" fontWeight="800">Patients Ready</Typography>
-                </Box>
-                <QrScannerModal onScan={async (token) => {
-                  const patient = await getPatientByQrToken(token);
-                  if (patient) {
-                    const item = waitingList.find(i => i.patient_id === patient.id);
-                    if (item) {
-                      handleOpenConsult(item);
+        <Grid container spacing={3}>
+          <Grid size={{ xs: 12, lg: 9 }}>
+            <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+              <CardContent sx={{ p: isMobile ? 2 : 3 }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexDirection={isMobile ? 'column' : 'row'} gap={2}>
+                  <Box display="flex" alignItems="center">
+                    <AssignmentIcon color="primary" sx={{ mr: 1 }} />
+                    <Typography variant="h6" fontWeight="800">Patients Ready</Typography>
+                  </Box>
+                  <QrScannerModal onScan={async (token) => {
+                    const patient = await getPatientByQrToken(token);
+                    if (patient) {
+                      const item = waitingList.find(i => i.patient_id === patient.id);
+                      if (item) {
+                        handleOpenConsult(item);
+                      } else {
+                        notify("Patient not found in queue.", "error");
+                      }
                     } else {
-                      notify("Patient not found in queue.", "error");
+                      notify("Patient not found.", "error");
                     }
-                  } else {
-                    notify("Patient not found.", "error");
-                  }
-                }} />
-              </Box>
-              
-              {isMobile || isTablet ? (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {waitingList.length === 0 ? (
-                    <Typography color="textSecondary" align="center" sx={{ py: 4 }}>No patients waiting.</Typography>
-                  ) : (
-                    waitingList.map((item) => {
-                      const waitTime = item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : 0;
-                      return (
-                        <Card key={item.id} variant="outlined" sx={{ borderRadius: 2 }}>
-                          <CardContent sx={{ p: 2 }}>
-                            <Box display="flex" justifyContent="space-between" alignItems="start">
-                              <Box>
-                                <Typography variant="subtitle1" fontWeight="bold">{item.patient_name || item.patient_id}</Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  Wait: {waitTime} mins
-                                </Typography>
-                              </Box>
-                              <Chip 
-                                label={item.triage_level?.toUpperCase() || 'STANDARD'} 
-                                size="small" 
-                                color={item.triage_level === 'emergency' ? 'error' : item.triage_level === 'urgent' ? 'warning' : 'default'}
-                              />
-                            </Box>
-                            <Box display="flex" justifyContent="flex-end" mt={2}>
-                              <Button 
-                                variant={item.status === 'IN_CONSULTATION' ? "outlined" : "contained"} 
-                                color={item.status === 'IN_CONSULTATION' ? "secondary" : "primary"}
-                                size="small" 
-                                onClick={() => handleOpenConsult(item)}
-                              >
-                                {item.status === 'IN_CONSULTATION' ? 'Resume' : 'Start'}
-                              </Button>
-                            </Box>
-                          </CardContent>
-                        </Card>
-                      );
-                    })
-                  )}
+                  }} />
                 </Box>
-              ) : (
-                <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-                  <Table>
-                    <TableHead sx={{ bgcolor: 'grey.50' }}>
-                      <TableRow>
-                        <TableCell sx={{ fontWeight: 700 }}>Patient Name</TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>Wait Time</TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>Priority</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {waitingList.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={4} align="center">
-                            <Typography color="textSecondary" sx={{ py: 4 }}>No patients waiting.</Typography>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        waitingList.map((item) => {
-                          const waitTime = item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : 0;
-                          return (
-                            <TableRow key={item.id} hover>
-                              <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_name || item.patient_id}</TableCell>
-                              <TableCell>{waitTime} mins</TableCell>
-                              <TableCell>
-                                <Chip label={item.triage_level?.toUpperCase() || 'STANDARD'} size="small" />
-                              </TableCell>
-                              <TableCell align="right">
+                
+                {isMobile || isTablet ? (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {waitingList.length === 0 ? (
+                      <Typography color="textSecondary" align="center" sx={{ py: 4 }}>No patients waiting.</Typography>
+                    ) : (
+                      waitingList.map((item) => {
+                        const waitTime = item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : 0;
+                        return (
+                          <Card key={item.id} variant="outlined" sx={{ borderRadius: 2 }}>
+                            <CardContent sx={{ p: 2 }}>
+                              <Box display="flex" justifyContent="space-between" alignItems="start">
+                                <Box>
+                                  <Typography variant="subtitle1" fontWeight="bold">{item.patient_name || item.patient_id}</Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Wait: {waitTime} mins
+                                  </Typography>
+                                </Box>
+                                <Chip 
+                                  label={item.triage_level?.toUpperCase() || 'STANDARD'} 
+                                  size="small" 
+                                  color={item.triage_level === 'emergency' ? 'error' : item.triage_level === 'urgent' ? 'warning' : 'default'}
+                                />
+                              </Box>
+                              <Box display="flex" justifyContent="flex-end" mt={2}>
                                 <Button 
                                   variant={item.status === 'IN_CONSULTATION' ? "outlined" : "contained"} 
                                   color={item.status === 'IN_CONSULTATION' ? "secondary" : "primary"}
@@ -408,30 +400,75 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
                                 >
                                   {item.status === 'IN_CONSULTATION' ? 'Resume' : 'Start'}
                                 </Button>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
+                              </Box>
+                            </CardContent>
+                          </Card>
+                        );
+                      })
+                    )}
+                  </Box>
+                ) : (
+                  <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                    <Table>
+                      <TableHead sx={{ bgcolor: 'grey.50' }}>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700 }}>Patient Name</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Wait Time</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Priority</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {waitingList.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={4} align="center">
+                              <Typography color="textSecondary" sx={{ py: 4 }}>No patients waiting.</Typography>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          waitingList.map((item) => {
+                            const waitTime = item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : 0;
+                            return (
+                              <TableRow key={item.id} hover>
+                                <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_name || item.patient_id}</TableCell>
+                                <TableCell>{waitTime} mins</TableCell>
+                                <TableCell>
+                                  <Chip label={item.triage_level?.toUpperCase() || 'STANDARD'} size="small" />
+                                </TableCell>
+                                <TableCell align="right">
+                                  <Button 
+                                    variant={item.status === 'IN_CONSULTATION' ? "outlined" : "contained"} 
+                                    color={item.status === 'IN_CONSULTATION' ? "secondary" : "primary"}
+                                    size="small" 
+                                    onClick={() => handleOpenConsult(item)}
+                                  >
+                                    {item.status === 'IN_CONSULTATION' ? 'Resume' : 'Start'}
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
 
-        <Grid size={{ xs: 12, lg: 3 }}>
-          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: 'primary.light', color: 'primary.contrastText' }}>
-            <CardContent>
-              <Typography variant="subtitle2" sx={{ opacity: 0.8, fontWeight: 'bold', textTransform: 'uppercase' }}>Consultations Today</Typography>
-              <Typography variant="h3" fontWeight="800">{consultationCount}</Typography>
-            </CardContent>
-          </Card>
+          <Grid size={{ xs: 12, lg: 3 }}>
+            <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+              <CardContent>
+                <Typography variant="subtitle2" sx={{ opacity: 0.8, fontWeight: 'bold', textTransform: 'uppercase' }}>Consultations Today</Typography>
+                <Typography variant="h3" fontWeight="800">{consultationCount}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
         </Grid>
-      </Grid>
-    </Box>
-  );
+      </Box>
+    );
+  };
 
   const renderConsultationWorkspace = () => {
     if (!selectedItem || !currentPatient) return null;
@@ -442,7 +479,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
         <Box sx={{ flexGrow: 1, p: isMobile ? 1 : 2 }}>
           <Grid container spacing={2}>
             {/* Alerts Section */}
-            <Grid size={{ xs: 12 }}>
+            <Grid size={12}>
               {currentTriage && currentTriage.allergies && currentTriage.allergies.length > 0 && (
                 <AlertBanner 
                   type="allergy" 

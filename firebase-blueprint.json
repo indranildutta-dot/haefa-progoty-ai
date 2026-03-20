@@ -31,6 +31,49 @@
         "updated_at": { "type": "string", "format": "date-time" }
       },
       "required": ["given_name", "family_name", "gender", "country_id", "clinic_id"]
+    },
+    "Medication": {
+      "title": "Medication",
+      "description": "Global master list of medications",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "generic_name": { "type": "string" },
+        "form": { "type": "string" },
+        "strength": { "type": "string" },
+        "cold_chain_req": { "type": "boolean" },
+        "base_unit": { "type": "string" },
+        "package_unit": { "type": "string" },
+        "package_size": { "type": "number" }
+      },
+      "required": ["name", "generic_name", "form", "strength", "base_unit"]
+    },
+    "Batch": {
+      "title": "Batch",
+      "description": "Inventory batch details",
+      "type": "object",
+      "properties": {
+        "batch_id": { "type": "string" },
+        "expiry_date": { "type": "string", "format": "date" },
+        "current_qty": { "type": "number" },
+        "medication_id": { "type": "string" }
+      },
+      "required": ["batch_id", "expiry_date", "current_qty", "medication_id"]
+    },
+    "InventoryLog": {
+      "title": "InventoryLog",
+      "description": "Audit trail for inventory changes",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "type": { "type": "string", "enum": ["receive", "dispense", "waste"] },
+        "qty": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "medication_id": { "type": "string" },
+        "batch_id": { "type": "string" },
+        "clinic_id": { "type": "string" }
+      },
+      "required": ["user_id", "type", "qty", "timestamp", "medication_id", "clinic_id"]
     }
   },
   "firestore": {
@@ -50,9 +93,21 @@
       "schema": "object",
       "description": "Daily global metrics"
     },
-    "qr_tokens": {
+    "badge_tokens": {
       "schema": "object",
       "description": "Mapping of QR tokens to patient IDs"
+    },
+    "medications_catalog": {
+      "schema": "Medication",
+      "description": "Global master list of medications"
+    },
+    "clinics/{clinicId}/inventory": {
+      "schema": "Batch",
+      "description": "Inventory batches for each clinic"
+    },
+    "inventory_logs": {
+      "schema": "InventoryLog",
+      "description": "Audit trail for inventory changes"
     }
   }
 }

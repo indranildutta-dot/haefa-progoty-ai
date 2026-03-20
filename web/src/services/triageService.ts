@@ -9,13 +9,13 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { TriageAssessment } from "../types";
-import { useAppStore } from "../store/useAppStore";
+import { getSession } from "../utils/session";
 
 const TRIAGE_ASSESSMENTS_COLLECTION = "triage_assessments";
 
 export const saveTriageAssessment = async (triageData: Omit<TriageAssessment, 'id' | 'created_at' | 'clinic_id' | 'country_code'>) => {
-  const { selectedCountry, selectedClinic } = useAppStore.getState();
-  if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
+  const { selectedCountry, selectedClinic } = getSession();
+  if (!selectedClinic) throw new Error("Clinic not selected");
 
   await addDoc(collection(db, TRIAGE_ASSESSMENTS_COLLECTION), {
     ...triageData,

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Box, Typography, Paper, Grid } from '@mui/material';
+import { Box, Typography, Paper } from '@mui/material';
+import Grid from '@mui/material/Grid';
 import { VitalsRecord } from '../types';
 
 interface VitalsSnapshotProps {
@@ -26,7 +27,7 @@ const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals }) => {
         Current Vitals
       </Typography>
       <Grid container spacing={1.5}>
-        <Grid size={{ xs: 6 }}>
+        <Grid size={6}>
           <Box sx={{ p: 1, borderRadius: 1, bgcolor: 'white', border: '1px solid', borderColor: isAbnormalTemp ? 'error.main' : 'divider' }}>
             <Typography variant="caption" color="textSecondary" display="block">Temp</Typography>
             <Typography variant="body2" fontWeight="bold" color={isAbnormalTemp ? 'error.main' : 'text.primary'}>
@@ -34,7 +35,7 @@ const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals }) => {
             </Typography>
           </Box>
         </Grid>
-        <Grid size={{ xs: 6 }}>
+        <Grid size={6}>
           <Box sx={{ p: 1, borderRadius: 1, bgcolor: 'white', border: '1px solid', borderColor: isAbnormalHR ? 'error.main' : 'divider' }}>
             <Typography variant="caption" color="textSecondary" display="block">HR</Typography>
             <Typography variant="body2" fontWeight="bold" color={isAbnormalHR ? 'error.main' : 'text.primary'}>
@@ -42,7 +43,7 @@ const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals }) => {
             </Typography>
           </Box>
         </Grid>
-        <Grid size={{ xs: 6 }}>
+        <Grid size={6}>
           <Box sx={{ p: 1, borderRadius: 1, bgcolor: 'white', border: '1px solid', borderColor: isAbnormalBP ? 'error.main' : 'divider' }}>
             <Typography variant="caption" color="textSecondary" display="block">BP</Typography>
             <Typography variant="body2" fontWeight="bold" color={isAbnormalBP ? 'error.main' : 'text.primary'}>
@@ -50,7 +51,7 @@ const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals }) => {
             </Typography>
           </Box>
         </Grid>
-        <Grid size={{ xs: 6 }}>
+        <Grid size={6}>
           <Box sx={{ p: 1, borderRadius: 1, bgcolor: 'white', border: '1px solid', borderColor: isAbnormalO2 ? 'error.main' : 'divider' }}>
             <Typography variant="caption" color="textSecondary" display="block">O2 Sat</Typography>
             <Typography variant="body2" fontWeight="bold" color={isAbnormalO2 ? 'error.main' : 'text.primary'}>

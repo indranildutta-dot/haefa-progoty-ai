@@ -124,7 +124,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
               </Select>
             </FormControl>
           </Grid>
-          <Grid size={{ xs: 12 }}>
+          <Grid size={12}>
             <TextField 
               fullWidth 
               size="small" 
@@ -133,7 +133,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
               onChange={(e) => setNewMed({ ...newMed, instructions: e.target.value })} 
             />
           </Grid>
-          <Grid size={{ xs: 12 }}>
+          <Grid size={12}>
             <Button 
               variant="contained" 
               color="secondary" 

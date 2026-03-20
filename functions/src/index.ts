@@ -3,6 +3,7 @@ import { onSchedule, ScheduledEvent } from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import * as crypto from "crypto";
+import * as ExcelJS from 'exceljs';
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -269,24 +270,115 @@ export const generateBadgeToken = onCall(async (request: CallableRequest) => {
   }
 });
 
-// export const archiveOldData = onSchedule("every 24 hours", async (event: ScheduledEvent) => {
-// console.log("archiveOldData started");
-//  const ninetyDaysAgo = new Date();
-//  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-//
-//  const collections = ['encounters', 'vitals', 'diagnoses', 'prescriptions'];
-//
-//  for (const collectionName of collections) {
-//    const snapshot = await db.collection(collectionName)
-//      .where('created_at', '<', Timestamp.fromDate(ninetyDaysAgo))
-//      .get();
-//
-//  const batch = db.batch();
-//  snapshot.docs.forEach(doc => {
-//    batch.create(db.collection(`${collectionName}_archive`).doc(doc.id), doc.data());
-//    batch.delete(doc.ref);
-//  });
-//  await batch.commit();
-//  console.log(`Archived ${snapshot.size} documents from ${collectionName}`);
-// }
-// });
+export const dispenseMedication = onCall(async (request: CallableRequest) => {
+  const { clinicId, patientId, encounterId, medications } = request.data;
+  if (!clinicId || !patientId || !encounterId || !medications) {
+    throw new HttpsError("invalid-argument", "Missing required fields.");
+  }
+
+  return await db.runTransaction(async (transaction) => {
+    for (const med of medications) {
+      // 1. Find batches with FEFO
+      const inventoryRef = db.collection(`clinics/${clinicId}/inventory`);
+      const q = inventoryRef
+        .where("medication_id", "==", med.medication_id)
+        .where("quantity", ">", 0)
+        .orderBy("expiry_date", "asc");
+      
+      const snapshot = await transaction.get(q);
+
+      if (snapshot.empty) {
+        throw new HttpsError("failed-precondition", `No stock for ${med.medication_id}`);
+      }
+
+      let remainingToDispense = med.quantity;
+      for (const doc of snapshot.docs) {
+        if (remainingToDispense <= 0) break;
+
+        const batch = doc.data() as any;
+        const available = batch.quantity;
+        const toTake = Math.min(available, remainingToDispense);
+
+        transaction.update(doc.ref, { quantity: available - toTake });
+        remainingToDispense -= toTake;
+
+        // 2. Log inventory log
+        const logRef = db.collection("inventory_logs").doc();
+        transaction.set(logRef, {
+          clinic_id: clinicId,
+          medication_id: med.medication_id,
+          batch_id: batch.batch_id,
+          type: 'dispense',
+          quantity: toTake,
+          user_id: request.auth?.uid,
+          encounter_id: encounterId,
+          timestamp: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
+
+      if (remainingToDispense > 0) {
+        throw new HttpsError("failed-precondition", `Insufficient stock for ${med.medication_id}`);
+      }
+    }
+
+    // 3. Update encounter status
+    const encounterRef = db.collection("encounters").doc(encounterId);
+    transaction.update(encounterRef, { encounter_status: 'COMPLETED' });
+
+    return { success: true };
+  });
+});
+
+export const bulkUpload = onCall(async (request: CallableRequest) => {
+  const { clinicId, fileBase64 } = request.data;
+  if (!clinicId || !fileBase64) {
+    throw new HttpsError("invalid-argument", "Missing required fields.");
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(Buffer.from(fileBase64, 'base64'));
+  const worksheet = workbook.getWorksheet(1);
+  if (!worksheet) {
+    throw new HttpsError("internal", "Failed to load worksheet");
+  }
+
+  const batch = db.batch();
+  worksheet.eachRow((row: ExcelJS.Row, rowNumber: number) => {
+    if (rowNumber === 1) return; // Skip header
+    const [medication_id, batch_id, expiry_date, quantity, base_unit, package_unit] = row.values as any[];
+    
+    const docRef = db.collection(`clinics/${clinicId}/inventory`).doc();
+    batch.set(docRef, {
+      medication_id,
+      batch_id,
+      expiry_date: Timestamp.fromDate(new Date(expiry_date)),
+      quantity: Number(quantity),
+      base_unit,
+      package_unit,
+      created_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+  });
+
+  await batch.commit();
+  return { success: true };
+});
+
+export const stockAlerts = onSchedule("every 24 hours", async (event: ScheduledEvent) => {
+  console.log("stockAlerts started");
+  const ninetyDaysFromNow = new Date();
+  ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
+
+  const clinicsSnapshot = await db.collection("clinics").get();
+  for (const clinicDoc of clinicsSnapshot.docs) {
+    const clinicId = clinicDoc.id;
+    const inventorySnapshot = await db.collection(`clinics/${clinicId}/inventory`)
+      .where("expiry_date", "<=", Timestamp.fromDate(ninetyDaysFromNow))
+      .where("quantity", ">", 0)
+      .get();
+
+    if (!inventorySnapshot.empty) {
+      console.log(`Alert: ${inventorySnapshot.size} expiring batches in clinic ${clinicId}`);
+      // TODO: Send notification to clinic staff
+    }
+  }
+});

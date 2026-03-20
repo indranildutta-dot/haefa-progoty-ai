@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, initializeFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
+import { getFunctions } from "firebase/functions";
 import { OperationType, FirestoreErrorInfo } from "./types";
 
 // These should be set in your .env file
@@ -29,6 +30,7 @@ const app = initializeApp(isFirebaseConfigValid ? firebaseConfig : dummyConfig);
 let dbInstance;
 let authInstance;
 let storageInstance;
+let functionsInstance;
 
 try {
   // Use initializeFirestore with experimentalForceLongPolling to bypass WebSocket blocking issues
@@ -43,13 +45,17 @@ try {
   } else {
     console.warn("Firebase Storage bucket not configured. Storage features will be unavailable.");
   }
+  
+  // Initialize Functions
+  functionsInstance = getFunctions(app);
 } catch (error) {
   console.error("Failed to initialize Firebase services:", error);
 }
 
 export const db = dbInstance!;
 export const auth = authInstance!;
-export const storage = storageInstance; // Removed the ! to allow it to be undefined if not configured
+export const storage = storageInstance;
+export const functions = functionsInstance!;
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errInfo: FirestoreErrorInfo = {

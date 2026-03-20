@@ -60,15 +60,40 @@ import StationLayout from '../components/StationLayout';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import PrescriptionPrintView from '../components/PrescriptionPrintView';
 import LocalPrintshopIcon from '@mui/icons-material/LocalPrintshop';
+import BatchEntry from '../components/BatchEntry';
+import { dispenseMedication } from '../services/pharmacyService';
 
 interface PharmacyStationProps {
   countryId: string;
 }
 
 const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
-  const { notify, selectedCountry, selectedClinic } = useAppStore();
+  const { notify, selectedCountry, selectedClinic, userProfile } = useAppStore();
   const { isMobile, isTablet } = useResponsiveLayout();
   const [waitingList, setWaitingList] = useState<QueueItem[]>([]);
+  const [permissionError, setPermissionError] = useState(false);
+  
+  if (!selectedClinic) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography variant="h6">Please select a clinic to use the Pharmacy Station.</Typography>
+      </Box>
+    );
+  }
+
+  if (userProfile && !userProfile.isApproved) {
+    return (
+      <StationLayout title="Medication Dispensing" stationName="Pharmacy" showPatientContext={false}>
+        <Box sx={{ p: 3, textAlign: 'center' }}>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Account Pending Approval: Your account must be approved by an administrator before you can access the patient queue.
+          </Alert>
+          <Typography variant="body1">Please contact your country or global administrator for approval.</Typography>
+        </Box>
+      </StationLayout>
+    );
+  }
+
   const [selectedItem, setSelectedItem] = useState<QueueItem | null>(null);
   const [currentDiagnosis, setCurrentDiagnosis] = useState<DiagnosisRecord | null>(null);
   const [currentPrescription, setCurrentPrescription] = useState<PrescriptionRecord | null>(null);
@@ -77,6 +102,7 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
   const [currentTriage, setCurrentTriage] = useState<TriageAssessment | null>(null);
   const [currentEncounter, setCurrentEncounter] = useState<Encounter | null>(null);
   const [openDispenseDialog, setOpenDispenseDialog] = useState(false);
+  const [openBatchDialog, setOpenBatchDialog] = useState(false);
   const [dispensedItems, setDispensedItems] = useState<Record<number, boolean>>({});
   const [dispensedCount, setDispensedCount] = useState(0);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -109,11 +135,18 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!selectedClinic || (userProfile && !userProfile.isApproved)) return;
+
     const unsubscribe = subscribeToQueue('WAITING_FOR_PHARMACY', (items) => {
       setWaitingList(items);
+      setPermissionError(false);
+    }, (error) => {
+      if (error.message.includes('permission-denied')) {
+        setPermissionError(true);
+      }
     });
     return () => unsubscribe();
-  }, []);
+  }, [selectedClinic, userProfile?.isApproved]);
 
   const handleOpenDispense = async (item: QueueItem) => {
     setSelectedItem(item);
@@ -150,7 +183,11 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
     if (!currentPrescription || !selectedItem) return;
     try {
       if (pharmacyAction === 'DISPENSE') {
-        await markPrescriptionDispensed(currentPrescription.id!);
+        const medications = currentPrescription.prescriptions.map(p => ({
+          medication_id: p.medicationId,
+          quantity: p.quantity || 1
+        }));
+        await dispenseMedication(currentPrescription.patient_id, currentPrescription.encounter_id, medications);
         await updateQueueStatus(selectedItem.id!, 'COMPLETED' as any);
         notify(`Medication dispensed for ${selectedItem.patient_name}`, 'success');
       } else if (pharmacyAction === 'HOLD') {
@@ -282,6 +319,13 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
                     {isMobile ? 'Queue' : 'Prescriptions Waiting'}
                   </Typography>
                 </Box>
+                <Button 
+                  variant="outlined" 
+                  onClick={() => setOpenBatchDialog(true)}
+                  sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
+                >
+                  Batch Inventory Entry
+                </Button>
                 <QrScannerModal onScan={async (token) => {
                   const patient = await getPatientByQrToken(token);
                   if (patient) {
@@ -297,7 +341,16 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
                 }} />
               </Box>
               
-              {isMobile || isTablet ? (
+              {permissionError ? (
+                <Box sx={{ p: 4, textAlign: 'center' }}>
+                  <Alert severity="error" sx={{ mb: 2 }}>
+                    Permission Error: You do not have the required permissions to view the pharmacy queue.
+                  </Alert>
+                  <Typography variant="body2" color="textSecondary">
+                    This may be due to incorrect security rules or your user role. Please contact support.
+                  </Typography>
+                </Box>
+              ) : isMobile || isTablet ? (
                 <Box>
                   {waitingList.length === 0 ? (
                     <Typography color="textSecondary" align="center" sx={{ py: 4 }}>
@@ -474,6 +527,8 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
           </Box>
         </DialogActions>
       </Dialog>
+      
+      <BatchEntry open={openBatchDialog} onClose={() => setOpenBatchDialog(false)} onSuccess={() => {}} />
 
       {/* Hidden Print View */}
       {currentPatient && currentEncounter && (

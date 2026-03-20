@@ -1,41 +1,20 @@
 import React from 'react';
-import { Box, Typography, Button, Container, Paper } from '@mui/material';
+import { Box, Typography, Button, Container, Paper, IconButton } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
 
-  const runBootstrap = async () => {
-    const functions = getFunctions();
-    const bootstrap = httpsCallable(functions, 'bootstrapAdmins');
-    try {
-      console.log("Running bootstrapAdmins...");
-      await bootstrap();
-      alert('Bootstrap successful! Please log out and log back in.');
-    } catch (e) {
-      console.error("Bootstrap error:", e);
-      alert('Bootstrap failed. Check console for details.');
-    }
-  };
-
-  const runMigration = async () => {
-    const functions = getFunctions();
-    const migrate = httpsCallable(functions, 'migrateUsers');
-    try {
-      console.log("Running migrateUsers...");
-      const result = await migrate();
-      console.log("Migration result:", result.data);
-      alert('Migration successful! Check console for details.');
-    } catch (e) {
-      console.error("Migration error:", e);
-      alert('Migration failed. Check console for details.');
-    }
-  };
-
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Typography variant="h4" gutterBottom>Admin Dashboard</Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+        <IconButton onClick={() => navigate('/')} sx={{ mr: 2 }}>
+          <ArrowBackIcon />
+        </IconButton>
+        <Typography variant="h4">Admin Dashboard</Typography>
+      </Box>
+      
       <Paper sx={{ p: 3, mt: 2 }}>
         <Typography variant="h6">User Management</Typography>
         <Typography variant="body1" sx={{ mb: 2 }}>
@@ -44,12 +23,6 @@ const AdminDashboard = () => {
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Button variant="contained" onClick={() => navigate('/admin/users')}>
             Go to User Management
-          </Button>
-          <Button onClick={runBootstrap} variant="outlined" color="secondary">
-            Run Bootstrap Admins
-          </Button>
-          <Button onClick={runMigration} variant="outlined" color="warning">
-            Run Migration
           </Button>
         </Box>
       </Paper>

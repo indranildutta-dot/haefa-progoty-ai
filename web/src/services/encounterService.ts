@@ -22,7 +22,7 @@ import {
   DiagnosisRecord, 
   PrescriptionRecord 
 } from "../types";
-import { useAppStore } from "../store/useAppStore";
+import { getSession } from "../utils/session";
 import { logAction } from "./auditService";
 import { updateQueueMetric } from "./queueMetricsService";
 
@@ -35,8 +35,8 @@ const DIAGNOSES_COLLECTION = "diagnoses";
 const PRESCRIPTIONS_COLLECTION = "prescriptions";
 
 export const createEncounter = async (patient_id: string) => {
-  const { selectedCountry, selectedClinic } = useAppStore.getState();
-  if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
+  const { selectedCountry, selectedClinic } = getSession();
+  if (!selectedClinic) throw new Error("Clinic not selected");
 
   await updateQueueMetric(selectedClinic.id, {
     patients_registered_today: 1,
@@ -138,8 +138,8 @@ export const updateEncounterStatus = async (encounterId: string, status: Encount
 };
 
 export const saveVitals = async (vitalsData: Omit<VitalsRecord, 'id' | 'created_at' | 'country_code' | 'clinic_id'>) => {
-  const { selectedCountry, selectedClinic } = useAppStore.getState();
-  if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
+  const { selectedCountry, selectedClinic } = getSession();
+  if (!selectedClinic) throw new Error("Clinic not selected");
 
   await addDoc(collection(db, VITALS_COLLECTION), {
     ...vitalsData,
@@ -184,8 +184,8 @@ export const saveConsultation = async (
   diagnosisData: Omit<DiagnosisRecord, 'id' | 'created_at' | 'country_code' | 'clinic_id'>,
   prescriptionData?: Omit<PrescriptionRecord, 'id' | 'created_at' | 'status' | 'country_code' | 'clinic_id'>
 ) => {
-  const { selectedCountry, selectedClinic } = useAppStore.getState();
-  if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
+  const { selectedCountry, selectedClinic } = getSession();
+  if (!selectedClinic) throw new Error("Clinic not selected");
 
   await addDoc(collection(db, DIAGNOSES_COLLECTION), {
     ...diagnosisData,

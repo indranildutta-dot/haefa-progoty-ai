@@ -1,6 +1,6 @@
 import { Timestamp } from "firebase/firestore";
 
-export type UserRole = 'global_admin' | 'country_admin' | 'doctor' | 'nurse';
+export type UserRole = 'global_admin' | 'country_admin' | 'doctor' | 'nurse' | 'registration' | 'pharmacy' | 'admin';
 
 export interface UserProfile {
   uid: string;
@@ -116,6 +116,8 @@ export interface Vitals {
   height: number;
   bmi?: number;
   oxygenSaturation?: number;
+  blood_sugar?: string;
+  hemoglobin?: string;
 }
 
 export interface Prescription {
@@ -125,6 +127,7 @@ export interface Prescription {
   frequency: string;
   duration: string;
   instructions: string;
+  quantity?: number;
 }
 
 export interface VitalsRecord extends Vitals {
@@ -271,6 +274,7 @@ export interface TriageAssessment {
   family_medical_history: string;
   pregnancy_status: 'yes' | 'no' | 'unknown';
   triage_notes: string;
+  chief_complaint?: string;
 }
 
 export interface ClinicMetrics {

@@ -32,6 +32,7 @@ export const getUserProfile = async (uid: string): Promise<UserProfile> => {
     email: "test@haefa.org",
     role: "admin",
     name: "Test User",
-    countryId: "BD"
+    countryCode: "BD",
+    isApproved: true
   };
 };

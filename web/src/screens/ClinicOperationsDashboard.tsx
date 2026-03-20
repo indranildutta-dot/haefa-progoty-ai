@@ -282,22 +282,22 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
             <Typography variant="subtitle1" fontWeight="800">{title}</Typography>
           </Box>
           <Grid container spacing={1}>
-            <Grid size={{ xs: 6 }}>
-              <Typography variant="caption" color="text.secondary" display="block">Queue</Typography>
-              <Typography variant="h6" fontWeight="bold">{data.queue}</Typography>
-            </Grid>
-            <Grid size={{ xs: 6 }}>
-              <Typography variant="caption" color="text.secondary" display="block">Active</Typography>
-              <Typography variant="h6" fontWeight="bold">{data.active || 0}</Typography>
-            </Grid>
-            <Grid size={{ xs: 6 }}>
-              <Typography variant="caption" color="text.secondary" display="block">Completed</Typography>
-              <Typography variant="h6" fontWeight="bold">{data.completed}</Typography>
-            </Grid>
-            <Grid size={{ xs: 6 }}>
-              <Typography variant="caption" color="text.secondary" display="block">Avg Wait</Typography>
-              <Typography variant="h6" fontWeight="bold">{data.avgWait}m</Typography>
-            </Grid>
+          <Grid size={6}>
+            <Typography variant="caption" color="text.secondary" display="block">Queue</Typography>
+            <Typography variant="h6" fontWeight="bold">{data.queue}</Typography>
+          </Grid>
+          <Grid size={6}>
+            <Typography variant="caption" color="text.secondary" display="block">Active</Typography>
+            <Typography variant="h6" fontWeight="bold">{data.active || 0}</Typography>
+          </Grid>
+          <Grid size={6}>
+            <Typography variant="caption" color="text.secondary" display="block">Completed</Typography>
+            <Typography variant="h6" fontWeight="bold">{data.completed}</Typography>
+          </Grid>
+          <Grid size={6}>
+            <Typography variant="caption" color="text.secondary" display="block">Avg Wait</Typography>
+            <Typography variant="h6" fontWeight="bold">{data.avgWait}m</Typography>
+          </Grid>
           </Grid>
         </CardContent>
       </Card>
@@ -591,7 +591,7 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
             <Grid size={{ xs: 12, md: 6 }}>
               <TriageDistributionPanel data={triageData} />
             </Grid>
-            <Grid size={{ xs: 12 }}>
+            <Grid size={12}>
               <LongestWaitPanel patients={longestWaitPatients} />
             </Grid>
           </Grid>

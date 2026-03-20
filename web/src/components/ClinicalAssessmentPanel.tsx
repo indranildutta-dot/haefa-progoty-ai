@@ -243,8 +243,8 @@ const ClinicalAssessmentPanel: React.FC<Props> = ({ data, onChange }) => {
         {renderAccordionHeader('vaccination', 'Vaccination', 'vaccination')}
         <AccordionDetails sx={{ bgcolor: 'grey.100' }}>
           <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
-            <Grid size={{ xs: 6 }}><Typography variant="subtitle2">Did you get the following vaccinations?</Typography></Grid>
-            <Grid size={{ xs: 6 }} sx={{ textAlign: 'right' }}><Typography variant="caption">Given by Nirog Team?</Typography></Grid>
+            <Grid size={6}><Typography variant="subtitle2">Did you get the following vaccinations?</Typography></Grid>
+            <Grid size={6} sx={{ textAlign: 'right' }}><Typography variant="caption">Given by Nirog Team?</Typography></Grid>
           </Grid>
           {['BCG', 'Pentavalent', 'OPV', 'PCV', 'IPV', 'MR', 'Cholera: Dose-1', 'Cholera: Dose-2', 'Cholera: Dose-3', 'Measles', 'TT', 'Rubella'].map((vax) => (
             <Box key={vax} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', my: 1 }}>

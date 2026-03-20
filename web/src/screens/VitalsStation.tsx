@@ -52,12 +52,13 @@ import StationLayout from '../components/StationLayout';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
-  const { notify, selectedPatient, setSelectedPatient } = useAppStore();
+  const { notify, selectedPatient, setSelectedPatient, userProfile, selectedClinic } = useAppStore();
   const { isMobile, isTablet } = useResponsiveLayout();
   const [waitingList, setWaitingList] = useState<QueueItem[]>([]);
   const [selectedQueueItem, setSelectedQueueItem] = useState<QueueItem | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [permissionError, setPermissionError] = useState<boolean>(false);
 
   // Triage State
   const [triageResult, setTriageResult] = useState<TriageResult | null>(null);
@@ -76,11 +77,26 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
   });
 
   useEffect(() => {
-    const unsubscribe = subscribeToQueue('WAITING_FOR_VITALS' as any, (items) => {
-      setWaitingList(items);
-    });
+    if (!userProfile?.isApproved || !selectedClinic) {
+      setWaitingList([]);
+      return;
+    }
+
+    setPermissionError(false);
+    const unsubscribe = subscribeToQueue(
+      'WAITING_FOR_VITALS' as any, 
+      (items) => {
+        setWaitingList(items);
+      },
+      (error) => {
+        console.error("Queue subscription error:", error);
+        if (error.code === 'permission-denied' || error.message?.includes('permission')) {
+          setPermissionError(true);
+        }
+      }
+    );
     return () => unsubscribe();
-  }, []);
+  }, [userProfile?.isApproved, selectedClinic]);
 
   // Calculate BMI automatically
   useEffect(() => {
@@ -175,123 +191,144 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
     }
   };
 
-  const renderWaitingList = () => (
-    <Grid container spacing={isMobile ? 2 : 3}>
-      <Grid size={{ xs: 12, lg: 9 }}>
-        <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-          <CardContent sx={{ p: isMobile ? 2 : 3 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexDirection={isMobile ? 'column' : 'row'} gap={2}>
-              <Box display="flex" alignItems="center">
-                <LocalHospitalIcon color="info" sx={{ mr: 1 }} />
-                <Typography variant="h6" fontWeight="800">Patients Waiting</Typography>
-              </Box>
-              <QrScannerModal onScan={async (token) => {
-                const patient = await getPatientByQrToken(token);
-                if (patient) {
-                  const item = waitingList.find(i => i.patient_id === patient.id);
-                  if (item) {
-                    handleSelectPatient(item);
+  const renderWaitingList = () => {
+    if (!userProfile?.isApproved) {
+      return (
+        <Alert severity="warning" sx={{ borderRadius: 3, mb: 3 }}>
+          <Typography variant="subtitle2" fontWeight="bold">Account Pending Approval</Typography>
+          Your account must be approved by a Global Administrator before you can access the patient queue.
+        </Alert>
+      );
+    }
+
+    if (permissionError) {
+      return (
+        <Alert severity="error" sx={{ borderRadius: 3, mb: 3 }}>
+          <Typography variant="subtitle2" fontWeight="bold">Permission Error</Typography>
+          You do not have permission to view the patient queue for this clinic. 
+          Please contact your administrator to ensure your clinic assignments and security rules are correctly configured.
+        </Alert>
+      );
+    }
+
+    return (
+      <Grid container spacing={isMobile ? 2 : 3}>
+        <Grid size={{ xs: 12, lg: 9 }}>
+          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+            <CardContent sx={{ p: isMobile ? 2 : 3 }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexDirection={isMobile ? 'column' : 'row'} gap={2}>
+                <Box display="flex" alignItems="center">
+                  <LocalHospitalIcon color="info" sx={{ mr: 1 }} />
+                  <Typography variant="h6" fontWeight="800">Patients Waiting</Typography>
+                </Box>
+                <QrScannerModal onScan={async (token) => {
+                  const patient = await getPatientByQrToken(token);
+                  if (patient) {
+                    const item = waitingList.find(i => i.patient_id === patient.id);
+                    if (item) {
+                      handleSelectPatient(item);
+                    } else {
+                      notify("Patient not found in queue.", "error");
+                    }
                   } else {
-                    notify("Patient not found in queue.", "error");
+                    notify("Patient not found.", "error");
                   }
-                } else {
-                  notify("Patient not found.", "error");
-                }
-              }} />
-            </Box>
-            
-            {isMobile || isTablet ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {waitingList.length === 0 ? (
-                  <Typography color="textSecondary" align="center" sx={{ py: 4 }}>No patients waiting.</Typography>
-                ) : (
-                  waitingList.map((item) => {
-                    const waitTime = item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : 0;
-                    return (
-                      <Card key={item.id} variant="outlined" sx={{ borderRadius: 2 }}>
-                        <CardContent sx={{ p: 2 }}>
-                          <Box display="flex" justifyContent="space-between" alignItems="start">
-                            <Box>
-                              <Typography variant="subtitle1" fontWeight="bold">{item.patient_name}</Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                Registered: {item.created_at?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </Typography>
-                            </Box>
-                            <Chip 
-                              label={item.triage_level?.toUpperCase() || 'STANDARD'} 
-                              size="small" 
-                              color={item.triage_level === 'emergency' ? 'error' : item.triage_level === 'urgent' ? 'warning' : 'default'}
-                            />
-                          </Box>
-                          <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
-                            <Typography variant="body2" sx={{ color: waitTime > 30 ? 'error.main' : 'success.main', fontWeight: 'bold' }}>
-                              {waitTime} mins wait
-                            </Typography>
-                            <Button variant="contained" color="info" size="small" onClick={() => handleSelectPatient(item)}>
-                              Take Vitals
-                            </Button>
-                          </Box>
-                        </CardContent>
-                      </Card>
-                    );
-                  })
-                )}
+                }} />
               </Box>
-            ) : (
-              <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-                <Table>
-                  <TableHead sx={{ bgcolor: 'grey.50' }}>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 700 }}>Patient Name</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Wait Time</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Priority</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {waitingList.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} align="center">
-                          <Typography color="textSecondary" sx={{ py: 4 }}>No patients waiting.</Typography>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      waitingList.map((item) => {
-                        const waitTime = item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : 0;
-                        return (
-                          <TableRow key={item.id} hover>
-                            <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_name}</TableCell>
-                            <TableCell>{waitTime} mins</TableCell>
-                            <TableCell>
-                              <Chip label={item.triage_level?.toUpperCase() || 'STANDARD'} size="small" />
-                            </TableCell>
-                            <TableCell align="right">
+              
+              {isMobile || isTablet ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {waitingList.length === 0 ? (
+                    <Typography color="textSecondary" align="center" sx={{ py: 4 }}>No patients waiting.</Typography>
+                  ) : (
+                    waitingList.map((item) => {
+                      const waitTime = item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : 0;
+                      return (
+                        <Card key={item.id} variant="outlined" sx={{ borderRadius: 2 }}>
+                          <CardContent sx={{ p: 2 }}>
+                            <Box display="flex" justifyContent="space-between" alignItems="start">
+                              <Box>
+                                <Typography variant="subtitle1" fontWeight="bold">{item.patient_name}</Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  Registered: {item.created_at?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </Typography>
+                              </Box>
+                              <Chip 
+                                label={item.triage_level?.toUpperCase() || 'STANDARD'} 
+                                size="small" 
+                                color={item.triage_level === 'emergency' ? 'error' : item.triage_level === 'urgent' ? 'warning' : 'default'}
+                              />
+                            </Box>
+                            <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
+                              <Typography variant="body2" sx={{ color: waitTime > 30 ? 'error.main' : 'success.main', fontWeight: 'bold' }}>
+                                {waitTime} mins wait
+                              </Typography>
                               <Button variant="contained" color="info" size="small" onClick={() => handleSelectPatient(item)}>
                                 Take Vitals
                               </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            )}
-          </CardContent>
-        </Card>
+                            </Box>
+                          </CardContent>
+                        </Card>
+                      );
+                    })
+                  )}
+                </Box>
+              ) : (
+                <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                  <Table>
+                    <TableHead sx={{ bgcolor: 'grey.50' }}>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 700 }}>Patient Name</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Wait Time</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Priority</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {waitingList.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} align="center">
+                            <Typography color="textSecondary" sx={{ py: 4 }}>No patients waiting.</Typography>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        waitingList.map((item) => {
+                          const waitTime = item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : 0;
+                          return (
+                            <TableRow key={item.id} hover>
+                              <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_name}</TableCell>
+                              <TableCell>{waitTime} mins</TableCell>
+                              <TableCell>
+                                <Chip label={item.triage_level?.toUpperCase() || 'STANDARD'} size="small" />
+                              </TableCell>
+                              <TableCell align="right">
+                                <Button variant="contained" color="info" size="small" onClick={() => handleSelectPatient(item)}>
+                                  Take Vitals
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid size={{ xs: 12, lg: 3 }}>
+          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+            <CardContent>
+              <Typography variant="subtitle2" color="textSecondary" gutterBottom fontWeight="bold">QUEUE SUMMARY</Typography>
+              <Typography variant="h3" fontWeight="800" color="info.main">{waitingList.length}</Typography>
+              <Typography variant="body2" color="textSecondary">Patients waiting for vitals</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
-      <Grid size={{ xs: 12, lg: 3 }}>
-        <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-          <CardContent>
-            <Typography variant="subtitle2" color="textSecondary" gutterBottom fontWeight="bold">QUEUE SUMMARY</Typography>
-            <Typography variant="h3" fontWeight="800" color="info.main">{waitingList.length}</Typography>
-            <Typography variant="body2" color="textSecondary">Patients waiting for vitals</Typography>
-          </CardContent>
-        </Card>
-      </Grid>
-    </Grid>
-  );
+    );
+  };
 
   const renderVitalsForm = () => (
     <Box>

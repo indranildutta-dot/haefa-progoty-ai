@@ -17,7 +17,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { QueueItem, EncounterStatus } from "../types";
-import { useAppStore } from "../store/useAppStore";
+import { getSession } from "../utils/session";
 import { logAction } from "./auditService";
 import { updateMetrics } from "./metricsService";
 import { handleFirestoreError, OperationType } from "../utils/firestoreError";
@@ -26,8 +26,8 @@ const QUEUE_ACTIVE_COLLECTION = "queues_active";
 const QUEUE_ARCHIVE_COLLECTION = "queues_archive";
 
 export const addToQueue = async (queueData: Omit<QueueItem, 'id' | 'created_at' | 'country_code' | 'clinic_id'>) => {
-  const { selectedCountry, selectedClinic } = useAppStore.getState();
-  if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
+  const { selectedCountry, selectedClinic } = getSession();
+  if (!selectedClinic) throw new Error("Clinic not selected");
 
   let docRef;
   try {
@@ -148,8 +148,8 @@ export const updateQueueTriage = async (queueId: string, triageData: Partial<Que
 };
 
 export const getQueueByStatus = async (status: EncounterStatus) => {
-  const { selectedCountry, selectedClinic } = useAppStore.getState();
-  if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
+  const { selectedCountry, selectedClinic } = getSession();
+  if (!selectedClinic) throw new Error("Clinic not selected");
 
   const q = query(
     collection(db, QUEUE_ACTIVE_COLLECTION),
@@ -182,9 +182,13 @@ export const getQueueByStatus = async (status: EncounterStatus) => {
     });
 };
 
-export const subscribeToQueue = (status: EncounterStatus | EncounterStatus[], callback: (items: QueueItem[]) => void) => {
-  const { selectedCountry, selectedClinic } = useAppStore.getState();
-  if (!selectedCountry || !selectedClinic) throw new Error("Session not initialized");
+export const subscribeToQueue = (
+  status: EncounterStatus | EncounterStatus[], 
+  callback: (items: QueueItem[]) => void,
+  onError?: (error: any) => void
+) => {
+  const { selectedCountry, selectedClinic } = getSession();
+  if (!selectedClinic) throw new Error("Clinic not selected");
 
   const q = query(
     collection(db, QUEUE_ACTIVE_COLLECTION),
@@ -219,5 +223,11 @@ export const subscribeToQueue = (status: EncounterStatus | EncounterStatus[], ca
       });
 
     callback(filtered);
+  }, (error) => {
+    if (onError) {
+      onError(error);
+    } else {
+      handleFirestoreError(error, OperationType.GET, QUEUE_ACTIVE_COLLECTION);
+    }
   });
 };
