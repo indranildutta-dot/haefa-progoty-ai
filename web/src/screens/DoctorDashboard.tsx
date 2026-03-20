@@ -117,7 +117,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
   useEffect(() => {
     const fetchConsultationCount = async () => {
       try {
-        if (!selectedCountry || !selectedClinic) return;
+        if (!selectedCountry || !selectedClinic || !userProfile?.isApproved) return;
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
         
@@ -134,7 +134,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
       }
     };
     fetchConsultationCount();
-  }, [selectedCountry, selectedClinic]);
+  }, [selectedCountry, selectedClinic, userProfile?.isApproved]);
 
   useEffect(() => {
     if (!userProfile?.isApproved || !selectedClinic) {
@@ -208,6 +208,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
     } catch (err) {
       console.error(err);
       setErrorMsg("Failed to load patient data.");
+      setSelectedItem(null);
     }
   };
 

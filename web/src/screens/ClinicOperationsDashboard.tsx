@@ -45,7 +45,7 @@ interface ClinicOperationsDashboardProps {
 type Scope = 'current_clinic' | 'clinic' | 'country' | 'global';
 
 const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ countryId }) => {
-  const { selectedCountry, selectedClinic, notify } = useAppStore();
+  const { selectedCountry, selectedClinic, notify, userProfile } = useAppStore();
   const { isMobile, isTablet } = useResponsiveLayout();
   
   const [scope, setScope] = useState<Scope>('current_clinic');
@@ -85,7 +85,7 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
 
   // Fetch data
   useEffect(() => {
-    if (!selectedScopeId) return;
+    if (!selectedScopeId || !userProfile?.isApproved) return;
 
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
@@ -113,7 +113,7 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
       unsubscribePatients();
       unsubscribeQueue();
     };
-  }, [scope, selectedScopeId]);
+  }, [scope, selectedScopeId, userProfile?.isApproved]);
 
   // Calculate metrics
   useEffect(() => {
@@ -223,7 +223,7 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
       ];
 
       for (const m of meds) {
-        await addDoc(collection(db, "medications"), m);
+        await addDoc(collection(db, "medications_catalog"), m);
       }
 
       const interactions = [
@@ -242,7 +242,7 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
       ];
 
       for (const i of interactions) {
-        await addDoc(collection(db, "drug_interactions"), i);
+        await addDoc(collection(db, "medication_interactions"), i);
       }
 
       notify("Medications and interactions seeded successfully!", "success");
@@ -398,9 +398,15 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
                   sx={{ fontSize: '0.875rem' }}
                 >
                   <MenuItem value="current_clinic">Current Clinic</MenuItem>
-                  <MenuItem value="clinic">Select Clinic</MenuItem>
-                  <MenuItem value="country">Select Country</MenuItem>
-                  <MenuItem value="global">Global View</MenuItem>
+                  {(userProfile?.role === 'global_admin' || userProfile?.role === 'country_admin' || userProfile?.role === 'admin') && (
+                    <>
+                      <MenuItem value="clinic">Select Clinic</MenuItem>
+                      <MenuItem value="country">Select Country</MenuItem>
+                    </>
+                  )}
+                  {userProfile?.role === 'global_admin' && (
+                    <MenuItem value="global">Global View</MenuItem>
+                  )}
                 </Select>
               </FormControl>
 
@@ -413,7 +419,11 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
                     disableUnderline
                     sx={{ fontSize: '0.875rem' }}
                   >
-                    {countries.flatMap(c => c.clinics).map(clinic => (
+                    {countries
+                      .filter(c => userProfile?.role === 'global_admin' || userProfile?.assignedCountries?.includes(c.id) || userProfile?.assignedClinics?.some(ac => c.clinics.some(cl => cl.id === ac)))
+                      .flatMap(c => c.clinics)
+                      .filter(clinic => userProfile?.role === 'global_admin' || userProfile?.role === 'country_admin' || userProfile?.assignedClinics?.includes(clinic.id))
+                      .map(clinic => (
                       <MenuItem key={clinic.id} value={clinic.id}>{clinic.name}</MenuItem>
                     ))}
                   </Select>
@@ -429,7 +439,9 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
                     disableUnderline
                     sx={{ fontSize: '0.875rem' }}
                   >
-                    {countries.map(country => (
+                    {countries
+                      .filter(country => userProfile?.role === 'global_admin' || userProfile?.assignedCountries?.includes(country.id))
+                      .map(country => (
                       <MenuItem key={country.id} value={country.id}>{country.name}</MenuItem>
                     ))}
                   </Select>

@@ -17,7 +17,21 @@ export const useAuth = () => {
         try {
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
-            setUserProfile(userDoc.data() as UserProfile);
+            const profile = userDoc.data() as UserProfile;
+            const defaultAdmins = ['indranil_dutta@haefa.org', 'ruhul_abid@haefa.org'];
+            const isBootstrapAdmin = user.email && defaultAdmins.includes(user.email);
+            
+            if (isBootstrapAdmin && (!profile.isApproved || profile.role !== 'global_admin')) {
+              const updatedProfile: UserProfile = {
+                ...profile,
+                role: 'global_admin',
+                isApproved: true
+              };
+              await setDoc(doc(db, 'users', user.uid), updatedProfile, { merge: true });
+              setUserProfile(updatedProfile);
+            } else {
+              setUserProfile(profile);
+            }
           } else {
             // Self-provisioning for default admin
             const defaultAdmins = ['indranil_dutta@haefa.org', 'ruhul_abid@haefa.org'];

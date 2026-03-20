@@ -21,6 +21,7 @@ import {
 import { ArrowBack, DeleteOutline } from '@mui/icons-material';
 import { CountryConfig, ClinicConfig } from '../config/countries';
 import { clearBangladeshData } from '../services/adminService';
+import { useAppStore } from '../store/useAppStore';
 
 interface ClinicSelectionProps {
   selectedCountry: CountryConfig;
@@ -70,7 +71,15 @@ const ClinicSelection: React.FC<ClinicSelectionProps> = ({ selectedCountry, onSe
       </Box>
 
       <Grid container spacing={2}>
-        {selectedCountry.clinics.map((clinic) => (
+        {selectedCountry.clinics
+          .filter(clinic => {
+            const profile = useAppStore.getState().userProfile;
+            return profile?.role === 'global_admin' || 
+                   profile?.role === 'country_admin' || 
+                   profile?.role === 'admin' || 
+                   profile?.assignedClinics?.includes(clinic.id);
+          })
+          .map((clinic) => (
           <Grid size={{ xs: 12, sm: 6, md: 4 }} key={clinic.id}>
             <Card 
               sx={{ 

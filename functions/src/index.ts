@@ -156,7 +156,7 @@ const sanitizeData = (data: any) => {
   return sanitized;
 };
 
-export const registerPatient = onCall(async (request: CallableRequest) => {
+export const registerPatient = onCall({ region: "us-central1" }, async (request: CallableRequest) => {
   console.log("registerPatient called");
   
   const data = request.data || {};
@@ -245,7 +245,7 @@ export const registerPatient = onCall(async (request: CallableRequest) => {
   }
 });
 
-export const generateBadgeToken = onCall(async (request: CallableRequest) => {
+export const generateBadgeToken = onCall({ region: "us-central1" }, async (request: CallableRequest) => {
   console.log("generateBadgeToken called");
   const data = request.data || {};
   const { patientId } = data;
@@ -270,66 +270,85 @@ export const generateBadgeToken = onCall(async (request: CallableRequest) => {
   }
 });
 
-export const dispenseMedication = onCall(async (request: CallableRequest) => {
+export const dispenseMedication = onCall({ region: "us-central1" }, async (request: CallableRequest) => {
+  // Trigger redeployment
+  console.log("dispenseMedication called with data:", JSON.stringify(request.data));
   const { clinicId, patientId, encounterId, medications } = request.data;
   if (!clinicId || !patientId || !encounterId || !medications) {
+    console.error("Missing required fields:", request.data);
     throw new HttpsError("invalid-argument", "Missing required fields.");
   }
 
   return await db.runTransaction(async (transaction) => {
-    for (const med of medications) {
-      // 1. Find batches with FEFO
-      const inventoryRef = db.collection(`clinics/${clinicId}/inventory`);
-      const q = inventoryRef
-        .where("medication_id", "==", med.medication_id)
-        .where("quantity", ">", 0)
-        .orderBy("expiry_date", "asc");
-      
-      const snapshot = await transaction.get(q);
+    try {
+      console.log("Starting transaction for dispensing");
+      for (const med of medications) {
+        console.log("Processing medication:", med.medication_id, "quantity:", med.quantity);
+        // 1. Find batches with FEFO
+        const inventoryRef = db.collection(`clinics/${clinicId}/inventory`);
+        const q = inventoryRef
+          .where("medication_id", "==", med.medication_id)
+          .where("quantity", ">", 0)
+          .orderBy("expiry_date", "asc");
+        
+        console.log("Querying inventory for:", med.medication_id);
+        const snapshot = await transaction.get(q);
 
-      if (snapshot.empty) {
-        throw new HttpsError("failed-precondition", `No stock for ${med.medication_id}`);
+        if (snapshot.empty) {
+          console.error("No stock found for medication:", med.medication_id);
+          throw new HttpsError("failed-precondition", `No stock for ${med.medication_id}`);
+        }
+        console.log("Found", snapshot.size, "batches for", med.medication_id);
+
+        let remainingToDispense = med.quantity;
+        for (const doc of snapshot.docs) {
+          if (remainingToDispense <= 0) break;
+
+          const batch = doc.data() as any;
+          const available = batch.quantity;
+          const toTake = Math.min(available, remainingToDispense);
+          
+          console.log("Taking", toTake, "from batch", batch.batch_id, "available:", available);
+
+          transaction.update(doc.ref, { quantity: available - toTake });
+          remainingToDispense -= toTake;
+
+          // 2. Log inventory log
+          const logRef = db.collection("inventory_logs").doc();
+          console.log("Creating inventory log entry");
+          transaction.set(logRef, {
+            clinic_id: clinicId,
+            medication_id: med.medication_id,
+            batch_id: batch.batch_id,
+            type: 'dispense',
+            quantity: toTake,
+            user_id: request.auth?.uid,
+            encounter_id: encounterId,
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+          });
+        }
+
+        if (remainingToDispense > 0) {
+          console.error("Insufficient stock for medication:", med.medication_id, "remaining:", remainingToDispense);
+          throw new HttpsError("failed-precondition", `Insufficient stock for ${med.medication_id}`);
+        }
       }
 
-      let remainingToDispense = med.quantity;
-      for (const doc of snapshot.docs) {
-        if (remainingToDispense <= 0) break;
+      // 3. Update encounter status
+      console.log("Updating encounter status to COMPLETED");
+      const encounterRef = db.collection("encounters").doc(encounterId);
+      transaction.update(encounterRef, { status: 'COMPLETED' });
 
-        const batch = doc.data() as any;
-        const available = batch.quantity;
-        const toTake = Math.min(available, remainingToDispense);
-
-        transaction.update(doc.ref, { quantity: available - toTake });
-        remainingToDispense -= toTake;
-
-        // 2. Log inventory log
-        const logRef = db.collection("inventory_logs").doc();
-        transaction.set(logRef, {
-          clinic_id: clinicId,
-          medication_id: med.medication_id,
-          batch_id: batch.batch_id,
-          type: 'dispense',
-          quantity: toTake,
-          user_id: request.auth?.uid,
-          encounter_id: encounterId,
-          timestamp: admin.firestore.FieldValue.serverTimestamp()
-        });
-      }
-
-      if (remainingToDispense > 0) {
-        throw new HttpsError("failed-precondition", `Insufficient stock for ${med.medication_id}`);
-      }
+      console.log("Transaction completed successfully");
+      return { success: true };
+    } catch (error: any) {
+      console.error("Transaction failed inside runTransaction:", error);
+      throw error;
     }
-
-    // 3. Update encounter status
-    const encounterRef = db.collection("encounters").doc(encounterId);
-    transaction.update(encounterRef, { encounter_status: 'COMPLETED' });
-
-    return { success: true };
   });
 });
 
-export const bulkUpload = onCall(async (request: CallableRequest) => {
+export const bulkUpload = onCall({ region: "us-central1" }, async (request: CallableRequest) => {
   const { clinicId, fileBase64 } = request.data;
   if (!clinicId || !fileBase64) {
     throw new HttpsError("invalid-argument", "Missing required fields.");
@@ -345,7 +364,7 @@ export const bulkUpload = onCall(async (request: CallableRequest) => {
   const batch = db.batch();
   worksheet.eachRow((row: ExcelJS.Row, rowNumber: number) => {
     if (rowNumber === 1) return; // Skip header
-    const [medication_id, batch_id, expiry_date, quantity, base_unit, package_unit] = row.values as any[];
+    const [medication_id, batch_id, expiry_date, quantity, base_unit, package_unit, dosage] = row.values as any[];
     
     const docRef = db.collection(`clinics/${clinicId}/inventory`).doc();
     batch.set(docRef, {
@@ -355,6 +374,7 @@ export const bulkUpload = onCall(async (request: CallableRequest) => {
       quantity: Number(quantity),
       base_unit,
       package_unit,
+      dosage,
       created_at: admin.firestore.FieldValue.serverTimestamp()
     });
   });

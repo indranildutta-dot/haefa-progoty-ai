@@ -20,7 +20,7 @@ interface QueueBoardProps {
 }
 
 const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
-  const { selectedCountry, selectedClinic } = useAppStore();
+  const { selectedCountry, selectedClinic, userProfile } = useAppStore();
   const { isMobile } = useResponsiveLayout();
   const [queuePatients, setQueuePatients] = useState<QueuePatient[]>([]);
   const [patientsCache, setPatientsCache] = useState<Record<string, Patient>>({});
@@ -28,7 +28,7 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!selectedCountry || !selectedClinic) return;
+    if (!selectedCountry || !selectedClinic || !userProfile?.isApproved) return;
     
     const path = "queues_active";
     const q = query(
@@ -96,7 +96,7 @@ const QueueBoard: React.FC<QueueBoardProps> = ({ countryId }) => {
     });
 
     return () => unsubscribe();
-  }, [selectedCountry, selectedClinic, patientsCache]);
+  }, [selectedCountry, selectedClinic, patientsCache, userProfile?.isApproved]);
 
   const groupedPatients = useMemo(() => {
     const groups: Record<string, QueuePatient[]> = {

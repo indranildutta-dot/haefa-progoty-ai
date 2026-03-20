@@ -2,8 +2,8 @@ import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 import { Medication, DrugInteraction, PatientAllergy, Prescription, SafetyAlert } from "../types";
 
-const MEDICATIONS_COLLECTION = "medications";
-const INTERACTIONS_COLLECTION = "drug_interactions";
+const MEDICATIONS_COLLECTION = "medications_catalog";
+const INTERACTIONS_COLLECTION = "medication_interactions";
 const ALLERGIES_COLLECTION = "patient_allergies";
 
 // Helper to extract numeric dose from a string (e.g., "500 mg" -> 500)

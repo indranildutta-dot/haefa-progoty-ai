@@ -6,9 +6,11 @@ import { useNavigate } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { db } from '../firebase';
 import { countries } from '../config/countries';
+import { useAppStore } from '../store/useAppStore';
 
 const AdminUserManagement = () => {
   const navigate = useNavigate();
+  const { userProfile } = useAppStore();
   const [users, setUsers] = useState<any[]>([]);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('nurse');
@@ -18,13 +20,22 @@ const AdminUserManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    if (userProfile?.isApproved && (userProfile?.role === 'global_admin' || userProfile?.role === 'country_admin')) {
+      fetchUsers();
+    }
+  }, [userProfile]);
 
   const fetchUsers = async () => {
-    const q = query(collection(db, 'users'));
-    const snapshot = await getDocs(q);
-    setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    try {
+      let q = query(collection(db, 'users'));
+      if (userProfile?.role === 'country_admin' && userProfile?.assignedCountries?.length) {
+        q = query(q, where('countryCode', 'in', userProfile.assignedCountries));
+      }
+      const snapshot = await getDocs(q);
+      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (err) {
+      console.error("Error fetching users:", err);
+    }
   };
 
   const filteredUsers = useMemo(() => {

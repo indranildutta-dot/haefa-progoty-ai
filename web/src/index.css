@@ -7,3 +7,17 @@
 body {
   @apply bg-slate-50 text-slate-900 font-sans;
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable, .printable * {
+    visibility: visible;
+  }
+  .printable {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+}

@@ -56,7 +56,7 @@ const BatchEntry: React.FC<BatchEntryProps> = ({ open, onClose, onSuccess }) => 
       <DialogTitle>Batch Inventory Entry</DialogTitle>
       <DialogContent>
         <Typography variant="body2" sx={{ mb: 2 }}>
-          Upload an Excel file with columns: medication_id, batch_id, expiry_date, quantity, base_unit, package_unit.
+          Upload an Excel file with columns: medication_id, batch_id, expiry_date, quantity, base_unit, package_unit, dosage.
         </Typography>
         <input type="file" accept=".xlsx" onChange={handleFileChange} />
         {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}

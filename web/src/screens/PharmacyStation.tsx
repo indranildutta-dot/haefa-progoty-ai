@@ -29,8 +29,11 @@ import {
   InputLabel,
   TextField,
   Stack,
-  IconButton
+  IconButton,
+  Tabs,
+  Tab
 } from '@mui/material';
+import InventoryView from '../components/InventoryView';
 import MedicationIcon from '@mui/icons-material/Medication';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -108,11 +111,12 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [pharmacyNote, setPharmacyNote] = useState('');
   const [pharmacyAction, setPharmacyAction] = useState<'DISPENSE' | 'HOLD' | 'CANCEL'>('DISPENSE');
+  const [tabValue, setTabValue] = useState(0);
 
   useEffect(() => {
     const fetchDispensedCount = async () => {
       try {
-        if (!selectedCountry || !selectedClinic) return;
+        if (!selectedCountry || !selectedClinic || !userProfile?.isApproved) return;
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
         
@@ -130,12 +134,12 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
       }
     };
     fetchDispensedCount();
-  }, [selectedCountry, selectedClinic]);
+  }, [selectedCountry, selectedClinic, userProfile?.isApproved]);
   
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!selectedClinic || (userProfile && !userProfile.isApproved)) return;
+    if (!selectedClinic || !userProfile?.isApproved) return;
 
     const unsubscribe = subscribeToQueue('WAITING_FOR_PHARMACY', (items) => {
       setWaitingList(items);
@@ -172,6 +176,7 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
     } catch (err) {
       console.error(err);
       setErrorMsg("Failed to load prescription data.");
+      setSelectedItem(null);
     }
   };
 
@@ -200,10 +205,11 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
       
       setOpenDispenseDialog(false);
       setSelectedItem(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setErrorMsg("Failed to complete dispensing.");
-      notify("Failed to complete dispensing", "error");
+      const errorMessage = err.message || "Failed to complete dispensing.";
+      setErrorMsg(errorMessage);
+      notify(errorMessage, "error");
     }
   };
 
@@ -303,117 +309,125 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
         <Typography variant="subtitle1" color="text.secondary">
           Dispense prescribed medications to patients.
         </Typography>
+        <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)} sx={{ mt: 2 }}>
+          <Tab label="Dispensing Queue" />
+          <Tab label="Inventory" />
+        </Tabs>
       </Box>
 
       {successMsg && <Alert severity="success" sx={{ mb: 3, borderRadius: 3 }}>{successMsg}</Alert>}
       {errorMsg && <Alert severity="error" sx={{ mb: 3, borderRadius: 3 }}>{errorMsg}</Alert>}
 
-      <Grid container spacing={isMobile ? 2 : 3}>
-        <Grid size={{ xs: 12, lg: 9 }}>
-          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-            <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Box display="flex" alignItems="center">
-                  <MedicationIcon color="warning" sx={{ mr: 1 }} />
-                  <Typography variant="h6" fontWeight="800">
-                    {isMobile ? 'Queue' : 'Prescriptions Waiting'}
-                  </Typography>
-                </Box>
-                <Button 
-                  variant="outlined" 
-                  onClick={() => setOpenBatchDialog(true)}
-                  sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
-                >
-                  Batch Inventory Entry
-                </Button>
-                <QrScannerModal onScan={async (token) => {
-                  const patient = await getPatientByQrToken(token);
-                  if (patient) {
-                    const item = waitingList.find(i => i.patient_id === patient.id);
-                    if (item) {
-                      handleOpenDispense(item);
-                    } else {
-                      notify("Patient not found in queue.", "error");
-                    }
-                  } else {
-                    notify("Patient not found.", "error");
-                  }
-                }} />
-              </Box>
-              
-              {permissionError ? (
-                <Box sx={{ p: 4, textAlign: 'center' }}>
-                  <Alert severity="error" sx={{ mb: 2 }}>
-                    Permission Error: You do not have the required permissions to view the pharmacy queue.
-                  </Alert>
-                  <Typography variant="body2" color="textSecondary">
-                    This may be due to incorrect security rules or your user role. Please contact support.
-                  </Typography>
-                </Box>
-              ) : isMobile || isTablet ? (
-                <Box>
-                  {waitingList.length === 0 ? (
-                    <Typography color="textSecondary" align="center" sx={{ py: 4 }}>
-                      No patients waiting for medication.
+      {tabValue === 0 ? (
+        <Grid container spacing={isMobile ? 2 : 3}>
+          <Grid size={{ xs: 12, lg: 9 }}>
+            <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+              <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+                  <Box display="flex" alignItems="center">
+                    <MedicationIcon color="warning" sx={{ mr: 1 }} />
+                    <Typography variant="h6" fontWeight="800">
+                      {isMobile ? 'Queue' : 'Prescriptions Waiting'}
                     </Typography>
-                  ) : (
-                    waitingList.map(renderQueueItem)
-                  )}
+                  </Box>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setOpenBatchDialog(true)}
+                    sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
+                  >
+                    Batch Inventory Entry
+                  </Button>
+                  <QrScannerModal onScan={async (token) => {
+                    const patient = await getPatientByQrToken(token);
+                    if (patient) {
+                      const item = waitingList.find(i => i.patient_id === patient.id);
+                      if (item) {
+                        handleOpenDispense(item);
+                      } else {
+                        notify("Patient not found in queue.", "error");
+                      }
+                    } else {
+                      notify("Patient not found.", "error");
+                    }
+                  }} />
                 </Box>
-              ) : (
-                <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-                  <Table>
-                    <TableHead sx={{ bgcolor: 'grey.50' }}>
-                      <TableRow>
-                        <TableCell sx={{ fontWeight: 700 }}>Patient Name</TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>Registration Time</TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>Wait Time</TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>Priority</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {waitingList.length === 0 ? (
+                
+                {permissionError ? (
+                  <Box sx={{ p: 4, textAlign: 'center' }}>
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      Permission Error: You do not have the required permissions to view the pharmacy queue.
+                    </Alert>
+                    <Typography variant="body2" color="textSecondary">
+                      This may be due to incorrect security rules or your user role. Please contact support.
+                    </Typography>
+                  </Box>
+                ) : isMobile || isTablet ? (
+                  <Box>
+                    {waitingList.length === 0 ? (
+                      <Typography color="textSecondary" align="center" sx={{ py: 4 }}>
+                        No patients waiting for medication.
+                      </Typography>
+                    ) : (
+                      waitingList.map(renderQueueItem)
+                    )}
+                  </Box>
+                ) : (
+                  <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                    <Table>
+                      <TableHead sx={{ bgcolor: 'grey.50' }}>
                         <TableRow>
-                          <TableCell colSpan={5} align="center">
-                            <Typography color="textSecondary" sx={{ py: 4 }}>No patients waiting for medication.</Typography>
-                          </TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Patient Name</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Registration Time</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Wait Time</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Priority</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
                         </TableRow>
-                      ) : (
-                        waitingList.map(renderQueueItem)
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
+                      </TableHead>
+                      <TableBody>
+                        {waitingList.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} align="center">
+                              <Typography color="textSecondary" sx={{ py: 4 }}>No patients waiting for medication.</Typography>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          waitingList.map(renderQueueItem)
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
 
-        <Grid size={{ xs: 12, lg: 3 }}>
-          <Card sx={{ 
-            borderRadius: 3, 
-            border: '1px solid', 
-            borderColor: 'divider', 
-            boxShadow: 'none', 
-            bgcolor: 'warning.light', 
-            color: 'warning.contrastText',
-            height: '100%'
-          }}>
-            <CardContent sx={{ textAlign: { xs: 'center', lg: 'left' } }}>
-              <Typography variant="subtitle2" sx={{ opacity: 0.8, fontWeight: 'bold', textTransform: 'uppercase' }}>
-                Dispensed Today
-              </Typography>
-              <Typography variant="h3" fontWeight="800">
-                {dispensedCount}
-              </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9, mt: 1 }}>
-                Patients served since morning
-              </Typography>
-            </CardContent>
-          </Card>
+          <Grid size={{ xs: 12, lg: 3 }}>
+            <Card sx={{ 
+              borderRadius: 3, 
+              border: '1px solid', 
+              borderColor: 'divider', 
+              boxShadow: 'none', 
+              bgcolor: 'warning.light', 
+              color: 'warning.contrastText',
+              height: '100%'
+            }}>
+              <CardContent sx={{ textAlign: { xs: 'center', lg: 'left' } }}>
+                <Typography variant="subtitle2" sx={{ opacity: 0.8, fontWeight: 'bold', textTransform: 'uppercase' }}>
+                  Dispensed Today
+                </Typography>
+                <Typography variant="h3" fontWeight="800">
+                  {dispensedCount}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.9, mt: 1 }}>
+                  Patients served since morning
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
         </Grid>
-      </Grid>
+      ) : (
+        <InventoryView />
+      )}
 
       {/* Dispensing Dialog */}
       <Dialog 
@@ -505,7 +519,22 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
         <DialogActions sx={{ p: 2, bgcolor: 'grey.50', justifyContent: 'space-between' }}>
           <Button 
             variant="outlined" 
-            onClick={() => window.print()} 
+            onClick={() => {
+              const printWindow = window.open('', '_blank');
+              if (printWindow) {
+                printWindow.document.write('<html><head><title>Prescription</title>');
+                printWindow.document.write('<style>@media print { body { visibility: visible; } }</style>');
+                printWindow.document.write('</head><body>');
+                const printContent = document.querySelector('.printable')?.innerHTML;
+                if (printContent) {
+                  printWindow.document.write(printContent);
+                }
+                printWindow.document.write('</body></html>');
+                printWindow.document.close();
+                printWindow.focus();
+                printWindow.print();
+              }
+            }} 
             startIcon={<LocalPrintshopIcon />} 
             sx={{ fontWeight: 700, borderRadius: 2 }}
           >
@@ -532,7 +561,7 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
 
       {/* Hidden Print View */}
       {currentPatient && currentEncounter && (
-        <Box sx={{ display: 'none', '@media print': { display: 'block' } }}>
+        <Box className="printable" sx={{ display: 'none' }}>
           <PrescriptionPrintView 
             patient={currentPatient}
             encounter={currentEncounter}

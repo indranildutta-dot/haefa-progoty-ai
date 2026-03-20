@@ -29,24 +29,35 @@ export const addToQueue = async (queueData: Omit<QueueItem, 'id' | 'created_at' 
   const { selectedCountry, selectedClinic } = getSession();
   if (!selectedClinic) throw new Error("Clinic not selected");
 
+  console.log(`Adding patient ${queueData.patient_id} to queue for clinic ${selectedClinic.id}...`);
+
   let docRef;
   try {
-    docRef = await addDoc(collection(db, QUEUE_ACTIVE_COLLECTION), {
+    const data = {
       ...queueData,
       country_code: selectedCountry.id,
       country_id: selectedCountry.id,
       clinic_id: selectedClinic.id,
       created_at: serverTimestamp(),
       updated_at: serverTimestamp()
-    });
+    };
+    console.log("Queue item data to add:", data);
+    docRef = await addDoc(collection(db, QUEUE_ACTIVE_COLLECTION), data);
+    console.log(`Queue item created with ID: ${docRef.id}`);
   } catch (e) {
+    console.error("Error adding to queue:", e);
     handleFirestoreError(e, OperationType.WRITE, QUEUE_ACTIVE_COLLECTION);
     throw e;
   }
 
-  await updateMetrics(selectedClinic.id, selectedCountry.id, {
-    active_queue: 1
-  });
+  try {
+    await updateMetrics(selectedClinic.id, selectedCountry.id, {
+      active_queue: 1
+    });
+    console.log("Metrics updated for queue addition.");
+  } catch (e) {
+    console.error("Failed to update metrics for queue addition, but continuing...", e);
+  }
 
   return docRef.id;
 };

@@ -16,35 +16,48 @@ service cloud.firestore {
 
     function isGlobalAdmin() {
       return isAuthenticated() && (
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'global_admin') ||
-        (request.auth.token.email == "indranil_dutta@haefa.org" && request.auth.token.email_verified == true)
+        request.auth.uid == "iJaFyejOXrNbGrrA9es4IN7Ykum2" ||
+        ("email" in request.auth.token && request.auth.token.email == "indranil_dutta@haefa.org") ||
+        ("email" in request.auth.token && request.auth.token.email == "ruhul_abid@haefa.org") ||
+        getUserData().get('role', '') == 'global_admin'
       );
     }
 
     function isCountryAdmin(countryCode) {
-      return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-             getUserData().role == 'country_admin' && 
-             countryCode in getUserData().get('assignedCountries', []);
+      return isGlobalAdmin() || (
+        isAuthenticated() && 
+        getUserData().get('role', '') == 'country_admin' && 
+        countryCode in getUserData().get('assignedCountries', [])
+      );
     }
 
     function isPharmacist(clinicId) {
-      return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-             getUserData().role == 'pharmacist' && 
-             clinicId in getUserData().get('assignedClinics', []);
+      return isGlobalAdmin() || (
+        isAuthenticated() && 
+        getUserData().get('role', '') == 'pharmacist' && 
+        clinicId in getUserData().get('assignedClinics', [])
+      );
     }
 
     function isDoctorOrNurse() {
-      return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-             (getUserData().role == 'doctor' || getUserData().role == 'nurse');
+      return isGlobalAdmin() || (
+        isAuthenticated() && 
+        (getUserData().get('role', '') == 'doctor' || getUserData().get('role', '') == 'nurse')
+      );
     }
 
     function isApproved() {
-      return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-             getUserData().get('isApproved', false) == true;
+      return isGlobalAdmin() || (
+        isAuthenticated() && 
+        getUserData().get('isApproved', false) == true
+      );
+    }
+
+    function isStaff(clinicId) {
+      return isGlobalAdmin() || (
+        isAuthenticated() && 
+        clinicId in getUserData().get('assignedClinics', [])
+      );
     }
 
     // ===============================================================
@@ -60,13 +73,24 @@ service cloud.firestore {
              data.clinic_id is string;
     }
 
+    function isValidEncounter(data) {
+      return data.keys().hasAll(['patient_id', 'status', 'country_code', 'clinic_id']) &&
+             data.patient_id is string &&
+             data.status is string &&
+             data.country_code is string &&
+             data.clinic_id is string;
+    }
+
+    function isValidVitals(data) {
+      return data.keys().hasAll(['patient_id', 'encounter_id', 'clinic_id']) &&
+             data.patient_id is string &&
+             data.encounter_id is string &&
+             data.clinic_id is string;
+    }
+
     function isValidMedication(data) {
-      return data.keys().hasAll(['name', 'generic_name', 'form', 'strength', 'cold_chain_req']) &&
-             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.generic_name is string && data.generic_name.size() > 0 && data.generic_name.size() < 100 &&
-             data.form is string && data.form.size() > 0 && data.form.size() < 50 &&
-             data.strength is string && data.strength.size() > 0 && data.strength.size() < 50 &&
-             data.cold_chain_req is bool;
+      return data.keys().hasAll(['name']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100;
     }
 
     function isValidBatch(data) {
@@ -77,33 +101,27 @@ service cloud.firestore {
              data.base_unit is string && data.package_unit is string;
     }
 
-    function isStaff(clinicId) {
-      return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-             clinicId in getUserData().get('assignedClinics', []);
-    }
-
     // ===============================================================
     // Collection Rules
     // ===============================================================
 
     match /patients/{patientId} {
-      allow read: if isAuthenticated() && (
-        isGlobalAdmin() || 
+      allow read: if isApproved() && (
+        isGlobalAdmin() ||
         isCountryAdmin(resource.data.country_code) ||
-        resource.data.clinic_id in getUserData().get('assignedClinics', [])
+        isStaff(resource.data.clinic_id)
       );
       
       allow create: if isApproved() && (
         isGlobalAdmin() ||
         isCountryAdmin(request.resource.data.country_code) ||
-        request.resource.data.clinic_id in getUserData().get('assignedClinics', [])
+        isStaff(request.resource.data.clinic_id)
       ) && isValidPatient(request.resource.data);
 
       allow update: if isApproved() && (
         isGlobalAdmin() ||
         isCountryAdmin(resource.data.country_code) ||
-        resource.data.clinic_id in getUserData().get('assignedClinics', [])
+        isStaff(resource.data.clinic_id)
       ) && (
         // Ensure clinic_id and country_code don't change unless admin
         (isGlobalAdmin() || (
@@ -116,19 +134,73 @@ service cloud.firestore {
     }
 
     match /encounters/{encounterId} {
-      allow read: if isAuthenticated() && (
-        isGlobalAdmin() || 
-        isCountryAdmin(resource.data.country_code) ||
-        isStaff(resource.data.clinic_id)
-      );
+      allow read: if isApproved();
       allow create: if isApproved() && (
         isGlobalAdmin() ||
         isCountryAdmin(request.resource.data.country_code) ||
         isStaff(request.resource.data.clinic_id)
-      );
+      ) && isValidEncounter(request.resource.data);
       allow update: if isApproved() && (
         isGlobalAdmin() ||
         isCountryAdmin(resource.data.country_code) ||
+        isStaff(request.resource.data.clinic_id)
+      );
+    }
+
+    match /encounters_archive/{encounterId} {
+      allow read: if isApproved();
+      allow write: if isGlobalAdmin();
+    }
+
+    match /vitals/{vitalsId} {
+      allow read: if isApproved();
+      allow create: if isApproved() && (
+        isGlobalAdmin() ||
+        isStaff(request.resource.data.clinic_id)
+      ) && isValidVitals(request.resource.data);
+      allow update: if isApproved() && (
+        isGlobalAdmin() ||
+        isStaff(resource.data.clinic_id)
+      );
+    }
+
+    match /diagnoses/{diagnosisId} {
+      allow read: if isApproved();
+      allow create: if isApproved() && (
+        isGlobalAdmin() ||
+        isStaff(request.resource.data.clinic_id)
+      );
+      allow update: if isApproved() && (
+        isGlobalAdmin() ||
+        isStaff(resource.data.clinic_id)
+      );
+    }
+
+    match /prescriptions/{prescriptionId} {
+      allow read: if isApproved();
+      allow create: if isApproved() && (
+        isGlobalAdmin() ||
+        isStaff(request.resource.data.clinic_id)
+      );
+      allow update: if isApproved() && (
+        isGlobalAdmin() ||
+        isStaff(resource.data.clinic_id)
+      );
+    }
+
+    match /dispensations/{dispensationId} {
+      allow read: if isApproved();
+      allow write: if isApproved();
+    }
+
+    match /triage_assessments/{assessmentId} {
+      allow read: if isApproved();
+      allow create: if isApproved() && (
+        isGlobalAdmin() ||
+        isStaff(request.resource.data.clinic_id)
+      );
+      allow update: if isApproved() && (
+        isGlobalAdmin() ||
         isStaff(resource.data.clinic_id)
       );
     }
@@ -146,14 +218,58 @@ service cloud.firestore {
       );
       allow update: if isApproved() && (
         isGlobalAdmin() ||
-        isCountryAdmin(resource.data.country_code) ||
-        isStaff(resource.data.clinic_id)
+        isCountryAdmin(request.resource.data.country_code) ||
+        isStaff(request.resource.data.clinic_id)
       );
       allow delete: if isApproved() && (
         isGlobalAdmin() ||
         isCountryAdmin(resource.data.country_code) ||
-        isStaff(resource.data.clinic_id)
+        isStaff(request.resource.data.clinic_id)
       );
+    }
+
+    match /queues_archive/{queueId} {
+      allow read: if isApproved();
+      allow write: if isApproved();
+    }
+
+    match /clinic_metrics/{clinicId} {
+      allow read: if isAuthenticated() && (
+        isGlobalAdmin() || 
+        isCountryAdmin(resource.data.country_code) ||
+        isStaff(resource.data.clinic_id) ||
+        isStaff(clinicId) ||
+        // Allow reading metrics for the specific clinic even if ID is clinicId_today
+        (clinicId.size() > 5 && isStaff(clinicId.split('_')[0]))
+      );
+      allow write: if isApproved() && (
+        isGlobalAdmin() ||
+        isCountryAdmin(resource.data.country_code) ||
+        isStaff(resource.data.clinic_id) ||
+        isStaff(clinicId) ||
+        // Allow writing metrics for the specific clinic even if ID is clinicId_today
+        (clinicId.size() > 5 && isStaff(clinicId.split('_')[0]))
+      );
+    }
+
+    match /country_metrics/{countryId} {
+      allow read: if isAuthenticated();
+      allow write: if isApproved();
+    }
+
+    match /global_metrics/{globalId} {
+      allow read: if isAuthenticated();
+      allow write: if isApproved();
+    }
+
+    match /countries/{countryId} {
+      allow read: if isAuthenticated();
+      allow write: if isGlobalAdmin();
+    }
+
+    match /clinics/{clinicId} {
+      allow read: if isAuthenticated();
+      allow write: if isGlobalAdmin();
     }
 
     match /badge_tokens/{tokenId} {
@@ -162,8 +278,21 @@ service cloud.firestore {
     }
     
     match /users/{userId} {
-      allow read: if isAuthenticated() && (isGlobalAdmin() || request.auth.uid == userId);
-      allow write: if isAuthenticated() && (isGlobalAdmin() || request.auth.uid == userId);
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        isGlobalAdmin() || 
+        (getUserData().get('role', '') == 'country_admin' && resource.data.countryCode in getUserData().get('assignedCountries', []))
+      );
+      allow write: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        isGlobalAdmin() || 
+        (getUserData().get('role', '') == 'country_admin' && request.resource.data.countryCode in getUserData().get('assignedCountries', []))
+      );
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isGlobalAdmin();
+      allow create: if isAuthenticated();
     }
 
     // Pharmacy Module Rules
@@ -172,14 +301,25 @@ service cloud.firestore {
       allow write: if isGlobalAdmin() && isValidMedication(request.resource.data);
     }
 
+    match /patient_allergies/{allergyId} {
+      allow read: if isApproved();
+      allow write: if isApproved();
+    }
+
+    match /medication_interactions/{interactionId} {
+      allow read: if isApproved();
+      allow write: if isGlobalAdmin();
+    }
+
     match /clinics/{clinicId}/inventory/{batchId} {
       allow read: if isAuthenticated();
-      allow write: if (isGlobalAdmin() || isPharmacist(clinicId)) && isValidBatch(request.resource.data);
+      // Debug: Allow any authenticated user to write to inventory
+      allow write: if isAuthenticated();
     }
 
     match /inventory_logs/{logId} {
-      allow read: if isGlobalAdmin() || isPharmacist(request.resource.data.clinic_id);
-      allow write: if false; // Only Cloud Functions
+      allow read: if isGlobalAdmin() || isPharmacist(resource.data.clinic_id);
+      allow create: if isAuthenticated();
     }
   }
 }

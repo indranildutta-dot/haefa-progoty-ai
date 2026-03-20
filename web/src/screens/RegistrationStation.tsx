@@ -199,7 +199,9 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
     if (!selectedClinic) return;
     setLoading(true);
     try {
+      console.log(`Starting encounter for patient ${patientId} (${patientName})...`);
       const encounterId = await createEncounter(patientId);
+      console.log(`Encounter created: ${encounterId}. Adding to queue...`);
       await addToQueue({
         patient_id: patientId,
         patient_name: patientName,
@@ -207,9 +209,18 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
         status: 'WAITING_FOR_VITALS',
         station: 'vitals'
       });
+      console.log("Added to queue successfully.");
       notify(`Encounter started for ${patientName}`, "success");
-    } catch (error) {
-      notify("Error starting encounter.", "error");
+    } catch (error: any) {
+      console.error("Error in startEncounter:", error);
+      let message = "Error starting encounter.";
+      try {
+        const errInfo = JSON.parse(error.message);
+        message = `Error starting encounter: ${errInfo.error}`;
+      } catch (e) {
+        message = `Error starting encounter: ${error.message || 'Unknown error'}`;
+      }
+      notify(message, "error");
     } finally {
       setLoading(false);
     }
@@ -335,21 +346,34 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({ countryId }) 
         await updatePatient(editingPatientId, patientData);
       }
 
-      console.log("Creating encounter...");
-      const encounterId = await createEncounter(currentPatientId);
-      console.log(`Encounter created: ${encounterId}`);
-      
-      console.log("Adding to queue...");
-      await addToQueue({
-        patient_id: currentPatientId,
-        patient_name: `${newPatient.given_name} ${newPatient.family_name}`,
-        encounter_id: encounterId,
-        status: 'WAITING_FOR_VITALS',
-        station: 'vitals'
-      });
-      console.log("Added to queue successfully.");
-      
-      setSuccessMsg(editingPatientId ? "Patient updated and encounter started!" : "Patient registered and encounter started!");
+      try {
+        console.log("Creating encounter...");
+        const encounterId = await createEncounter(currentPatientId);
+        console.log(`Encounter created: ${encounterId}`);
+        
+        console.log("Adding to queue...");
+        await addToQueue({
+          patient_id: currentPatientId,
+          patient_name: `${newPatient.given_name} ${newPatient.family_name}`,
+          encounter_id: encounterId,
+          status: 'WAITING_FOR_VITALS',
+          station: 'vitals'
+        });
+        console.log("Added to queue successfully.");
+        
+        setSuccessMsg(editingPatientId ? "Patient updated and encounter started!" : "Patient registered and encounter started!");
+      } catch (e: any) {
+        console.error("Failed to start encounter after registration/update:", e);
+        let errorMsg = "Failed to start encounter. ";
+        try {
+          const parsed = JSON.parse(e.message);
+          errorMsg += parsed.error || e.message;
+        } catch {
+          errorMsg += e.message;
+        }
+        setErrorMsg(errorMsg);
+        return; // Don't reset form if it failed
+      }
       
       // Reset form
       setNewPatient(initialPatientState);

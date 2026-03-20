@@ -38,14 +38,20 @@ export const createEncounter = async (patient_id: string) => {
   const { selectedCountry, selectedClinic } = getSession();
   if (!selectedClinic) throw new Error("Clinic not selected");
 
-  await updateQueueMetric(selectedClinic.id, {
-    patients_registered_today: 1,
-    waiting_for_vitals: 1
-  });
+  console.log(`Creating encounter for patient ${patient_id} in clinic ${selectedClinic.id}...`);
+
+  try {
+    await updateQueueMetric(selectedClinic.id, {
+      patients_registered_today: 1,
+      waiting_for_vitals: 1
+    });
+  } catch (e) {
+    console.error("Failed to update queue metric, but continuing...", e);
+  }
 
   let docRef;
   try {
-    docRef = await addDoc(collection(db, ENCOUNTERS_COLLECTION), {
+    const encounterData = {
       patient_id,
       encounter_status: 'WAITING_FOR_VITALS',
       status: 'WAITING_FOR_VITALS',
@@ -55,19 +61,30 @@ export const createEncounter = async (patient_id: string) => {
       clinic_id: selectedClinic.id,
       created_at: serverTimestamp(),
       updated_at: serverTimestamp()
-    });
+    };
+    console.log("Encounter data to add:", encounterData);
+    docRef = await addDoc(collection(db, ENCOUNTERS_COLLECTION), encounterData);
+    console.log(`Encounter document created with ID: ${docRef.id}`);
   } catch (e) {
+    console.error("Error creating encounter document:", e);
     handleFirestoreError(e, OperationType.WRITE, ENCOUNTERS_COLLECTION);
     throw e; // Re-throw so caller knows it failed
   }
 
-  const patientRef = doc(db, "patients", patient_id);
-  await updateDoc(patientRef, {
-    latest_encounter_id: docRef.id,
-    last_visit_date: serverTimestamp(),
-    encounter_count: increment(1),
-    updated_at: serverTimestamp()
-  });
+  try {
+    const patientRef = doc(db, "patients", patient_id);
+    await updateDoc(patientRef, {
+      latest_encounter_id: docRef.id,
+      last_visit_date: serverTimestamp(),
+      encounter_count: increment(1),
+      updated_at: serverTimestamp()
+    });
+    console.log(`Patient ${patient_id} updated with latest encounter ID: ${docRef.id}`);
+  } catch (e) {
+    console.error("Error updating patient document:", e);
+    handleFirestoreError(e, OperationType.WRITE, `patients/${patient_id}`);
+    throw e;
+  }
 
   return docRef.id;
 };

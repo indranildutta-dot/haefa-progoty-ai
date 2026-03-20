@@ -47,7 +47,7 @@ try {
   }
   
   // Initialize Functions
-  functionsInstance = getFunctions(app);
+  functionsInstance = getFunctions(app, "us-central1");
 } catch (error) {
   console.error("Failed to initialize Firebase services:", error);
 }

@@ -59,6 +59,15 @@
         { "fieldPath": "family_name", "order": "ASCENDING" },
         { "fieldPath": "given_name", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "inventory",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "medication_id", "order": "ASCENDING" },
+        { "fieldPath": "quantity", "order": "ASCENDING" },
+        { "fieldPath": "expiry_date", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

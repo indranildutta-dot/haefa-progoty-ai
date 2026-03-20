@@ -29,7 +29,7 @@ const seed = async () => {
   ];
 
   for (const m of meds) {
-    await addDoc(collection(db, "medications"), m);
+    await addDoc(collection(db, "medications_catalog"), m);
   }
 
   console.log("Seeding interactions...");
@@ -49,7 +49,7 @@ const seed = async () => {
   ];
 
   for (const i of interactions) {
-    await addDoc(collection(db, "drug_interactions"), i);
+    await addDoc(collection(db, "medication_interactions"), i);
   }
 
   console.log("Done seeding.");
