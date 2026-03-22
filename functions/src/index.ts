@@ -255,8 +255,9 @@ export const dispenseMedication = onCall(
         const medIdLower = med.medication_id.toString().toLowerCase().replace(/\s+/g, '');
         const dosageNormalized = (med.dosage || '').toString().toLowerCase().replace(/\s+/g, '');
         const prescribedQty = Number(med.quantity) || 0;
-        const targetQty = Number(med.dispensed_qty) !== undefined ? Number(med.dispensed_qty) : prescribedQty;
-        
+        const dispensedQtyVal = (typeof med.dispensed_qty !== 'undefined' && med.dispensed_qty !== null && med.dispensed_qty !== '') ? Number(med.dispensed_qty) : prescribedQty;
+        const targetQty = isNaN(dispensedQtyVal) ? prescribedQty : dispensedQtyVal;
+              
         const inventoryRef = db.collection(`clinics/${clinicId}/inventory`);
         const q = inventoryRef
           .where("med_id_lower", "==", medIdLower)

@@ -1,7 +1,10 @@
-import React from 'react';
-import { Box, Typography, Chip, Paper, Divider } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, Typography, Chip, Paper, Divider, Alert } from '@mui/material';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
 import { Patient, TriageAssessment } from '../types';
 import PatientAllergies from './PatientAllergies';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 interface PatientSummaryPanelProps {
   patient: Patient;
@@ -9,8 +12,48 @@ interface PatientSummaryPanelProps {
 }
 
 const PatientSummaryPanel: React.FC<PatientSummaryPanelProps> = ({ patient, triage }) => {
+  const [hasOwedMedication, setHasOwedMedication] = useState(false);
+
+  useEffect(() => {
+    if (!patient.id) return;
+    const q = query(
+      collection(db, "procurement_requests"),
+      where("patient_id", "==", patient.id),
+      where("status", "==", "PENDING_ORDER")
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setHasOwedMedication(!snapshot.empty);
+    });
+    return () => unsubscribe();
+  }, [patient.id]);
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      {hasOwedMedication && (
+        <Alert 
+          severity="error" 
+          icon={<ErrorOutlineIcon />}
+          sx={{ 
+            borderRadius: 2, 
+            fontWeight: 800, 
+            border: '2px solid', 
+            borderColor: 'error.main',
+            animation: 'pulse 2s infinite'
+          }}
+        >
+          OWED MEDICATION: This patient has pending IOUs from previous visits.
+          <style>
+            {`
+              @keyframes pulse {
+                0% { opacity: 1; }
+                50% { opacity: 0.7; }
+                100% { opacity: 1; }
+              }
+            `}
+          </style>
+        </Alert>
+      )}
+
       <Box>
         <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1 }}>
           Basic Information

@@ -200,12 +200,18 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
     if (!currentPrescription || !selectedItem || !selectedClinic) return;
     try {
       if (pharmacyAction === 'DISPENSE') {
-        const medications = currentPrescription.prescriptions.map((p, idx) => ({
-          medication_id: p.medicationId,
-          dosage: p.dosage,
-          quantity: p.quantity || 0,
-          dispensed_qty: dispensedQuantities[idx] || 0
-        }));
+        const medications = currentPrescription.prescriptions.map((p, idx) => {
+          const dispensed = dispensedQuantities[idx] || 0;
+          if (dispensed > (p.quantity || 0)) {
+            throw new Error(`Dispensed quantity for ${p.medicationId} cannot exceed prescribed quantity (${p.quantity})`);
+          }
+          return {
+            medication_id: p.medicationId,
+            dosage: p.dosage,
+            quantity: p.quantity || 0,
+            dispensed_qty: dispensed
+          };
+        });
         
         const result = await dispenseMedication(selectedClinic.id, selectedItem.patient_id, selectedItem.encounter_id, medications);
         setDispenseSummary(result);
@@ -599,35 +605,26 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
         <DialogContent dividers>
           {dispenseSummary && (
             <Box>
-              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>Dispensed Items:</Typography>
-              {dispenseSummary.dispensed.map((item: any, idx: number) => (
-                <Box key={idx} sx={{ mb: 1, p: 1, bgcolor: 'success.50', borderRadius: 1 }}>
-                  <Typography variant="body2">
-                    <strong>{item.medication_id}</strong>: {item.dispensed_qty} units dispensed.
+              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>Dispensing Results:</Typography>
+              {dispenseSummary.summary.map((item: any, idx: number) => (
+                <Box key={idx} sx={{ mb: 1, p: 1.5, bgcolor: item.shortfall > 0 ? 'warning.50' : 'success.50', borderRadius: 2, border: '1px solid', borderColor: item.shortfall > 0 ? 'warning.200' : 'success.200' }}>
+                  <Typography variant="body2" fontWeight="700" color="primary">{item.medication}</Typography>
+                  <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    <strong>Dispensed:</strong> {item.dispensed}, <strong>Owed:</strong> {item.shortfall}
                   </Typography>
                 </Box>
               ))}
               
-              {dispenseSummary.shortfalls && dispenseSummary.shortfalls.length > 0 && (
-                <Box sx={{ mt: 3 }}>
-                  <Typography variant="subtitle1" fontWeight="bold" color="error" gutterBottom>Shortfalls (IOUs Created):</Typography>
-                  {dispenseSummary.shortfalls.map((item: any, idx: number) => (
-                    <Box key={idx} sx={{ mb: 1, p: 1, bgcolor: 'error.50', borderRadius: 1 }}>
-                      <Typography variant="body2">
-                        <strong>{item.medication_id}</strong>: Shortfall of {item.shortfall_qty} units.
-                      </Typography>
-                    </Box>
-                  ))}
-                  <Alert severity="info" sx={{ mt: 2 }}>
-                    Procurement requests have been automatically created for these shortfalls.
-                  </Alert>
-                </Box>
+              {dispenseSummary.summary.some((s: any) => s.shortfall > 0) && (
+                <Alert severity="warning" sx={{ mt: 3, borderRadius: 2 }}>
+                  Procurement requests have been automatically created for the shortfalls (IOUs).
+                </Alert>
               )}
             </Box>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenSummaryDialog(false)} variant="contained" sx={{ borderRadius: 2, fontWeight: 700 }}>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenSummaryDialog(false)} variant="contained" sx={{ borderRadius: 2, fontWeight: 700, px: 4 }}>
             Close
           </Button>
         </DialogActions>
