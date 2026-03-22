@@ -177,6 +177,38 @@ export const initClinics = onCall(
   }
 );
 
+/**
+ * DELETE USER: Removes a user from Firebase Auth and Firestore.
+ * Restricted to Global Admins.
+ */
+export const deleteUser = onCall(
+  { region: "us-central1" },
+  async (request: any) => {
+    // GUARD: Check Global Admin status before doing ANYTHING
+    if (!checkIsGlobalAdmin(request.auth)) {
+      throw new HttpsError("permission-denied", "Unauthorized: Global Admin privileges required.");
+    }
+
+    const { uid } = request.data;
+    if (!uid) {
+      throw new HttpsError("invalid-argument", "Missing required field: uid.");
+    }
+
+    try {
+      // 1. Delete from Firebase Authentication
+      await admin.auth().deleteUser(uid);
+      
+      // 2. Delete from Firestore 'users' collection
+      await db.collection("users").doc(uid).delete();
+      
+      return { success: true, message: `User ${uid} deleted successfully.` };
+    } catch (error: any) {
+      console.error("Error deleting user:", error);
+      throw new HttpsError("internal", error.message || "Failed to delete user.");
+    }
+  }
+);
+
 // --- Patient & Clinical Functions ---
 
 export const registerPatient = onCall(

@@ -1,5 +1,17 @@
 import { collection, getDocs, query, where, deleteDoc, doc, or } from "firebase/firestore";
-import { db } from "../firebase";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "../firebase";
+
+export const deleteUser = async (uid: string) => {
+  const deleteUserFn = httpsCallable(functions, 'deleteUser');
+  try {
+    const result = await deleteUserFn({ uid });
+    return result.data;
+  } catch (error) {
+    console.error("Error calling deleteUser function:", error);
+    throw error;
+  }
+};
 
 export const clearBangladeshData = async () => {
   const collectionsToClear = [

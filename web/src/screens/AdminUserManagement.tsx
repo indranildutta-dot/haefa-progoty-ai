@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Box, Typography, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Select, MenuItem, FormControl, InputLabel, OutlinedInput, Chip, Switch, FormControlLabel, IconButton } from '@mui/material';
-import { collection, query, getDocs } from 'firebase/firestore';
+import { Box, Typography, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Select, MenuItem, FormControl, InputLabel, OutlinedInput, Chip, Switch, FormControlLabel, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { collection, query, getDocs, where } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { db } from '../firebase';
 import { countries } from '../config/countries';
 import { useAppStore } from '../store/useAppStore';
+import { deleteUser } from '../services/adminService';
 
 const AdminUserManagement = () => {
   const navigate = useNavigate();
@@ -18,6 +20,8 @@ const AdminUserManagement = () => {
   const [selectedCountryId, setSelectedCountryId] = useState('');
   const [isApproved, setIsApproved] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<any>(null);
 
   useEffect(() => {
     if (userProfile?.isApproved && (userProfile?.role === 'global_admin' || userProfile?.role === 'country_admin')) {
@@ -81,6 +85,24 @@ const AdminUserManagement = () => {
     } catch (error) {
       console.error('Error syncing permissions:', error);
       alert('Failed to sync permissions.');
+    }
+  };
+
+  const handleDeleteClick = (user: any) => {
+    setUserToDelete(user);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!userToDelete) return;
+    try {
+      await deleteUser(userToDelete.id);
+      setDeleteConfirmOpen(false);
+      setUserToDelete(null);
+      fetchUsers();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert('Failed to delete user.');
     }
   };
 
@@ -175,12 +197,36 @@ const AdminUserManagement = () => {
                 <TableCell>{user.isApproved ? 'Yes' : 'No'}</TableCell>
                 <TableCell>
                   <Button size="small" onClick={() => handleEditUser(user)}>Edit</Button>
+                  {userProfile?.role === 'global_admin' && (
+                    <IconButton size="small" color="error" onClick={() => handleDeleteClick(user)}>
+                      <DeleteIcon />
+                    </IconButton>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </TableContainer>
+
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+      >
+        <DialogTitle>Confirm User Deletion</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to fully remove user <strong>{userToDelete?.email}</strong>? 
+            This will delete them from both Authentication and the database. This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+            Delete Permanently
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
