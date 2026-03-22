@@ -134,7 +134,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
         <Grid container spacing={2}>
           
           {/* SEARCH FIELD */}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             {!isNewMedicine ? (
               <Autocomplete
                 options={inventoryOptions}
@@ -198,7 +198,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
           </Grid>
 
           {/* DOSAGE FIELD */}
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             {isNewMedicine ? (
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <TextField 
@@ -231,7 +231,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
           </Grid>
 
           {/* QUANTITY FIELD */}
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField 
               fullWidth 
               size="small" 
@@ -243,7 +243,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
           </Grid>
 
           {/* FREQUENCY & DURATION */}
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField 
               fullWidth 
               size="small" 
@@ -252,7 +252,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
               onChange={(e) => setNewMed({ ...newMed, frequency: e.target.value })} 
             />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField 
               fullWidth 
               size="small" 
@@ -262,7 +262,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
               onChange={(e) => setDurationValue(e.target.value)} 
             />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <FormControl fullWidth size="small">
               <InputLabel>Unit</InputLabel>
               <Select value={durationUnit} onChange={(e) => setDurationUnit(e.target.value)} label="Unit">
@@ -272,7 +272,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
           </Grid>
 
           {/* INSTRUCTIONS */}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <TextField 
               fullWidth 
               size="small" 
@@ -282,7 +282,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
             />
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Button 
               variant="contained" 
               color="secondary" 

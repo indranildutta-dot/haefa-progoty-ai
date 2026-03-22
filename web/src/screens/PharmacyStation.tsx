@@ -115,6 +115,7 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
   const [pharmacyNote, setPharmacyNote] = useState('');
   const [pharmacyAction, setPharmacyAction] = useState<'DISPENSE' | 'HOLD' | 'CANCEL'>('DISPENSE');
   const [tabValue, setTabValue] = useState(0);
+  const [returnDate, setReturnDate] = useState<string>('');
 
   useEffect(() => {
     const fetchDispensedCount = async () => {
@@ -179,6 +180,7 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
       });
       setDispensedQuantities(initialQtys);
       setPharmacyNote('');
+      setReturnDate('');
       setPharmacyAction('DISPENSE');
       setOpenDispenseDialog(true);
     } catch (err) {
@@ -212,8 +214,9 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
             dispensed_qty: dispensed
           };
         });
-        
-        const result = await dispenseMedication(selectedClinic.id, selectedItem.patient_id, selectedItem.encounter_id, medications);
+
+        const hasShortfall = medications.some(m => m.dispensed_qty < m.quantity);
+        const result = await dispenseMedication(selectedClinic.id, selectedItem.patient_id, selectedItem.encounter_id, medications, hasShortfall ? returnDate : undefined);
         setDispenseSummary(result);
         setOpenSummaryDialog(true);
         
@@ -557,6 +560,24 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
           ) : (
             <Typography color="textSecondary">No medications prescribed.</Typography>
           )}
+
+          {pharmacyAction === 'DISPENSE' && currentPrescription?.prescriptions.some((p, idx) => (dispensedQuantities[idx] || 0) < (p.quantity || 0)) && (
+            <Box sx={{ mt: 3, p: 2, bgcolor: 'warning.50', borderRadius: 2, border: '1px solid', borderColor: 'warning.200' }}>
+              <Typography variant="subtitle2" color="warning.dark" fontWeight="bold" gutterBottom>
+                Shortfall Detected
+              </Typography>
+              <TextField
+                fullWidth
+                label="Expected Restock / Patient Return Date"
+                type="date"
+                size="small"
+                value={returnDate}
+                onChange={(e) => setReturnDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                sx={{ bgcolor: 'white' }}
+              />
+            </Box>
+          )}
         </DialogContent>
         <DialogActions sx={{ p: 2, bgcolor: 'grey.50', justifyContent: 'space-between' }}>
           <Button 
@@ -616,9 +637,18 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
               ))}
               
               {dispenseSummary.summary.some((s: any) => s.shortfall > 0) && (
-                <Alert severity="warning" sx={{ mt: 3, borderRadius: 2 }}>
-                  Procurement requests have been automatically created for the shortfalls (IOUs).
-                </Alert>
+                <>
+                  {returnDate && (
+                    <Box sx={{ mt: 2, mb: 1, p: 1.5, bgcolor: 'info.50', borderRadius: 2, border: '1px dashed', borderColor: 'info.300' }}>
+                      <Typography variant="body2">
+                        <strong>Return Date:</strong> {returnDate}
+                      </Typography>
+                    </Box>
+                  )}
+                  <Alert severity="warning" sx={{ mt: 1, borderRadius: 2 }}>
+                    Procurement requests have been automatically created for the shortfalls (IOUs).
+                  </Alert>
+                </>
               )}
             </Box>
           )}

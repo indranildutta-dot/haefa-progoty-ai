@@ -243,7 +243,7 @@ export const dispenseMedication = onCall(
   async (request: any) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
 
-    const { clinicId, medications, encounterId, patientId } = request.data;
+    const { clinicId, medications, encounterId, patientId, returnDate } = request.data;
     if (!clinicId || !medications || !encounterId) {
       throw new HttpsError("invalid-argument", "Missing required fields.");
     }
@@ -308,7 +308,8 @@ export const dispenseMedication = onCall(
             shortfall_qty: shortfall,
             status: 'PENDING_ORDER',
             created_at: admin.firestore.FieldValue.serverTimestamp(),
-            encounter_id: encounterId
+            encounter_id: encounterId,
+            return_date: returnDate ? (typeof returnDate === 'string' ? returnDate : admin.firestore.Timestamp.fromDate(new Date(returnDate))) : null
           });
         }
 
