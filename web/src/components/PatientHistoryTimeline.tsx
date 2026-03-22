@@ -215,11 +215,39 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
                     <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 1 }}>Prescriptions</Typography>
                     {item.prescription && item.prescription.prescriptions.length > 0 ? (
                       <ul style={{ margin: 0, paddingLeft: '20px' }}>
-                        {item.prescription.prescriptions.map((p, i) => (
-                          <li key={i}>
-                            <Typography variant="body2">{p.medicationName} - {p.dosage} ({p.frequency} for {p.duration})</Typography>
-                          </li>
-                        ))}
+                        {item.prescription.prescriptions.map((p, i) => {
+                          const isDispensed = item.prescription?.status !== 'PENDING';
+                          const shortfall = p.shortfall_qty || 0;
+                          const dispensed = p.dispensed_qty || 0;
+                          const prescribed = p.quantity || 0;
+                          
+                          let statusLabel = '';
+                          let statusColor = 'text.secondary';
+                          
+                          if (isDispensed) {
+                            if (shortfall === 0) {
+                              statusLabel = ' (Fully Dispensed)';
+                              statusColor = 'success.main';
+                            } else if (dispensed > 0) {
+                              statusLabel = ` (Partial: ${dispensed}/${prescribed})`;
+                              statusColor = 'warning.main';
+                            } else {
+                              statusLabel = ' (Out of Stock)';
+                              statusColor = 'error.main';
+                            }
+                          }
+
+                          return (
+                            <li key={i}>
+                              <Typography variant="body2">
+                                {p.medicationName} - {p.dosage} ({p.frequency} for {p.duration})
+                                <Box component="span" sx={{ color: statusColor, fontWeight: 'bold', ml: 1 }}>
+                                  {statusLabel}
+                                </Box>
+                              </Typography>
+                            </li>
+                          );
+                        })}
                       </ul>
                     ) : (
                       <Typography variant="body2" color="textSecondary">None recorded</Typography>

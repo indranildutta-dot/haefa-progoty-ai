@@ -24,13 +24,11 @@ const SUPER_ADMIN_EMAILS = [
 
 /**
  * Helper to verify if the caller is a Global Admin
- * via either Hardcoded Email or Custom Claims.
  */
 const checkIsGlobalAdmin = (auth: any) => {
   if (!auth) return false;
   const email = auth.token.email?.toLowerCase();
   const role = auth.token.role;
-
   return SUPER_ADMIN_EMAILS.includes(email) || role === 'global_admin';
 };
 
@@ -69,14 +67,12 @@ const sanitizeData = (data: any) => {
 export const syncUserPermissions = onCall(
   { region: "us-central1", maxInstances: 10 },
   async (request: any) => {
-    // GUARD: Check Global Admin status before doing ANYTHING
     if (!checkIsGlobalAdmin(request.auth)) {
-      throw new HttpsError("permission-denied", "Unauthorized: Global Admin privileges required.");
+      throw new HttpsError("permission-denied", "Unauthorized: Global Admin required.");
     }
-
     const { email, role, countryCode, assignedCountries, assignedClinics, isApproved } = request.data;
     if (!email || !role) {
-      throw new HttpsError("invalid-argument", "Missing required fields: email or role.");
+      throw new HttpsError("invalid-argument", "Missing email or role.");
     }
     try {
       let userRecord;
@@ -90,25 +86,59 @@ export const syncUserPermissions = onCall(
         }
       }
       const uid = userRecord.uid;
-      
-      // Set the claim so the user becomes an admin in the token
       await admin.auth().setCustomUserClaims(uid, { role });
-      
-      // Update the user document for app visibility
       await db.collection("users").doc(uid).set({
-        email,
-        role,
-        countryCode: countryCode || null,
+        email, role, countryCode: countryCode || null,
         assignedCountries: assignedCountries || [],
         assignedClinics: assignedClinics || [],
         isApproved: isApproved ?? false,
         lastUpdated: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
-      
-      return { success: true, message: `Permissions updated for ${email}` };
+      return { success: true };
     } catch (error: any) {
-      console.error("Error syncing permissions:", error);
-      throw new HttpsError("internal", error.message || "Failed to sync permissions.");
+      throw new HttpsError("internal", error.message);
+    }
+  }
+);
+
+export const deleteUser = onCall(
+  { region: "us-central1" },
+  async (request: any) => {
+    if (!checkIsGlobalAdmin(request.auth)) {
+      throw new HttpsError("permission-denied", "Unauthorized.");
+    }
+    const { uid } = request.data;
+    if (!uid) throw new HttpsError("invalid-argument", "Missing UID.");
+    if (request.auth.uid === uid) {
+      throw new HttpsError("failed-precondition", "You cannot delete yourself.");
+    }
+    try {
+      await admin.auth().deleteUser(uid);
+      await db.collection("users").doc(uid).delete();
+      return { success: true };
+    } catch (error: any) {
+      throw new HttpsError("internal", error.message);
+    }
+  }
+);
+
+export const wipeDemoData = onCall(
+  { region: "us-central1" },
+  async (request: any) => {
+    if (!checkIsGlobalAdmin(request.auth)) {
+      throw new HttpsError("permission-denied", "Unauthorized.");
+    }
+    const collectionsToWipe = ["patients", "encounters", "queues_active"];
+    try {
+      for (const colName of collectionsToWipe) {
+        const snapshot = await db.collection(colName).get();
+        const batch = db.batch();
+        snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+        await batch.commit();
+      }
+      return { success: true };
+    } catch (error: any) {
+      throw new HttpsError("internal", error.message);
     }
   }
 );
@@ -116,11 +146,9 @@ export const syncUserPermissions = onCall(
 export const initClinics = onCall(
   { region: "us-central1" },
   async (request: any) => {
-    // GUARD: Check Global Admin status before doing ANYTHING
     if (!checkIsGlobalAdmin(request.auth)) {
-      throw new HttpsError("permission-denied", "Unauthorized: Global Admin privileges required.");
+      throw new HttpsError("permission-denied", "Unauthorized.");
     }
-
     const clinicsToCreate = [
       { id: 'BD-01', name: 'Dhaka Clinic', country: 'Bangladesh', code: 'BD', currency: 'BDT' },
       { id: 'BD-02', name: 'Cox’s Bazar Clinic', country: 'Bangladesh', code: 'BD', currency: 'BDT' },
@@ -137,14 +165,7 @@ export const initClinics = onCall(
       max_patients_per_day: 1000,
       timezone: 'UTC',
       status: 'active',
-      units: {
-        weight: 'kg',
-        height: 'cm',
-        blood_pressure: 'mmHg',
-        temperature: 'Celsius',
-        blood_glucose: 'mg/dL',
-        heart_rate: 'bpm'
-      },
+      units: { weight: 'kg', height: 'cm', blood_pressure: 'mmHg', temperature: 'Celsius', blood_glucose: 'mg/dL', heart_rate: 'bpm' },
       queue_structure: [
         { id: 'registration', name: 'Registration', order: 1 },
         { id: 'vitals', name: 'Vitals', order: 2 },
@@ -171,116 +192,149 @@ export const initClinics = onCall(
       await batch.commit();
       return { success: true, count: clinicsToCreate.length };
     } catch (error: any) {
-      console.error("Clinic bootstrap failed:", error);
       throw new HttpsError("internal", error.message);
     }
   }
 );
 
-/**
- * DELETE USER: Removes a user from Firebase Auth and Firestore.
- * Restricted to Global Admins.
- */
-export const deleteUser = onCall(
-  { region: "us-central1" },
-  async (request: any) => {
-    // GUARD: Check Global Admin status before doing ANYTHING
-    if (!checkIsGlobalAdmin(request.auth)) {
-      throw new HttpsError("permission-denied", "Unauthorized: Global Admin privileges required.");
-    }
-
-    const { uid } = request.data;
-    if (!uid) {
-      throw new HttpsError("invalid-argument", "Missing required field: uid.");
-    }
-
-    try {
-      // 1. Delete from Firebase Authentication
-      await admin.auth().deleteUser(uid);
-      
-      // 2. Delete from Firestore 'users' collection
-      await db.collection("users").doc(uid).delete();
-      
-      return { success: true, message: `User ${uid} deleted successfully.` };
-    } catch (error: any) {
-      console.error("Error deleting user:", error);
-      throw new HttpsError("internal", error.message || "Failed to delete user.");
-    }
-  }
-);
-
-// --- Patient & Clinical Functions ---
+// --- Patient & Clinical ---
 
 export const registerPatient = onCall(
   { region: "us-central1" },
   async (request: any) => {
     const data = request.data || {};
     const { patientData, photoBase64, clinicId, countryCode } = data;
-    if (!patientData || typeof patientData !== 'object' || !clinicId || !countryCode) {
-      throw new HttpsError("invalid-argument", "Missing required registration data");
+    if (!patientData || !clinicId || !countryCode) {
+      throw new HttpsError("invalid-argument", "Missing registration data");
     }
     try {
       const patientId = generateId();
       const encounterId = generateId();
       let photoUrl = "";
-      if (photoBase64 && typeof photoBase64 === 'string' && photoBase64.includes(",")) {
-        try {
-          const bucket = admin.storage().bucket();
-          const file = bucket.file(`patient_photos/${patientId}/photo.jpg`);
-          const base64Data = photoBase64.split(",")[1];
-          if (base64Data) {
-            const buffer = Buffer.from(base64Data, "base64");
-            await file.save(buffer, { contentType: "image/jpeg" });
-            const signedUrls = await file.getSignedUrl({ action: "read", expires: "03-01-2500" });
-            photoUrl = signedUrls[0];
-          }
-        } catch (error) {
-          console.error("Photo upload error:", error);
-        }
+      if (photoBase64 && photoBase64.includes(",")) {
+        const bucket = admin.storage().bucket();
+        const file = bucket.file(`patient_photos/${patientId}/photo.jpg`);
+        const buffer = Buffer.from(photoBase64.split(",")[1], "base64");
+        await file.save(buffer, { contentType: "image/jpeg" });
+        const signedUrls = await file.getSignedUrl({ action: "read", expires: "03-01-2500" });
+        photoUrl = signedUrls[0];
       }
       
-      const sanitizedPatientData = sanitizeData(patientData);
+      await db.collection("patients").doc(patientId).set({ ...sanitizeData(patientData), photo_url: photoUrl, created_at: new Date() });
+      await db.collection("encounters").doc(encounterId).set({ patient_id: patientId, clinic_id: clinicId, country_code: countryCode, status: 'WAITING_FOR_VITALS', created_at: new Date() });
       
-      await db.collection("patients").doc(patientId).set({
-        ...sanitizedPatientData,
-        photo_url: photoUrl || "",
-        created_at: new Date()
-      });
-      await db.collection("encounters").doc(encounterId).set({
-        patient_id: patientId,
-        clinic_id: clinicId,
-        country_code: countryCode,
-        status: 'WAITING_FOR_VITALS',
-        created_at: new Date()
-      });
-      const fullName = `${patientData.given_name || ''} ${patientData.family_name || ''}`.trim() || 'Unknown Patient';
-      await db.collection("queues_active").add({
-        encounter_id: encounterId,
-        patient_id: patientId,
-        patient_name: fullName,
-        station: 'vitals',
-        status: 'WAITING_FOR_VITALS',
-        clinic_id: clinicId,
-        country_code: countryCode,
-        created_at: new Date(),
-        updated_at: new Date()
-      });
-      return { patientId, encounterId, photoUrl };
+      const fullName = `${patientData.given_name || ''} ${patientData.family_name || ''}`.trim() || 'Unknown';
+      await db.collection("queues_active").add({ encounter_id: encounterId, patient_id: patientId, patient_name: fullName, station: 'vitals', status: 'WAITING_FOR_VITALS', clinic_id: clinicId, country_code: countryCode, created_at: new Date(), updated_at: new Date() });
+      
+      return { patientId, encounterId };
     } catch (error: any) {
-      console.error("registerPatient failed:", error);
-      throw new HttpsError("internal", error.message || "Registration failed");
+      throw new HttpsError("internal", error.message);
     }
   }
 );
 
-// --- Pharmacy & Inventory Functions ---
+// --- Pharmacy & Inventory ---
+
+/**
+ * DISPENSE MEDICATION: Supports partial dispensing and Scenarios B & C.
+ */
+export const dispenseMedication = onCall(
+  { region: "us-central1" },
+  async (request: any) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
+
+    const { clinicId, medications, encounterId, patientId } = request.data;
+    if (!clinicId || !medications || !encounterId) {
+      throw new HttpsError("invalid-argument", "Missing required fields.");
+    }
+
+    return await db.runTransaction(async (transaction) => {
+      const results: any[] = [];
+
+      for (const med of medications) {
+        const medIdLower = med.medication_id.toString().toLowerCase().replace(/\s+/g, '');
+        const dosageNormalized = (med.dosage || '').toString().toLowerCase().replace(/\s+/g, '');
+        const prescribedQty = Number(med.quantity) || 0;
+        const targetQty = Number(med.dispensed_qty) !== undefined ? Number(med.dispensed_qty) : prescribedQty;
+        
+        const inventoryRef = db.collection(`clinics/${clinicId}/inventory`);
+        const q = inventoryRef
+          .where("med_id_lower", "==", medIdLower)
+          .where("dosage_normalized", "==", dosageNormalized)
+          .orderBy("expiry_date", "asc");
+        
+        const snapshot = await transaction.get(q);
+        let remainingToDispense = targetQty;
+        let actualDispensed = 0;
+
+        if (!snapshot.empty) {
+          for (const doc of snapshot.docs) {
+            if (remainingToDispense <= 0) break;
+            const batch = doc.data();
+            const available = Number(batch.quantity) || 0;
+            if (available <= 0) continue; 
+
+            const toTake = Math.min(available, remainingToDispense);
+            transaction.update(doc.ref, { quantity: available - toTake });
+            
+            actualDispensed += toTake;
+            remainingToDispense -= toTake;
+            
+            transaction.set(db.collection("inventory_logs").doc(), {
+              clinic_id: clinicId,
+              medication_id: med.medication_id,
+              type: 'dispense',
+              quantity: toTake,
+              batch_id: batch.batch_id || "N/A",
+              user_id: request.auth.uid,
+              encounter_id: encounterId,
+              timestamp: admin.firestore.FieldValue.serverTimestamp()
+            });
+          }
+        }
+
+        const shortfall = prescribedQty - actualDispensed;
+
+        if (shortfall > 0) {
+          const procurementRef = db.collection("procurement_requests").doc();
+          transaction.set(procurementRef, {
+            clinic_id: clinicId,
+            patient_id: patientId || "Unknown",
+            medication_id: med.medication_id,
+            dosage: med.dosage,
+            prescribed_qty: prescribedQty,
+            dispensed_qty: actualDispensed,
+            shortfall_qty: shortfall,
+            status: 'PENDING_ORDER',
+            created_at: admin.firestore.FieldValue.serverTimestamp(),
+            encounter_id: encounterId
+          });
+        }
+
+        results.push({
+          medication: med.medication_id,
+          prescribed: prescribedQty,
+          dispensed: actualDispensed,
+          shortfall: shortfall
+        });
+      }
+
+      const encounterRef = db.collection("encounters").doc(encounterId);
+      transaction.update(encounterRef, { 
+        status: 'PHARMACY_COMPLETED',
+        last_updated: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      return { success: true, summary: results };
+    });
+  }
+);
 
 export const getInventoryTemplate = onCall(
   { region: "us-central1" },
   async (request: any) => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Inventory Template');
-
     sheet.columns = [
       { header: 'medication_id', key: 'name', width: 25 },
       { header: 'batch_id', key: 'batch', width: 15 },
@@ -290,84 +344,8 @@ export const getInventoryTemplate = onCall(
       { header: 'package_unit', key: 'pkg', width: 12 },
       { header: 'dosage', key: 'dosage', width: 15 }
     ];
-
-    const examples = [
-      ['Tylenol (EXAMPLE)', 'BATCH-001', '2026-12-31', 100, 'tablets', 'box', '500mg'],
-      ['Amoxicillin (EXAMPLE)', 'B-999', '2025-06-15', 50, 'capsules', 'bottle', '250mg']
-    ];
-
-    examples.forEach(data => {
-      const row = sheet.addRow(data);
-      row.eachCell((cell: any) => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFA500' } };
-        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
-      });
-    });
-
     const buffer = await (workbook as any).xlsx.writeBuffer();
     return { fileBase64: Buffer.from(buffer).toString('base64') };
-  }
-);
-
-export const dispenseMedication = onCall(
-  { region: "us-central1" },
-  async (request: any) => {
-    const { clinicId, medications, encounterId } = request.data;
-    if (!clinicId || !medications || !encounterId) {
-      throw new HttpsError("invalid-argument", "Missing required fields.");
-    }
-    return await db.runTransaction(async (transaction) => {
-      try {
-        for (const med of medications) {
-          const medIdLower = med.medication_id.toString().toLowerCase().replace(/\s+/g, '');
-          const dosageNormalized = med.dosage.toString().toLowerCase().replace(/\s+/g, '');
-          
-          const inventoryRef = db.collection(`clinics/${clinicId}/inventory`);
-          const q = inventoryRef
-            .where("med_id_lower", "==", medIdLower)
-            .where("dosage_normalized", "==", dosageNormalized)
-            .orderBy("expiry_date", "asc");
-          
-          const snapshot = await transaction.get(q);
-          if (snapshot.empty) {
-            throw new HttpsError("failed-precondition", `Stock not found for ${med.medication_id} ${med.dosage}`);
-          }
-          
-          let remainingToDispense = med.quantity;
-          for (const doc of snapshot.docs) {
-            if (remainingToDispense <= 0) break;
-            const batch = doc.data() as any;
-            const available = batch.quantity;
-            if (available <= 0) continue; 
-            const toTake = Math.min(available, remainingToDispense);
-            transaction.update(doc.ref, { quantity: available - toTake });
-            remainingToDispense -= toTake;
-            
-            const logRef = db.collection("inventory_logs").doc();
-            transaction.set(logRef, {
-              clinic_id: clinicId,
-              medication_id: med.medication_id,
-              dosage: dosageNormalized,
-              batch_id: batch.batch_id,
-              type: 'dispense',
-              quantity: toTake,
-              user_id: request.auth?.uid,
-              encounter_id: encounterId,
-              timestamp: admin.firestore.FieldValue.serverTimestamp()
-            });
-          }
-          if (remainingToDispense > 0) {
-            throw new HttpsError("failed-precondition", `Insufficient stock for ${med.medication_id}`);
-          }
-        }
-        const encounterRef = db.collection("encounters").doc(encounterId);
-        transaction.update(encounterRef, { status: 'COMPLETED' });
-        return { success: true };
-      } catch (error: any) {
-        console.error("Dispensing failed:", error);
-        throw error;
-      }
-    });
   }
 );
 
@@ -375,59 +353,27 @@ export const bulkUpload = onCall(
   { region: "us-central1" },
   async (request: any) => {
     const { clinicId, fileBase64 } = request.data;
-    if (!clinicId || !fileBase64) {
-      throw new HttpsError("invalid-argument", "Missing required fields.");
-    }
-
     const workbook = new ExcelJS.Workbook();
     await (workbook as any).xlsx.load(Buffer.from(fileBase64, 'base64'));
     const worksheet = workbook.getWorksheet(1);
-    if (!worksheet) throw new HttpsError("internal", "Failed to load worksheet");
-
     const batch = db.batch();
-    
-    worksheet.eachRow((row: ExcelJS.Row, rowNumber: number) => {
-      const medication_id = row.getCell(1).value?.toString().trim() || "";
-      const dosage       = row.getCell(7).value?.toString().trim() || "N/A";
-      
-      const upperName = medication_id.toUpperCase();
-      if (!medication_id || upperName === 'MEDICATION_ID' || upperName.includes('EXAMPLE')) return;
-
-      const parsedDate = parseClinicalDate(row.getCell(3).value);
-      if (!parsedDate) return;
-
+    worksheet?.eachRow((row, rowNumber) => {
+      const medId = row.getCell(1).value?.toString().trim() || "";
+      const dosage = row.getCell(7).value?.toString().trim() || "N/A";
+      if (!medId || medId.toUpperCase().includes('EXAMPLE')) return;
       const docRef = db.collection(`clinics/${clinicId}/inventory`).doc();
-      batch.set(docRef, {
-        medication_id: medication_id,
-        med_id_lower: medication_id.toLowerCase().replace(/\s+/g, ''),
-        dosage: dosage,
-        dosage_normalized: dosage.toLowerCase().replace(/\s+/g, ''),
-        batch_id: row.getCell(2).value?.toString().trim() || "N/A",
-        expiry_date: Timestamp.fromDate(parsedDate),
-        quantity: Number(row.getCell(4).value) || 0,
-        base_unit: row.getCell(5).value?.toString().trim() || "",
-        package_unit: row.getCell(6).value?.toString().trim() || "",
-        created_at: admin.firestore.FieldValue.serverTimestamp()
-      });
+      batch.set(docRef, { medication_id: medId, med_id_lower: medId.toLowerCase().replace(/\s+/g, ''), dosage, dosage_normalized: dosage.toLowerCase().replace(/\s+/g, ''), expiry_date: Timestamp.fromDate(new Date(row.getCell(3).value as any)), quantity: Number(row.getCell(4).value) || 0, created_at: admin.firestore.FieldValue.serverTimestamp() });
     });
-
     await batch.commit();
     return { success: true };
   }
 );
 
 export const stockAlerts = onSchedule("every 24 hours", async (event: ScheduledEvent) => {
-  const ninetyDaysFromNow = new Date();
-  ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
-  const clinicsSnapshot = await db.collection("clinics").get();
-  for (const clinicDoc of clinicsSnapshot.docs) {
-    const clinicId = clinicDoc.id;
-    const inventorySnapshot = await db.collection(`clinics/${clinicId}/inventory`)
-      .where("expiry_date", "<=", Timestamp.fromDate(ninetyDaysFromNow))
-      .where("quantity", ">", 0)
-      .get();
-    if (!inventorySnapshot.empty) {
-      console.log(`Alert: ${inventorySnapshot.size} expiring batches in clinic ${clinicId}`);
-    }
+  const ninetyDays = new Date(); ninetyDays.setDate(ninetyDays.getDate() + 90);
+  const clinics = await db.collection("clinics").get();
+  for (const doc of clinics.docs) {
+    const expiring = await db.collection(`clinics/${doc.id}/inventory`).where("expiry_date", "<=", Timestamp.fromDate(ninetyDays)).where("quantity", ">", 0).get();
+    if (!expiring.empty) console.log(`Alert: ${expiring.size} expiring batches in ${doc.id}`);
   }
 });

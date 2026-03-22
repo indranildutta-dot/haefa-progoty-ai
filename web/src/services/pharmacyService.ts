@@ -2,17 +2,15 @@ import { httpsCallable } from "firebase/functions";
 import { functions } from "../firebase";
 import { getSession } from "../utils/session";
 
-export const dispenseMedication = async (patientId: string, encounterId: string, medications: { medication_id: string, quantity: number }[]) => {
-  const { selectedClinic } = getSession();
-  if (!selectedClinic) throw new Error("Clinic not selected");
-
+export const dispenseMedication = async (clinicId: string, patientId: string, encounterId: string, medications: { medication_id: string, dosage: string, quantity: number, dispensed_qty: number }[]) => {
   const dispense = httpsCallable(functions, 'dispenseMedication');
-  return await dispense({
-    clinicId: selectedClinic.id,
+  const result = await dispense({
+    clinicId,
     patientId,
     encounterId,
     medications
   });
+  return result.data;
 };
 
 export const bulkUpload = async (fileBase64: string) => {

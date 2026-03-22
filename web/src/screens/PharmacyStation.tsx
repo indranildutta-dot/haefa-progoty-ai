@@ -107,6 +107,9 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
   const [openDispenseDialog, setOpenDispenseDialog] = useState(false);
   const [openBatchDialog, setOpenBatchDialog] = useState(false);
   const [dispensedItems, setDispensedItems] = useState<Record<number, boolean>>({});
+  const [dispensedQuantities, setDispensedQuantities] = useState<Record<number, number>>({});
+  const [dispenseSummary, setDispenseSummary] = useState<any>(null);
+  const [openSummaryDialog, setOpenSummaryDialog] = useState(false);
   const [dispensedCount, setDispensedCount] = useState(0);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [pharmacyNote, setPharmacyNote] = useState('');
@@ -170,6 +173,11 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
       setCurrentTriage(triage);
       setCurrentEncounter(encounter);
       setDispensedItems({});
+      const initialQtys: Record<number, number> = {};
+      prescription?.prescriptions.forEach((p, idx) => {
+        initialQtys[idx] = p.quantity || 0;
+      });
+      setDispensedQuantities(initialQtys);
       setPharmacyNote('');
       setPharmacyAction('DISPENSE');
       setOpenDispenseDialog(true);
@@ -184,15 +192,25 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
     setDispensedItems(prev => ({ ...prev, [index]: !prev[index] }));
   };
 
+  const handleQtyChange = (index: number, qty: number) => {
+    setDispensedQuantities(prev => ({ ...prev, [index]: qty }));
+  };
+
   const handleCompleteDispensing = async () => {
-    if (!currentPrescription || !selectedItem) return;
+    if (!currentPrescription || !selectedItem || !selectedClinic) return;
     try {
       if (pharmacyAction === 'DISPENSE') {
-        const medications = currentPrescription.prescriptions.map(p => ({
+        const medications = currentPrescription.prescriptions.map((p, idx) => ({
           medication_id: p.medicationId,
-          quantity: p.quantity || 1
+          dosage: p.dosage,
+          quantity: p.quantity || 0,
+          dispensed_qty: dispensedQuantities[idx] || 0
         }));
-        await dispenseMedication(currentPrescription.patient_id, currentPrescription.encounter_id, medications);
+        
+        const result = await dispenseMedication(selectedClinic.id, selectedItem.patient_id, selectedItem.encounter_id, medications);
+        setDispenseSummary(result);
+        setOpenSummaryDialog(true);
+        
         await updateQueueStatus(selectedItem.id!, 'COMPLETED' as any);
         notify(`Medication dispensed for ${selectedItem.patient_name}`, 'success');
       } else if (pharmacyAction === 'HOLD') {
@@ -487,28 +505,46 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
                     transition: 'all 0.2s'
                   }}
                 >
-                  <FormControlLabel
-                    sx={{ width: '100%', m: 0 }}
-                    control={
-                      <Checkbox 
-                        checked={!!dispensedItems[index]} 
-                        onChange={() => handleToggleDispense(index)} 
-                        color="success" 
-                        disabled={pharmacyAction !== 'DISPENSE'} 
-                      />
-                    }
-                    label={
-                      <Box sx={{ ml: 1 }}>
-                        <Typography variant="body1" fontWeight="bold">{p.medicationName}</Typography>
-                        <Typography variant="body2" color="textSecondary">{p.dosage} | {p.frequency} | {p.duration}</Typography>
-                        {p.instructions && (
-                          <Typography variant="caption" sx={{ fontStyle: 'italic', display: 'block', mt: 0.5, color: 'primary.main' }}>
-                            Note: {p.instructions}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <FormControlLabel
+                      sx={{ m: 0, flex: 1 }}
+                      control={
+                        <Checkbox 
+                          checked={!!dispensedItems[index]} 
+                          onChange={() => handleToggleDispense(index)} 
+                          color="success" 
+                          disabled={pharmacyAction !== 'DISPENSE'} 
+                        />
+                      }
+                      label={
+                        <Box sx={{ ml: 1 }}>
+                          <Typography variant="body1" fontWeight="bold">{p.medicationName}</Typography>
+                          <Typography variant="body2" color="textSecondary">
+                            Prescribed: {p.quantity} | {p.dosage}
                           </Typography>
-                        )}
-                      </Box>
-                    }
-                  />
+                          <Typography variant="body2" color="textSecondary">
+                            {p.frequency} | {p.duration}
+                          </Typography>
+                          {p.instructions && (
+                            <Typography variant="caption" sx={{ fontStyle: 'italic', display: 'block', mt: 0.5, color: 'primary.main' }}>
+                              Note: {p.instructions}
+                            </Typography>
+                          )}
+                        </Box>
+                      }
+                    />
+                    <Box sx={{ width: 100, ml: 2 }}>
+                      <TextField
+                        label="Dispensed"
+                        type="number"
+                        size="small"
+                        value={dispensedQuantities[index] ?? ''}
+                        onChange={(e) => handleQtyChange(index, Number(e.target.value))}
+                        disabled={pharmacyAction !== 'DISPENSE'}
+                        inputProps={{ min: 0 }}
+                      />
+                    </Box>
+                  </Box>
                 </Paper>
               ))}
             </FormGroup>
@@ -554,6 +590,46 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
               {pharmacyAction === 'DISPENSE' ? 'Finalize Dispensing' : 'Submit Action'}
             </Button>
           </Box>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dispensing Summary Dialog */}
+      <Dialog open={openSummaryDialog} onClose={() => setOpenSummaryDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: '900' }}>Dispensing Summary</DialogTitle>
+        <DialogContent dividers>
+          {dispenseSummary && (
+            <Box>
+              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>Dispensed Items:</Typography>
+              {dispenseSummary.dispensed.map((item: any, idx: number) => (
+                <Box key={idx} sx={{ mb: 1, p: 1, bgcolor: 'success.50', borderRadius: 1 }}>
+                  <Typography variant="body2">
+                    <strong>{item.medication_id}</strong>: {item.dispensed_qty} units dispensed.
+                  </Typography>
+                </Box>
+              ))}
+              
+              {dispenseSummary.shortfalls && dispenseSummary.shortfalls.length > 0 && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle1" fontWeight="bold" color="error" gutterBottom>Shortfalls (IOUs Created):</Typography>
+                  {dispenseSummary.shortfalls.map((item: any, idx: number) => (
+                    <Box key={idx} sx={{ mb: 1, p: 1, bgcolor: 'error.50', borderRadius: 1 }}>
+                      <Typography variant="body2">
+                        <strong>{item.medication_id}</strong>: Shortfall of {item.shortfall_qty} units.
+                      </Typography>
+                    </Box>
+                  ))}
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    Procurement requests have been automatically created for these shortfalls.
+                  </Alert>
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenSummaryDialog(false)} variant="contained" sx={{ borderRadius: 2, fontWeight: 700 }}>
+            Close
+          </Button>
         </DialogActions>
       </Dialog>
       

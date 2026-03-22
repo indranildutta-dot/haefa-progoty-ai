@@ -128,6 +128,8 @@ export interface Prescription {
   duration: string;
   instructions: string;
   quantity?: number;
+  dispensed_qty?: number;
+  shortfall_qty?: number;
 }
 
 export interface VitalsRecord extends Vitals {
@@ -167,7 +169,7 @@ export interface PrescriptionRecord {
   encounter_id: string;
   patient_id: string;
   prescriptions: Prescription[];
-  status: 'PENDING' | 'DISPENSED';
+  status: 'PENDING' | 'DISPENSED' | 'PARTIAL_DISPENSE' | 'OUT_OF_STOCK';
   country_code: string;
   clinic_id: string;
   created_at: Timestamp;
