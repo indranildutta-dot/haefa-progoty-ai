@@ -1,7 +1,6 @@
 import { 
   onCall, 
-  HttpsError, 
-  CallableRequest 
+  HttpsError 
 } from "firebase-functions/v2/https";
 import { onSchedule, ScheduledEvent } from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
@@ -13,6 +12,27 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 const db = admin.firestore();
+
+// ==========================================
+// SUPER ADMIN CONFIGURATION
+// These emails bypass all database checks.
+// ==========================================
+const SUPER_ADMIN_EMAILS = [
+  'indranil_dutta@haefa.org', 
+  'ruhul_abid@haefa.org'
+];
+
+/**
+ * Helper to verify if the caller is a Global Admin
+ * via either Hardcoded Email or Custom Claims.
+ */
+const checkIsGlobalAdmin = (auth: any) => {
+  if (!auth) return false;
+  const email = auth.token.email?.toLowerCase();
+  const role = auth.token.role;
+
+  return SUPER_ADMIN_EMAILS.includes(email) || role === 'global_admin';
+};
 
 // --- Utility Functions ---
 
@@ -44,14 +64,16 @@ const sanitizeData = (data: any) => {
   return sanitized;
 };
 
-// --- RBAC & Admin Functions ---
+// --- Administrative & RBAC Functions ---
 
 export const syncUserPermissions = onCall(
   { region: "us-central1", maxInstances: 10 },
-  async (request: CallableRequest) => {
-    if (!request.auth || request.auth.token.role !== 'global_admin') {
-      throw new HttpsError("permission-denied", "Only global admins can execute this function.");
+  async (request: any) => {
+    // GUARD: Check Global Admin status before doing ANYTHING
+    if (!checkIsGlobalAdmin(request.auth)) {
+      throw new HttpsError("permission-denied", "Unauthorized: Global Admin privileges required.");
     }
+
     const { email, role, countryCode, assignedCountries, assignedClinics, isApproved } = request.data;
     if (!email || !role) {
       throw new HttpsError("invalid-argument", "Missing required fields: email or role.");
@@ -68,7 +90,11 @@ export const syncUserPermissions = onCall(
         }
       }
       const uid = userRecord.uid;
+      
+      // Set the claim so the user becomes an admin in the token
       await admin.auth().setCustomUserClaims(uid, { role });
+      
+      // Update the user document for app visibility
       await db.collection("users").doc(uid).set({
         email,
         role,
@@ -78,6 +104,7 @@ export const syncUserPermissions = onCall(
         isApproved: isApproved ?? false,
         lastUpdated: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
+      
       return { success: true, message: `Permissions updated for ${email}` };
     } catch (error: any) {
       console.error("Error syncing permissions:", error);
@@ -86,59 +113,67 @@ export const syncUserPermissions = onCall(
   }
 );
 
-export const migrateUsers = onCall(
-  { region: "us-central1", maxInstances: 10 },
-  async (request: CallableRequest) => {
-    if (!request.auth || request.auth.token.role !== 'global_admin') {
-      throw new HttpsError("permission-denied", "Only global admins can execute this function.");
-    }
-    try {
-      const usersSnapshot = await db.collection("users").get();
-      const batch = db.batch();
-      let count = 0;
-      usersSnapshot.docs.forEach((doc) => {
-        const data = doc.data();
-        if (data.isApproved !== undefined) return;
-        batch.update(doc.ref, {
-          countryCode: data.countryId || null,
-          assignedCountries: [],
-          assignedClinics: [],
-          isApproved: false,
-          lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-        });
-        count++;
-      });
-      if (count > 0) await batch.commit();
-      return { success: true, message: `Migrated ${count} users.` };
-    } catch (error: any) {
-      console.error("Error migrating users:", error);
-      throw new HttpsError("internal", error.message || "Failed to migrate users.");
-    }
-  }
-);
-
-export const bootstrapAdmins = onCall(
+export const initClinics = onCall(
   { region: "us-central1" },
-  async (request: CallableRequest) => {
-    const admins = [
-      { email: 'indranil_dutta@haefa.org', name: 'Indranil Dutta' },
-      { email: 'ruhul_abid@haefa.org', name: 'Ruhul Abid' }
-    ];
-    for (const adminUser of admins) {
-      try {
-        const user = await admin.auth().getUserByEmail(adminUser.email);
-        await admin.auth().setCustomUserClaims(user.uid, { role: 'global_admin' });
-        await db.collection("users").doc(user.uid).set({
-          email: adminUser.email,
-          name: adminUser.name,
-          role: 'global_admin',
-          updated_at: new Date()
-        }, { merge: true });
-      } catch (error) {
-        console.error(`Failed to bootstrap admin ${adminUser.email}:`, error);
-      }
+  async (request: any) => {
+    // GUARD: Check Global Admin status before doing ANYTHING
+    if (!checkIsGlobalAdmin(request.auth)) {
+      throw new HttpsError("permission-denied", "Unauthorized: Global Admin privileges required.");
     }
-    return { success: true };
+
+    const clinicsToCreate = [
+      { id: 'BD-01', name: 'Dhaka Clinic', country: 'Bangladesh', code: 'BD', currency: 'BDT' },
+      { id: 'BD-02', name: 'Cox’s Bazar Clinic', country: 'Bangladesh', code: 'BD', currency: 'BDT' },
+      { id: 'BD-03', name: 'Noakhali Clinic', country: 'Bangladesh', code: 'BD', currency: 'BDT' },
+      { id: 'BD-04', name: 'Kurigram Clinic', country: 'Bangladesh', code: 'BD', currency: 'BDT' },
+      { id: 'BD-05', name: 'Gazipur Clinic', country: 'Bangladesh', code: 'BD', currency: 'BDT' },
+      { id: 'SB-01', name: 'SL Island 1', country: 'Solomon Islands', code: 'SB', currency: 'SBD' },
+      { id: 'SB-02', name: 'SL Island 2', country: 'Solomon Islands', code: 'SB', currency: 'SBD' },
+      { id: 'NP-01', name: 'Kathmandu 1', country: 'Nepal', code: 'NP', currency: 'NPR' },
+      { id: 'NP-02', name: 'Kathmandu 2', country: 'Nepal', code: 'NP', currency: 'NPR' }
+    ];
+
+    const commonSettings = {
+      max_patients_per_day: 1000,
+      timezone: 'UTC',
+      status: 'active',
+      units: {
+        weight: 'kg',
+        height: 'cm',
+        blood_pressure: 'mmHg',
+        temperature: 'Celsius',
+        blood_glucose: 'mg/dL',
+        heart_rate: 'bpm'
+      },
+      queue_structure: [
+        { id: 'registration', name: 'Registration', order: 1 },
+        { id: 'vitals', name: 'Vitals', order: 2 },
+        { id: 'consultation', name: 'Doctor Consultation', order: 3 },
+        { id: 'pharmacy', name: 'Pharmacy/Dispensing', order: 4 }
+      ],
+      supported_roles: ['admin', 'doctor', 'nurse', 'pharmacist', 'lab_tech'],
+      created_at: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    try {
+      const batch = db.batch();
+      clinicsToCreate.forEach((clinic) => {
+        const docRef = db.collection('clinics').doc(clinic.id);
+        batch.set(docRef, {
+          clinic_id: clinic.id,
+          clinic_name: clinic.name,
+          country_code: clinic.code,
+          country_name: clinic.country,
+          local_currency: clinic.currency,
+          ...commonSettings
+        }, { merge: true });
+      });
+      await batch.commit();
+      return { success: true, count: clinicsToCreate.length };
+    } catch (error: any) {
+      console.error("Clinic bootstrap failed:", error);
+      throw new HttpsError("internal", error.message);
+    }
   }
 );
 
@@ -146,7 +181,7 @@ export const bootstrapAdmins = onCall(
 
 export const registerPatient = onCall(
   { region: "us-central1" },
-  async (request: CallableRequest) => {
+  async (request: any) => {
     const data = request.data || {};
     const { patientData, photoBase64, clinicId, countryCode } = data;
     if (!patientData || typeof patientData !== 'object' || !clinicId || !countryCode) {
@@ -172,7 +207,6 @@ export const registerPatient = onCall(
         }
       }
       
-      // FIXED: Call is now sanitizeData (correct name)
       const sanitizedPatientData = sanitizeData(patientData);
       
       await db.collection("patients").doc(patientId).set({
@@ -207,29 +241,11 @@ export const registerPatient = onCall(
   }
 );
 
-export const generateBadgeToken = onCall(
-  { region: "us-central1" },
-  async (request: CallableRequest) => {
-    const { patientId } = request.data;
-    if (!patientId) throw new HttpsError("invalid-argument", "Missing patientId");
-    try {
-      const token = generateId();
-      await db.collection("badge_tokens").doc(token).set({
-        patient_id: patientId,
-        created_at: new Date()
-      });
-      return { token };
-    } catch (error: any) {
-      throw new HttpsError("internal", error.message);
-    }
-  }
-);
-
 // --- Pharmacy & Inventory Functions ---
 
 export const getInventoryTemplate = onCall(
   { region: "us-central1" },
-  async (request: CallableRequest) => {
+  async (request: any) => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Inventory Template');
 
@@ -263,7 +279,7 @@ export const getInventoryTemplate = onCall(
 
 export const dispenseMedication = onCall(
   { region: "us-central1" },
-  async (request: CallableRequest) => {
+  async (request: any) => {
     const { clinicId, medications, encounterId } = request.data;
     if (!clinicId || !medications || !encounterId) {
       throw new HttpsError("invalid-argument", "Missing required fields.");
@@ -271,7 +287,6 @@ export const dispenseMedication = onCall(
     return await db.runTransaction(async (transaction) => {
       try {
         for (const med of medications) {
-          // NORMALIZATION: Strip spaces from name and dosage
           const medIdLower = med.medication_id.toString().toLowerCase().replace(/\s+/g, '');
           const dosageNormalized = med.dosage.toString().toLowerCase().replace(/\s+/g, '');
           
@@ -295,6 +310,7 @@ export const dispenseMedication = onCall(
             const toTake = Math.min(available, remainingToDispense);
             transaction.update(doc.ref, { quantity: available - toTake });
             remainingToDispense -= toTake;
+            
             const logRef = db.collection("inventory_logs").doc();
             transaction.set(logRef, {
               clinic_id: clinicId,
@@ -325,7 +341,7 @@ export const dispenseMedication = onCall(
 
 export const bulkUpload = onCall(
   { region: "us-central1" },
-  async (request: CallableRequest) => {
+  async (request: any) => {
     const { clinicId, fileBase64 } = request.data;
     if (!clinicId || !fileBase64) {
       throw new HttpsError("invalid-argument", "Missing required fields.");
