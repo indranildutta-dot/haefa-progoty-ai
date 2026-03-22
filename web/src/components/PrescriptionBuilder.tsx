@@ -7,7 +7,6 @@ import {
   Grid, 
   Paper, 
   IconButton,
-  Divider,
   Select,
   MenuItem,
   FormControl,
@@ -18,7 +17,7 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { Prescription } from '../types';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
 
@@ -49,6 +48,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
     instructions: '',
     quantity: 0
   });
+  
   const [dosageUnit, setDosageUnit] = useState(DOSAGE_UNITS[0]);
   const [durationUnit, setDurationUnit] = useState(DURATION_UNITS[0]);
   const [durationValue, setDurationValue] = useState('');
@@ -58,6 +58,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
   const [isNewMedicine, setIsNewMedicine] = useState(false);
   const [availableDosages, setAvailableDosages] = useState<string[]>([]);
 
+  // 1. Fetch Inventory for the specific clinic
   useEffect(() => {
     const fetchInventory = async () => {
       if (!selectedClinic) return;
@@ -76,12 +77,32 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
     fetchInventory();
   }, [selectedClinic]);
 
+  // 2. Group inventory by medication name to handle multiple dosages
+  const groupedInventory = inventory.reduce((acc, item) => {
+    if (!acc[item.med_id_lower]) {
+      acc[item.med_id_lower] = {
+        name: item.medication_id,
+        dosages: new Set<string>()
+      };
+    }
+    acc[item.med_id_lower].dosages.add(item.dosage);
+    return acc;
+  }, {} as Record<string, { name: string, dosages: Set<string> }>);
+
+  const inventoryOptions = Object.keys(groupedInventory).map(key => ({
+    id: key,
+    label: groupedInventory[key].name,
+    dosages: Array.from(groupedInventory[key].dosages)
+  }));
+
   const handleAdd = () => {
     if (newMed.medicationName && newMed.dosage && newMed.frequency && durationValue) {
       const fullDosage = isNewMedicine ? `${newMed.dosage} ${dosageUnit}` : newMed.dosage;
       const fullDuration = `${durationValue} ${durationUnit}`;
       
       onChange([...prescriptions, { ...newMed, dosage: fullDosage, duration: fullDuration }]);
+      
+      // Reset State
       setNewMed({
         medicationId: '',
         medicationName: '',
@@ -103,23 +124,6 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
     onChange(updated);
   };
 
-  const groupedInventory = inventory.reduce((acc, item) => {
-    if (!acc[item.med_id_lower]) {
-      acc[item.med_id_lower] = {
-        name: item.medication_id,
-        dosages: new Set<string>()
-      };
-    }
-    acc[item.med_id_lower].dosages.add(item.dosage);
-    return acc;
-  }, {} as Record<string, { name: string, dosages: Set<string> }>);
-
-  const inventoryOptions = Object.keys(groupedInventory).map(key => ({
-    id: key,
-    label: groupedInventory[key].name,
-    dosages: Array.from(groupedInventory[key].dosages)
-  }));
-
   return (
     <Box>
       <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', mb: 2 }}>
@@ -128,7 +132,9 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
 
       <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 3, bgcolor: 'grey.50' }}>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 12 }}>
+          
+          {/* SEARCH FIELD */}
+          <Grid item xs={12}>
             {!isNewMedicine ? (
               <Autocomplete
                 options={inventoryOptions}
@@ -142,11 +148,13 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
                       ...newMed,
                       medicationName: newValue.label,
                       medicationId: newValue.id,
-                      dosage: dosages.length === 1 ? dosages[0] : ''
+                      dosage: dosages.length === 1 ? dosages[0] : '',
+                      quantity: 0 // Initialize fresh
                     });
                   } else {
+                    // RESET FIX: Ensure quantity returns to 0 when search is cleared
                     setAvailableDosages([]);
-                    setNewMed({ ...newMed, medicationName: '', medicationId: '', dosage: '' });
+                    setNewMed({ ...newMed, medicationName: '', medicationId: '', dosage: '', quantity: 0 });
                   }
                 }}
                 noOptionsText={
@@ -161,7 +169,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    label="Search Medication"
+                    label="Search Clinic Inventory"
                     size="small"
                     InputProps={{
                       ...params.InputProps,
@@ -189,7 +197,8 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
             )}
           </Grid>
 
-          <Grid size={{ xs: 12, sm: 6 }}>
+          {/* DOSAGE FIELD */}
+          <Grid item xs={12} sm={6}>
             {isNewMedicine ? (
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <TextField 
@@ -221,7 +230,8 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
             )}
           </Grid>
 
-          <Grid size={{ xs: 12, sm: 6 }}>
+          {/* QUANTITY FIELD */}
+          <Grid item xs={12} sm={6}>
             <TextField 
               fullWidth 
               size="small" 
@@ -232,16 +242,17 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
             />
           </Grid>
 
-          <Grid size={{ xs: 12, sm: 4 }}>
+          {/* FREQUENCY & DURATION */}
+          <Grid item xs={12} sm={4}>
             <TextField 
               fullWidth 
               size="small" 
-              label="Frequency (e.g., 3 times daily)" 
+              label="Frequency (e.g., 3x daily)" 
               value={newMed.frequency} 
               onChange={(e) => setNewMed({ ...newMed, frequency: e.target.value })} 
             />
           </Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>
+          <Grid item xs={12} sm={4}>
             <TextField 
               fullWidth 
               size="small" 
@@ -251,7 +262,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
               onChange={(e) => setDurationValue(e.target.value)} 
             />
           </Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>
+          <Grid item xs={12} sm={4}>
             <FormControl fullWidth size="small">
               <InputLabel>Unit</InputLabel>
               <Select value={durationUnit} onChange={(e) => setDurationUnit(e.target.value)} label="Unit">
@@ -259,7 +270,9 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
               </Select>
             </FormControl>
           </Grid>
-          <Grid size={12}>
+
+          {/* INSTRUCTIONS */}
+          <Grid item xs={12}>
             <TextField 
               fullWidth 
               size="small" 
@@ -268,7 +281,8 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
               onChange={(e) => setNewMed({ ...newMed, instructions: e.target.value })} 
             />
           </Grid>
-          <Grid size={12}>
+
+          <Grid item xs={12}>
             <Button 
               variant="contained" 
               color="secondary" 
@@ -277,12 +291,13 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
               disabled={!newMed.medicationName || !newMed.dosage || !newMed.frequency || !durationValue || !newMed.quantity}
               sx={{ borderRadius: 2, fontWeight: 700 }}
             >
-              Add Medication
+              Add to Prescription
             </Button>
           </Grid>
         </Grid>
       </Paper>
 
+      {/* DISPLAY LIST */}
       {prescriptions.length > 0 && (
         <Box>
           <Typography variant="subtitle2" color="textSecondary" fontWeight="bold" sx={{ mb: 1 }}>
