@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Box, Typography, TextField, Button, IconButton, Paper, Stack, 
-  Autocomplete, Grid, Tooltip, Alert, InputAdornment, Divider, CircularProgress
+  Autocomplete, Grid, InputAdornment, Divider, CircularProgress, 
+  MenuItem, Select, FormControl, InputLabel, FormHelperText
 } from '@mui/material';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -12,34 +13,17 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import CalculateIcon from '@mui/icons-material/Calculate';
 import MedicationIcon from '@mui/icons-material/Medication';
-import InventoryIcon from '@mui/icons-material/Inventory';
 import InfoIcon from '@mui/icons-material/Info';
-
-// --- Clinical Math Helpers ---
-const parseFrequencyToNumber = (freq: string): number => {
-  const f = freq.toLowerCase();
-  if (f.includes('4') || f.includes('four')) return 4;
-  if (f.includes('3') || f.includes('three')) return 3;
-  if (f.includes('2') || f.includes('twice')) return 2;
-  if (f.includes('1') || f.includes('once') || f.includes('daily')) return 1;
-  return 1;
-};
-
-const parseDurationToDays = (dur: string): number => {
-  const d = dur.toLowerCase();
-  const numericMatch = d.match(/\d+/);
-  const num = numericMatch ? parseInt(numericMatch[0]) : 1;
-  if (d.includes('week')) return num * 7;
-  if (d.includes('month')) return num * 30;
-  return num; 
-};
 
 interface Prescription {
   medicationId: string;
   medicationName: string;
-  dosage: string;
-  frequency: string;
-  duration: string;
+  dosageValue: string;
+  dosageUnit: string;
+  frequencyValue: number;
+  frequencyUnit: string;
+  durationValue: number;
+  durationUnit: string;
   quantity: number;
   instructions: string;
 }
@@ -58,9 +42,12 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
   const [inventoryMeds, setInventoryMeds] = useState<any[]>([]);
   const [loadingInventory, setLoadingInventory] = useState(true);
 
-  // 1. Live Inventory Listener (Filtered by Clinic and Stock)
+  // 1. Live Inventory Listener: Ensures the Doctor only sees what the Pharmacy has
   useEffect(() => {
-    if (!selectedClinic?.id) return;
+    if (!selectedClinic?.id) {
+      setLoadingInventory(false);
+      return;
+    }
 
     const q = query(
       collection(db, "inventory"),
@@ -75,12 +62,15 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
       }));
       setInventoryMeds(items);
       setLoadingInventory(false);
+    }, (error) => {
+      console.error("Firestore Inventory Error:", error);
+      setLoadingInventory(false);
     });
 
     return () => unsubscribe();
   }, [selectedClinic]);
 
-  // 2. Safety Sync with Parent (prevents "not a function" crash)
+  // 2. Safety Sync with Parent (ConsultationPanel)
   useEffect(() => {
     if (typeof onPrescriptionChange === 'function') {
       onPrescriptionChange(prescriptions);
@@ -89,42 +79,40 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
 
   const handleAddMedication = () => {
     setPrescriptions([...prescriptions, {
-      medicationId: '', medicationName: '', dosage: '',
-      frequency: '1 time daily', duration: '7 days', quantity: 7, instructions: ''
+      medicationId: '', medicationName: '', dosageValue: '', dosageUnit: 'mg',
+      frequencyValue: 1, frequencyUnit: 'daily', durationValue: 7, durationUnit: 'days',
+      quantity: 7, instructions: ''
     }]);
-  };
-
-  const handleRemoveMedication = (index: number) => {
-    setPrescriptions(prescriptions.filter((_, i) => i !== index));
   };
 
   const updateMedication = (index: number, field: keyof Prescription, value: any) => {
     const updatedList = [...prescriptions];
-    const currentMed = { ...updatedList[index] };
-    (currentMed as any)[field] = value;
+    const med = { ...updatedList[index] };
+    (med as any)[field] = value;
 
-    // Auto-fill Dosage from Inventory Match
+    // Medication Auto-Fill Logic
     if (field === 'medicationName') {
       const match = inventoryMeds.find(m => m.name === value);
       if (match) {
-        currentMed.medicationId = match.medication_id || match.id;
-        currentMed.dosage = match.dosage || '';
+        med.medicationId = match.id;
+        // Attempt to parse existing dosage string (e.g., "500mg" -> 500 and mg)
+        const dosageMatch = match.dosage?.match(/(\d+)\s*([a-zA-Z]+)/);
+        if (dosageMatch) {
+          med.dosageValue = dosageMatch[1];
+          med.dosageUnit = dosageMatch[2];
+        } else {
+          med.dosageValue = match.dosage || '';
+        }
       }
     }
 
-    // Safety Math Logic
-    const freqVal = parseFrequencyToNumber(currentMed.frequency);
-    const daysVal = parseDurationToDays(currentMed.duration);
-    const minCalculated = freqVal * daysVal;
+    // Calculation Logic: Frequency * Duration = Quantity
+    // This ensures no math errors between doctor and pharmacist
+    const freq = Number(med.frequencyValue) || 0;
+    const dur = Number(med.durationValue) || 0;
+    med.quantity = freq * dur;
 
-    if (field === 'frequency' || field === 'duration') {
-      currentMed.quantity = minCalculated;
-    }
-    if (field === 'quantity') {
-      currentMed.quantity = value < minCalculated ? minCalculated : value;
-    }
-
-    updatedList[index] = currentMed;
+    updatedList[index] = med;
     setPrescriptions(updatedList);
   };
 
@@ -132,14 +120,16 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
     <Box sx={{ width: '100%', py: 2 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
         <Box>
-          <Typography variant="h5" fontWeight="900" color="primary">PRESCRIPTION BUILDER</Typography>
+          <Typography variant="h5" fontWeight="900" color="primary" sx={{ letterSpacing: -0.5 }}>
+            PRESCRIPTION BUILDER
+          </Typography>
           <Typography variant="body2" color="text.secondary">
-            Syncing stock for <strong>{selectedClinic?.name || 'Current Clinic'}</strong>
+            Authorized Inventory for: <strong>{selectedClinic?.name || 'Searching...'}</strong>
           </Typography>
         </Box>
         <Button 
           variant="contained" startIcon={<AddCircleIcon />} onClick={handleAddMedication}
-          sx={{ borderRadius: 3, fontWeight: 800, px: 4, height: '48px' }}
+          sx={{ borderRadius: 3, fontWeight: 800, px: 4, height: '48px', boxShadow: '0 4px 12px rgba(25, 118, 210, 0.2)' }}
         >
           Add Medicine
         </Button>
@@ -151,87 +141,128 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
             key={index} elevation={0}
             sx={{ 
               p: 4, borderRadius: 4, border: '1px solid #e0e0e0', position: 'relative',
-              transition: '0.2s ease-in-out',
+              transition: 'all 0.2s ease',
               '&:hover': { borderColor: 'primary.main', bgcolor: '#fcfdff' }
             }}
           >
+            {/* Delete Button */}
             <IconButton 
-              onClick={() => handleRemoveMedication(index)}
-              sx={{ position: 'absolute', top: 16, right: 16, color: 'error.main', bgcolor: '#fff1f1' }}
+              onClick={() => setPrescriptions(prescriptions.filter((_, i) => i !== index))}
+              sx={{ position: 'absolute', top: 16, right: 16, color: 'error.main', bgcolor: '#fff1f1', '&:hover': { bgcolor: '#ffe0e0' } }}
             >
               <DeleteIcon />
             </IconButton>
 
             <Grid container spacing={3}>
-              {/* Row 1: Search & Dosage */}
-              <Grid item xs={12} md={8}>
+              {/* ROW 1: MEDICATION SEARCH (FULL WIDTH ON TABLET) */}
+              <Grid item xs={12} md={7}>
                 <Autocomplete
                   fullWidth
-                  freeSolo
                   options={inventoryMeds.map(m => m.name)}
                   loading={loadingInventory}
                   value={med.medicationName}
                   onInputChange={(_, val) => updateMedication(index, 'medicationName', val)}
-                  ListboxProps={{ style: { width: '100%', maxWidth: 'none' } }}
+                  ListboxProps={{ style: { width: '100%' } }}
                   renderInput={(params) => (
                     <TextField 
-                      {...params} 
-                      label="Search Clinic Inventory" 
-                      variant="filled"
-                      placeholder={loadingInventory ? "Syncing..." : "Search Tylenol, Amoxicillin..."}
+                      {...params} label="Search Clinic Inventory" variant="filled"
+                      placeholder={loadingInventory ? "Syncing..." : "e.g. Tylenol, Amoxicillin"}
                       InputProps={{
                         ...params.InputProps,
-                        startAdornment: <InputAdornment position="start"><InventoryIcon color="primary" /></InputAdornment>,
-                        disableUnderline: true,
-                        sx: { borderRadius: 2 }
+                        startAdornment: <InputAdornment position="start"><MedicationIcon color="primary" /></InputAdornment>,
+                        disableUnderline: true, sx: { borderRadius: 2 }
                       }}
                     />
                   )}
                 />
               </Grid>
 
-              <Grid item xs={12} md={4}>
+              {/* DOSAGE SPLIT */}
+              <Grid item xs={7} md={3}>
                 <TextField
-                  fullWidth label="Dosage Strength" variant="outlined" value={med.dosage}
-                  onChange={(e) => updateMedication(index, 'dosage', e.target.value)}
+                  fullWidth label="Dosage Strength" type="number" value={med.dosageValue}
+                  onChange={(e) => updateMedication(index, 'dosageValue', e.target.value)}
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                 />
               </Grid>
+              
+              <Grid item xs={5} md={2}>
+                <FormControl fullWidth>
+                  <InputLabel>Unit</InputLabel>
+                  <Select
+                    value={med.dosageUnit} label="Unit"
+                    onChange={(e) => updateMedication(index, 'dosageUnit', e.target.value)}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    <MenuItem value="mg">mg</MenuItem>
+                    <MenuItem value="ml">ml</MenuItem>
+                    <MenuItem value="tablet">tablet</MenuItem>
+                    <MenuItem value="capsule">capsule</MenuItem>
+                    <MenuItem value="IU">IU</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
 
-              <Grid item xs={12}><Divider sx={{ borderStyle: 'dashed' }} /></Grid>
+              <Grid item xs={12}><Divider sx={{ borderStyle: 'dashed', my: 1 }} /></Grid>
 
-              {/* Row 2: Timing & Quantity */}
-              <Grid item xs={12} md={4}>
-                <Autocomplete
-                  freeSolo options={['1 time daily', '2 times daily', '3 times daily', '4 times daily']}
-                  value={med.frequency} onInputChange={(_, val) => updateMedication(index, 'frequency', val)}
-                  renderInput={(params) => <TextField {...params} label="Frequency" variant="outlined" />}
+              {/* ROW 2: FREQUENCY & DURATION SPLITS */}
+              <Grid item xs={4} md={2}>
+                <TextField 
+                  fullWidth type="number" label="Freq" value={med.frequencyValue}
+                  onChange={(e) => updateMedication(index, 'frequencyValue', e.target.value)}
                 />
               </Grid>
-              <Grid item xs={12} md={4}>
-                <Autocomplete
-                  freeSolo options={['3 days', '5 days', '7 days', '2 weeks', '1 month']}
-                  value={med.duration} onInputChange={(_, val) => updateMedication(index, 'duration', val)}
-                  renderInput={(params) => <TextField {...params} label="Duration" variant="outlined" />}
+              <Grid item xs={8} md={2.5}>
+                <FormControl fullWidth>
+                  <InputLabel>Frequency Unit</InputLabel>
+                  <Select
+                    value={med.frequencyUnit} label="Frequency Unit"
+                    onChange={(e) => updateMedication(index, 'frequencyUnit', e.target.value)}
+                  >
+                    <MenuItem value="daily">times daily</MenuItem>
+                    <MenuItem value="weekly">times weekly</MenuItem>
+                    <MenuItem value="monthly">times monthly</MenuItem>
+                    <MenuItem value="as needed">as needed (PRN)</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid item xs={4} md={2}>
+                <TextField 
+                  fullWidth type="number" label="Duration" value={med.durationValue}
+                  onChange={(e) => updateMedication(index, 'durationValue', e.target.value)}
                 />
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid item xs={8} md={2.5}>
+                <FormControl fullWidth>
+                  <InputLabel>Duration Unit</InputLabel>
+                  <Select
+                    value={med.durationUnit} label="Duration Unit"
+                    onChange={(e) => updateMedication(index, 'durationUnit', e.target.value)}
+                  >
+                    <MenuItem value="days">days</MenuItem>
+                    <MenuItem value="weeks">weeks</MenuItem>
+                    <MenuItem value="months">months</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid item xs={12} md={3}>
                 <TextField
-                  fullWidth type="number" label="Total Quantity" value={med.quantity}
-                  onChange={(e) => updateMedication(index, 'quantity', Number(e.target.value))}
+                  fullWidth disabled label="Total Quantity" value={med.quantity}
                   InputProps={{
-                    startAdornment: <InputAdornment position="start"><CalculateIcon color="primary" /></InputAdornment>,
-                    sx: { fontWeight: 900, borderRadius: 2, bgcolor: '#f0f7ff' }
+                    startAdornment: <InputAdornment position="start"><CalculateIcon color="primary" sx={{ opacity: 0.6 }} /></InputAdornment>,
+                    sx: { fontWeight: 900, bgcolor: '#f0f7ff', borderRadius: 2 }
                   }}
-                  helperText={`Minimum Required: ${parseFrequencyToNumber(med.frequency) * parseDurationToDays(med.duration)}`}
+                  helperText="Auto-calculated quantity"
                 />
               </Grid>
 
-              {/* Row 3: Instructions */}
+              {/* ROW 3: PHARMACIST INSTRUCTIONS (WIDE) */}
               <Grid item xs={12}>
                 <TextField
-                  fullWidth multiline rows={2} label="Pharmacist Instructions"
-                  placeholder="e.g., Take after meals, complete the full course..."
+                  fullWidth multiline rows={2} label="Pharmacist Instructions (Optional)"
+                  placeholder="e.g. Take after food. Avoid dairy for 2 hours. Complete full course."
                   value={med.instructions} onChange={(e) => updateMedication(index, 'instructions', e.target.value)}
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
                 />
@@ -241,10 +272,10 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
         ))}
       </Stack>
 
-      <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', bgcolor: '#f8f9fa', p: 2, borderRadius: 2 }}>
-        <InfoIcon sx={{ fontSize: 18, mr: 1, color: 'text.secondary' }} />
-        <Typography variant="caption" color="text.secondary" fontWeight="500">
-          The Total Quantity is automatically calculated based on the therapeutic window to prevent dispensing errors.
+      <Box sx={{ mt: 4, display: 'flex', alignItems: 'center', bgcolor: '#f9f9f9', p: 2, borderRadius: 2, border: '1px solid #eee' }}>
+        <InfoIcon sx={{ fontSize: 18, mr: 1.5, color: 'text.secondary' }} />
+        <Typography variant="caption" color="text.secondary" fontWeight="600">
+          The Medication list is filtered by live inventory at {selectedClinic?.name || 'the clinic'}.
         </Typography>
       </Box>
     </Box>
