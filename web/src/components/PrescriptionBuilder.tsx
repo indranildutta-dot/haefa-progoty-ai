@@ -58,7 +58,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
   const [inventoryMeds, setInventoryMeds] = useState<any[]>([]);
   const [loadingInventory, setLoadingInventory] = useState(true);
 
-  // 1. Live Inventory Listener
+  // 1. Live Inventory Listener (Filtered by Clinic and Stock)
   useEffect(() => {
     if (!selectedClinic?.id) return;
 
@@ -80,7 +80,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
     return () => unsubscribe();
   }, [selectedClinic]);
 
-  // 2. Safety Sync with Parent (ConsultationPanel)
+  // 2. Safety Sync with Parent (prevents "not a function" crash)
   useEffect(() => {
     if (typeof onPrescriptionChange === 'function') {
       onPrescriptionChange(prescriptions);
@@ -103,7 +103,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
     const currentMed = { ...updatedList[index] };
     (currentMed as any)[field] = value;
 
-    // Auto-fill Logic
+    // Auto-fill Dosage from Inventory Match
     if (field === 'medicationName') {
       const match = inventoryMeds.find(m => m.name === value);
       if (match) {
@@ -112,7 +112,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
       }
     }
 
-    // Safety Math: Freq * Duration = Minimum Floor
+    // Safety Math Logic
     const freqVal = parseFrequencyToNumber(currentMed.frequency);
     const daysVal = parseDurationToDays(currentMed.duration);
     const minCalculated = freqVal * daysVal;
@@ -132,11 +132,9 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
     <Box sx={{ width: '100%', py: 2 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
         <Box>
-          <Typography variant="h5" fontWeight="900" color="primary" sx={{ letterSpacing: -0.5 }}>
-            PRESCRIPTION BUILDER
-          </Typography>
+          <Typography variant="h5" fontWeight="900" color="primary">PRESCRIPTION BUILDER</Typography>
           <Typography variant="body2" color="text.secondary">
-            Dispensing items for <strong>{selectedClinic?.name || 'Current Clinic'}</strong>
+            Syncing stock for <strong>{selectedClinic?.name || 'Current Clinic'}</strong>
           </Typography>
         </Box>
         <Button 
@@ -153,6 +151,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
             key={index} elevation={0}
             sx={{ 
               p: 4, borderRadius: 4, border: '1px solid #e0e0e0', position: 'relative',
+              transition: '0.2s ease-in-out',
               '&:hover': { borderColor: 'primary.main', bgcolor: '#fcfdff' }
             }}
           >
@@ -164,6 +163,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
             </IconButton>
 
             <Grid container spacing={3}>
+              {/* Row 1: Search & Dosage */}
               <Grid item xs={12} md={8}>
                 <Autocomplete
                   fullWidth
@@ -200,6 +200,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
 
               <Grid item xs={12}><Divider sx={{ borderStyle: 'dashed' }} /></Grid>
 
+              {/* Row 2: Timing & Quantity */}
               <Grid item xs={12} md={4}>
                 <Autocomplete
                   freeSolo options={['1 time daily', '2 times daily', '3 times daily', '4 times daily']}
@@ -222,13 +223,15 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
                     startAdornment: <InputAdornment position="start"><CalculateIcon color="primary" /></InputAdornment>,
                     sx: { fontWeight: 900, borderRadius: 2, bgcolor: '#f0f7ff' }
                   }}
-                  helperText={`Minimum required: ${parseFrequencyToNumber(med.frequency) * parseDurationToDays(med.duration)}`}
+                  helperText={`Minimum Required: ${parseFrequencyToNumber(med.frequency) * parseDurationToDays(med.duration)}`}
                 />
               </Grid>
 
+              {/* Row 3: Instructions */}
               <Grid item xs={12}>
                 <TextField
-                  fullWidth multiline rows={2} label="Instructions"
+                  fullWidth multiline rows={2} label="Pharmacist Instructions"
+                  placeholder="e.g., Take after meals, complete the full course..."
                   value={med.instructions} onChange={(e) => updateMedication(index, 'instructions', e.target.value)}
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
                 />
@@ -237,6 +240,13 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
           </Paper>
         ))}
       </Stack>
+
+      <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', bgcolor: '#f8f9fa', p: 2, borderRadius: 2 }}>
+        <InfoIcon sx={{ fontSize: 18, mr: 1, color: 'text.secondary' }} />
+        <Typography variant="caption" color="text.secondary" fontWeight="500">
+          The Total Quantity is automatically calculated based on the therapeutic window to prevent dispensing errors.
+        </Typography>
+      </Box>
     </Box>
   );
 };
