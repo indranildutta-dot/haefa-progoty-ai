@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Box, Typography, TextField, Button, IconButton, Paper, Stack, 
   Autocomplete, Grid, InputAdornment, Divider, CircularProgress, 
-  MenuItem, Select, FormControl, InputLabel, FormHelperText
+  MenuItem, Select, FormControl, InputLabel, Alert
 } from '@mui/material';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -14,6 +14,26 @@ import AddCircleIcon from '@mui/icons-material/AddCircle';
 import CalculateIcon from '@mui/icons-material/Calculate';
 import MedicationIcon from '@mui/icons-material/Medication';
 import InfoIcon from '@mui/icons-material/Info';
+import InventoryIcon from '@mui/icons-material/Inventory';
+
+// --- Clinical Math Helpers ---
+const parseFrequencyToNumber = (freq: string): number => {
+  const f = freq.toLowerCase();
+  if (f.includes('4') || f.includes('four')) return 4;
+  if (f.includes('3') || f.includes('three')) return 3;
+  if (f.includes('2') || f.includes('twice')) return 2;
+  if (f.includes('1') || f.includes('once') || f.includes('daily')) return 1;
+  return 1;
+};
+
+const parseDurationToDays = (dur: string): number => {
+  const d = dur.toLowerCase();
+  const numericMatch = d.match(/\d+/);
+  const num = numericMatch ? parseInt(numericMatch[0]) : 1;
+  if (d.includes('week')) return num * 7;
+  if (d.includes('month')) return num * 30;
+  return num; 
+};
 
 interface Prescription {
   medicationId: string;
@@ -42,13 +62,16 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
   const [inventoryMeds, setInventoryMeds] = useState<any[]>([]);
   const [loadingInventory, setLoadingInventory] = useState(true);
 
-  // 1. Live Inventory Listener: Ensures the Doctor only sees what the Pharmacy has
+  // 1. DYNAMIC INVENTORY FETCH WITH POWERFUL DEBUGGING
   useEffect(() => {
     if (!selectedClinic?.id) {
       setLoadingInventory(false);
       return;
     }
 
+    console.log("DEBUG [PrescriptionBuilder]: Setting up inventory listener for clinic_id:", selectedClinic.id);
+
+    // The query: look for in-stock items (> 0) at the current clinic.
     const q = query(
       collection(db, "inventory"),
       where("clinic_id", "==", selectedClinic.id),
@@ -60,10 +83,18 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
         id: doc.id,
         ...doc.data()
       }));
+      
+      console.log(`DEBUG [PrescriptionBuilder]: Snapshot received for ${selectedClinic.name}. Found ${items.length} in-stock medications.`);
+      
+      if (items.length === 0) {
+        console.warn(`DEBUG [PrescriptionBuilder]: Zero in-stock medications found for clinic ID ${selectedClinic.id}. Please check the 'inventory' collection in Firestore for this clinic.`);
+      }
+
       setInventoryMeds(items);
       setLoadingInventory(false);
     }, (error) => {
-      console.error("Firestore Inventory Error:", error);
+      console.error("DEBUG [PrescriptionBuilder]: Firestore Inventory Listener Error:", error);
+      notify("Firestore database error. See console.", "error");
       setLoadingInventory(false);
     });
 
@@ -80,7 +111,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
   const handleAddMedication = () => {
     setPrescriptions([...prescriptions, {
       medicationId: '', medicationName: '', dosageValue: '', dosageUnit: 'mg',
-      frequencyValue: 1, frequencyUnit: 'daily', durationValue: 7, durationUnit: 'days',
+      frequencyValue: 1, frequencyUnit: 'times daily', durationValue: 7, durationUnit: 'days',
       quantity: 7, instructions: ''
     }]);
   };
@@ -90,12 +121,11 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
     const med = { ...updatedList[index] };
     (med as any)[field] = value;
 
-    // Medication Auto-Fill Logic
+    // Auto-fill Dosage from Inventory Match
     if (field === 'medicationName') {
       const match = inventoryMeds.find(m => m.name === value);
       if (match) {
         med.medicationId = match.id;
-        // Attempt to parse existing dosage string (e.g., "500mg" -> 500 and mg)
         const dosageMatch = match.dosage?.match(/(\d+)\s*([a-zA-Z]+)/);
         if (dosageMatch) {
           med.dosageValue = dosageMatch[1];
@@ -106,8 +136,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
       }
     }
 
-    // Calculation Logic: Frequency * Duration = Quantity
-    // This ensures no math errors between doctor and pharmacist
+    // Dynamic Math: Quantity = Freq * Duration
     const freq = Number(med.frequencyValue) || 0;
     const dur = Number(med.durationValue) || 0;
     med.quantity = freq * dur;
@@ -154,7 +183,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
             </IconButton>
 
             <Grid container spacing={3}>
-              {/* ROW 1: MEDICATION SEARCH (FULL WIDTH ON TABLET) */}
+              {/* Row 1: Search and Dosage (FULL WIDTH CARD ON TABLET) */}
               <Grid item xs={12} md={7}>
                 <Autocomplete
                   fullWidth
@@ -177,7 +206,6 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
                 />
               </Grid>
 
-              {/* DOSAGE SPLIT */}
               <Grid item xs={7} md={3}>
                 <TextField
                   fullWidth label="Dosage Strength" type="number" value={med.dosageValue}
@@ -205,24 +233,23 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
 
               <Grid item xs={12}><Divider sx={{ borderStyle: 'dashed', my: 1 }} /></Grid>
 
-              {/* ROW 2: FREQUENCY & DURATION SPLITS */}
+              {/* Row 2: Frequency and Duration splits */}
               <Grid item xs={4} md={2}>
                 <TextField 
                   fullWidth type="number" label="Freq" value={med.frequencyValue}
                   onChange={(e) => updateMedication(index, 'frequencyValue', e.target.value)}
                 />
               </Grid>
-              <Grid item xs={8} md={2.5}>
+              <Grid item xs={8} md={3}>
                 <FormControl fullWidth>
                   <InputLabel>Frequency Unit</InputLabel>
                   <Select
                     value={med.frequencyUnit} label="Frequency Unit"
                     onChange={(e) => updateMedication(index, 'frequencyUnit', e.target.value)}
                   >
-                    <MenuItem value="daily">times daily</MenuItem>
-                    <MenuItem value="weekly">times weekly</MenuItem>
-                    <MenuItem value="monthly">times monthly</MenuItem>
-                    <MenuItem value="as needed">as needed (PRN)</MenuItem>
+                    <MenuItem value="times daily">times daily</MenuItem>
+                    <MenuItem value="times weekly">times weekly</MenuItem>
+                    <MenuItem value="times monthly">times monthly</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
@@ -233,7 +260,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
                   onChange={(e) => updateMedication(index, 'durationValue', e.target.value)}
                 />
               </Grid>
-              <Grid item xs={8} md={2.5}>
+              <Grid item xs={8} md={3}>
                 <FormControl fullWidth>
                   <InputLabel>Duration Unit</InputLabel>
                   <Select
@@ -247,22 +274,24 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
                 </FormControl>
               </Grid>
 
-              <Grid item xs={12} md={3}>
+              <Grid item xs={12} md={2}>
                 <TextField
-                  fullWidth disabled label="Total Quantity" value={med.quantity}
+                  fullWidth disabled label="Total Qty" value={med.quantity}
                   InputProps={{
                     startAdornment: <InputAdornment position="start"><CalculateIcon color="primary" sx={{ opacity: 0.6 }} /></InputAdornment>,
                     sx: { fontWeight: 900, bgcolor: '#f0f7ff', borderRadius: 2 }
                   }}
-                  helperText="Auto-calculated quantity"
+                  helperText="Freq × Dur"
                 />
               </Grid>
 
-              {/* ROW 3: PHARMACIST INSTRUCTIONS (WIDE) */}
+              <Grid item xs={12}><Divider sx={{ borderStyle: 'dashed', mt: 1 }} /></Grid>
+
+              {/* ROW 3: PHARMACIST INSTRUCTIONS (WIDE, OWN ROW) */}
               <Grid item xs={12}>
                 <TextField
-                  fullWidth multiline rows={2} label="Pharmacist Instructions (Optional)"
-                  placeholder="e.g. Take after food. Avoid dairy for 2 hours. Complete full course."
+                  fullWidth multiline rows={4} label="Pharmacist Instructions (Required)"
+                  placeholder="e.g. Take after food. Avoid dairy. Complete the full course of antibiotics."
                   value={med.instructions} onChange={(e) => updateMedication(index, 'instructions', e.target.value)}
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
                 />
@@ -271,11 +300,19 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
           </Paper>
         ))}
       </Stack>
+      
+      {/* 3. USER-FRIENDLY ERROR MESSAGING */}
+      {selectedClinic && !loadingInventory && inventoryMeds.length === 0 && (
+          <Alert severity="warning" sx={{ mt: 4, borderRadius: 2 }} icon={<InventoryIcon />}>
+              <Typography variant="body2" fontWeight="700">No available inventory found for the {selectedClinic.name} clinic.</Typography>
+              <Typography variant="caption">Please verify that you have successfully used the Batch Uploader in the Pharmacy tab to stock this clinic with medications that have a positive quantity.</Typography>
+          </Alert>
+      )}
 
       <Box sx={{ mt: 4, display: 'flex', alignItems: 'center', bgcolor: '#f9f9f9', p: 2, borderRadius: 2, border: '1px solid #eee' }}>
         <InfoIcon sx={{ fontSize: 18, mr: 1.5, color: 'text.secondary' }} />
         <Typography variant="caption" color="text.secondary" fontWeight="600">
-          The Medication list is filtered by live inventory at {selectedClinic?.name || 'the clinic'}.
+          The Medication search list is strictly limited to medications currently in-stock at the {selectedClinic?.name || 'clinic'}.
         </Typography>
       </Box>
     </Box>
