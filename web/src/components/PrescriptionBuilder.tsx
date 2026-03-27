@@ -4,326 +4,317 @@ import {
   Typography, 
   TextField, 
   Button, 
-  Grid, 
+  IconButton, 
   Paper, 
-  IconButton,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Autocomplete,
-  CircularProgress
+  Stack, 
+  Autocomplete, 
+  Grid,
+  Tooltip,
+  Alert,
+  InputAdornment,
+  Divider
 } from '@mui/material';
+
+// Icons
 import DeleteIcon from '@mui/icons-material/Delete';
-import AddIcon from '@mui/icons-material/Add';
-import { Prescription } from '../types';
-import { collection, getDocs, query } from 'firebase/firestore';
-import { db } from '../firebase';
-import { useAppStore } from '../store/useAppStore';
+import AddCircleIcon from '@mui/icons-material/AddCircle';
+import CalculateIcon from '@mui/icons-material/Calculate';
+import MedicationIcon from '@mui/icons-material/Medication';
+import InfoIcon from '@mui/icons-material/Info';
+
+// --- Medication Database ---
+// In a production environment, this could be fetched from a global 'medicines' collection.
+const MEDICATION_DATABASE = [
+  { id: 'PARA-500', name: 'Paracetamol', defaultDosage: '500mg' },
+  { id: 'AMOX-250', name: 'Amoxicillin', defaultDosage: '250mg' },
+  { id: 'METF-500', name: 'Metformin', defaultDosage: '500mg' },
+  { id: 'ATOR-20', name: 'Atorvastatin', defaultDosage: '20mg' },
+  { id: 'OMEP-20', name: 'Omeprazole', defaultDosage: '20mg' },
+  { id: 'LOSA-50', name: 'Losartan', defaultDosage: '50mg' },
+  { id: 'AZIT-500', name: 'Azithromycin', defaultDosage: '500mg' },
+  { id: 'IBUP-400', name: 'Ibuprofen', defaultDosage: '400mg' },
+  { id: 'SALB-100', name: 'Salbutamol Inhaler', defaultDosage: '100mcg' },
+  { id: 'CETI-10', name: 'Cetirizine', defaultDosage: '10mg' },
+  // Add more as needed for HAEFA clinical standards
+];
+
+// --- Clinical Calculation Utilities ---
+
+const parseFrequencyToNumber = (freq: string): number => {
+  const f = freq.toLowerCase();
+  if (f.includes('4') || f.includes('four')) return 4;
+  if (f.includes('3') || f.includes('three')) return 3;
+  if (f.includes('2') || f.includes('twice')) return 2;
+  if (f.includes('1') || f.includes('once') || f.includes('daily')) return 1;
+  return 1;
+};
+
+const parseDurationToDays = (dur: string): number => {
+  const d = dur.toLowerCase();
+  const numericMatch = d.match(/\d+/);
+  const num = numericMatch ? parseInt(numericMatch[0]) : 1;
+
+  if (d.includes('week')) return num * 7;
+  if (d.includes('month')) return num * 30;
+  return num; // Default to days
+};
+
+// --- Component Definition ---
+
+interface Prescription {
+  medicationId: string;
+  medicationName: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  quantity: number;
+  instructions: string;
+}
 
 interface PrescriptionBuilderProps {
-  prescriptions: Prescription[];
-  onChange: (prescriptions: Prescription[]) => void;
+  onPrescriptionChange: (prescriptions: Prescription[]) => void;
+  initialData?: Prescription[];
 }
 
-interface InventoryItem {
-  medication_id: string;
-  med_id_lower: string;
-  dosage: string;
-  dosage_normalized: string;
-  quantity: number;
-}
+const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ 
+  onPrescriptionChange, 
+  initialData = [] 
+}) => {
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>(initialData);
 
-const DOSAGE_UNITS = ['mg', 'g', 'ml', 'units', 'tablets', 'capsules'];
-const DURATION_UNITS = ['days', 'weeks', 'months'];
-
-const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions, onChange }) => {
-  const { selectedClinic } = useAppStore();
-  const [newMed, setNewMed] = useState<Prescription>({
-    medicationId: '',
-    medicationName: '',
-    dosage: '',
-    frequency: '',
-    duration: '',
-    instructions: '',
-    quantity: 0
-  });
-  
-  const [dosageUnit, setDosageUnit] = useState(DOSAGE_UNITS[0]);
-  const [durationUnit, setDurationUnit] = useState(DURATION_UNITS[0]);
-  const [durationValue, setDurationValue] = useState('');
-  
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [loadingInventory, setLoadingInventory] = useState(false);
-  const [isNewMedicine, setIsNewMedicine] = useState(false);
-  const [availableDosages, setAvailableDosages] = useState<string[]>([]);
-
-  // 1. Fetch Inventory for the specific clinic
+  // Sync with parent component
   useEffect(() => {
-    const fetchInventory = async () => {
-      if (!selectedClinic) return;
-      setLoadingInventory(true);
-      try {
-        const q = query(collection(db, `clinics/${selectedClinic.id}/inventory`));
-        const snapshot = await getDocs(q);
-        const items = snapshot.docs.map(doc => doc.data() as InventoryItem);
-        setInventory(items);
-      } catch (err) {
-        console.error("Error fetching inventory:", err);
-      } finally {
-        setLoadingInventory(false);
-      }
+    onPrescriptionChange(prescriptions);
+  }, [prescriptions]);
+
+  const handleAddMedication = () => {
+    const newEntry: Prescription = {
+      medicationId: '',
+      medicationName: '',
+      dosage: '',
+      frequency: '1 time daily',
+      duration: '7 days',
+      quantity: 7,
+      instructions: ''
     };
-    fetchInventory();
-  }, [selectedClinic]);
-
-  // 2. Group inventory by medication name to handle multiple dosages
-  const groupedInventory = inventory.reduce((acc, item) => {
-    if (!acc[item.med_id_lower]) {
-      acc[item.med_id_lower] = {
-        name: item.medication_id,
-        dosages: new Set<string>()
-      };
-    }
-    acc[item.med_id_lower].dosages.add(item.dosage);
-    return acc;
-  }, {} as Record<string, { name: string, dosages: Set<string> }>);
-
-  const inventoryOptions = Object.keys(groupedInventory).map(key => ({
-    id: key,
-    label: groupedInventory[key].name,
-    dosages: Array.from(groupedInventory[key].dosages)
-  }));
-
-  const handleAdd = () => {
-    if (newMed.medicationName && newMed.dosage && newMed.frequency && durationValue) {
-      const fullDosage = isNewMedicine ? `${newMed.dosage} ${dosageUnit}` : newMed.dosage;
-      const fullDuration = `${durationValue} ${durationUnit}`;
-      
-      onChange([...prescriptions, { ...newMed, dosage: fullDosage, duration: fullDuration }]);
-      
-      // Reset State
-      setNewMed({
-        medicationId: '',
-        medicationName: '',
-        dosage: '',
-        frequency: '',
-        duration: '',
-        instructions: '',
-        quantity: 0
-      });
-      setDurationValue('');
-      setIsNewMedicine(false);
-      setAvailableDosages([]);
-    }
+    setPrescriptions([...prescriptions, newEntry]);
   };
 
-  const handleRemove = (index: number) => {
-    const updated = [...prescriptions];
-    updated.splice(index, 1);
-    onChange(updated);
+  const handleRemoveMedication = (index: number) => {
+    const filtered = prescriptions.filter((_, i) => i !== index);
+    setPrescriptions(filtered);
+  };
+
+  const updateMedication = (index: number, field: keyof Prescription, value: any) => {
+    const updatedList = [...prescriptions];
+    const currentMed = { ...updatedList[index] };
+
+    // Update the specific field
+    (currentMed as any)[field] = value;
+
+    // Logic for Medication Database Selection
+    if (field === 'medicationName') {
+      const match = MEDICATION_DATABASE.find(m => m.name === value);
+      if (match) {
+        currentMed.medicationId = match.id;
+        currentMed.dosage = match.defaultDosage;
+      }
+    }
+
+    // Logic for Auto-Calculation (Freq x Duration)
+    const freqVal = parseFrequencyToNumber(currentMed.frequency);
+    const daysVal = parseDurationToDays(currentMed.duration);
+    const minCalculated = freqVal * daysVal;
+
+    if (field === 'frequency' || field === 'duration') {
+      // Auto-set the total quantity whenever timing changes
+      currentMed.quantity = minCalculated;
+    }
+
+    if (field === 'quantity') {
+      // ENFORCE FLOOR: Cannot prescribe less than therapeutic course
+      // Allows professional override for MORE (buffer), but not LESS.
+      currentMed.quantity = value < minCalculated ? minCalculated : value;
+    }
+
+    updatedList[index] = currentMed;
+    setPrescriptions(updatedList);
   };
 
   return (
-    <Box>
-      <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', mb: 2 }}>
-        Section 4 — Prescribed Medicines
-      </Typography>
-
-      <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 3, bgcolor: 'grey.50' }}>
-        <Grid container spacing={2}>
-          
-          {/* SEARCH FIELD */}
-          <Grid size={{ xs: 12 }}>
-            {!isNewMedicine ? (
-              <Autocomplete
-                options={inventoryOptions}
-                loading={loadingInventory}
-                getOptionLabel={(option) => option.label}
-                onChange={(_, newValue) => {
-                  if (newValue) {
-                    const dosages = newValue.dosages;
-                    setAvailableDosages(dosages);
-                    setNewMed({
-                      ...newMed,
-                      medicationName: newValue.label,
-                      medicationId: newValue.id,
-                      dosage: dosages.length === 1 ? dosages[0] : '',
-                      quantity: 0 // Initialize fresh
-                    });
-                  } else {
-                    // RESET FIX: Ensure quantity returns to 0 when search is cleared
-                    setAvailableDosages([]);
-                    setNewMed({ ...newMed, medicationName: '', medicationId: '', dosage: '', quantity: 0 });
-                  }
-                }}
-                noOptionsText={
-                  <Button 
-                    color="primary" 
-                    onMouseDown={() => setIsNewMedicine(true)}
-                    sx={{ fontWeight: 'bold' }}
-                  >
-                    + New Medicine
-                  </Button>
-                }
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Search Clinic Inventory"
-                    slotProps={{ htmlInput: { ...params.inputProps, style: { minHeight: '44px' } } }}
-                    InputProps={{
-                      ...params.InputProps,
-                      endAdornment: (
-                        <React.Fragment>
-                          {loadingInventory ? <CircularProgress color="inherit" size={20} /> : null}
-                          {params.InputProps.endAdornment}
-                        </React.Fragment>
-                      ),
-                    }}
-                  />
-                )}
-              />
-            ) : (
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                <TextField 
-                  fullWidth 
-                  label="Manual Medication Name" 
-                  value={newMed.medicationName} 
-                  onChange={(e) => setNewMed({ ...newMed, medicationName: e.target.value, medicationId: e.target.value.toLowerCase().replace(/\s+/g, '-') })} 
-                  slotProps={{ htmlInput: { style: { minHeight: '44px' } } }}
-                />
-                <Button onClick={() => setIsNewMedicine(false)} sx={{ minHeight: '44px' }}>Cancel</Button>
-              </Box>
-            )}
-          </Grid>
-
-          {/* DOSAGE FIELD */}
-          <Grid size={{ xs: 12, sm: 6 }}>
-            {isNewMedicine ? (
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <TextField 
-                  fullWidth 
-                  label="Dose" 
-                  type="number"
-                  value={newMed.dosage} 
-                  onChange={(e) => setNewMed({ ...newMed, dosage: e.target.value })} 
-                  slotProps={{ htmlInput: { style: { minHeight: '44px' } } }}
-                />
-                <FormControl sx={{ minWidth: 100 }}>
-                  <InputLabel>Unit</InputLabel>
-                  <Select value={dosageUnit} onChange={(e) => setDosageUnit(e.target.value)} label="Unit" sx={{ minHeight: '44px' }}>
-                    {DOSAGE_UNITS.map(unit => <MenuItem key={unit} value={unit}>{unit}</MenuItem>)}
-                  </Select>
-                </FormControl>
-              </Box>
-            ) : (
-              <FormControl fullWidth disabled={availableDosages.length <= 1}>
-                <InputLabel>Dosage</InputLabel>
-                <Select 
-                  value={newMed.dosage} 
-                  onChange={(e) => setNewMed({ ...newMed, dosage: e.target.value })} 
-                  label="Dosage"
-                  sx={{ minHeight: '44px' }}
-                >
-                  {availableDosages.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
-                </Select>
-              </FormControl>
-            )}
-          </Grid>
-
-          {/* QUANTITY FIELD */}
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField 
-              fullWidth 
-              label="Total Quantity to Prescribe" 
-              type="number"
-              value={newMed.quantity || ''} 
-              onChange={(e) => setNewMed({ ...newMed, quantity: Number(e.target.value) })} 
-              slotProps={{ htmlInput: { style: { minHeight: '44px' } } }}
-            />
-          </Grid>
-
-          {/* FREQUENCY & DURATION */}
-          <Grid size={{ xs: 12, sm: 4 }}>
-            <TextField 
-              fullWidth 
-              label="Frequency (e.g., 3x daily)" 
-              value={newMed.frequency} 
-              onChange={(e) => setNewMed({ ...newMed, frequency: e.target.value })} 
-              slotProps={{ htmlInput: { style: { minHeight: '44px' } } }}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>
-            <TextField 
-              fullWidth 
-              label="Duration" 
-              type="number"
-              value={durationValue} 
-              onChange={(e) => setDurationValue(e.target.value)} 
-              slotProps={{ htmlInput: { style: { minHeight: '44px' } } }}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>
-            <FormControl fullWidth>
-              <InputLabel>Unit</InputLabel>
-              <Select value={durationUnit} onChange={(e) => setDurationUnit(e.target.value)} label="Unit" sx={{ minHeight: '44px' }}>
-                {DURATION_UNITS.map(unit => <MenuItem key={unit} value={unit}>{unit}</MenuItem>)}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {/* INSTRUCTIONS */}
-          <Grid size={{ xs: 12 }}>
-            <TextField 
-              fullWidth 
-              label="Instructions (e.g., After meals)" 
-              value={newMed.instructions} 
-              onChange={(e) => setNewMed({ ...newMed, instructions: e.target.value })} 
-              slotProps={{ htmlInput: { style: { minHeight: '44px' } } }}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12 }}>
-            <Button 
-              variant="contained" 
-              color="secondary" 
-              startIcon={<AddIcon />} 
-              onClick={handleAdd}
-              disabled={!newMed.medicationName || !newMed.dosage || !newMed.frequency || !durationValue || !newMed.quantity}
-              sx={{ borderRadius: 2, fontWeight: 700, minHeight: '44px' }}
-            >
-              Add to Prescription
-            </Button>
-          </Grid>
-        </Grid>
-      </Paper>
-
-      {/* DISPLAY LIST */}
-      {prescriptions.length > 0 && (
+    <Box sx={{ width: '100%' }}>
+      {/* Header Area */}
+      <Stack 
+        direction="row" 
+        justifyContent="space-between" 
+        alignItems="center" 
+        sx={{ mb: 3 }}
+      >
         <Box>
-          <Typography variant="subtitle2" color="textSecondary" fontWeight="bold" sx={{ mb: 1 }}>
-            Current Prescriptions ({prescriptions.length})
+          <Typography variant="h6" fontWeight="900" sx={{ color: 'primary.main' }}>
+            PRESCRIPTION BUILDER
           </Typography>
-          {prescriptions.map((p, idx) => (
-            <Paper key={idx} variant="outlined" sx={{ p: 2, mb: 1, borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderColor: 'secondary.main' }}>
-              <Box>
-                <Typography variant="body1" fontWeight="bold" color="secondary.main">{p.medicationName} ({p.quantity} units)</Typography>
-                <Typography variant="body2" color="textSecondary">
-                  {p.dosage} | {p.frequency} | {p.duration}
-                </Typography>
-                {p.instructions && (
-                  <Typography variant="caption" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
-                    Note: {p.instructions}
-                  </Typography>
-                )}
-              </Box>
-              <IconButton color="error" onClick={() => handleRemove(idx)} size="small">
+          <Typography variant="caption" color="textSecondary">
+            Calculate dosage and fulfillment for the pharmacy.
+          </Typography>
+        </Box>
+        <Button 
+          variant="contained" 
+          startIcon={<AddCircleIcon />}
+          onClick={handleAddMedication}
+          sx={{ 
+            borderRadius: 2, 
+            fontWeight: 800, 
+            px: 3,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)' 
+          }}
+        >
+          Add Medication
+        </Button>
+      </Stack>
+
+      {prescriptions.length === 0 && (
+        <Alert 
+          severity="info" 
+          sx={{ borderRadius: 3, border: '1px dashed', borderColor: 'info.main' }}
+        >
+          No medications added. Please click 'Add Medication' to begin prescribing.
+        </Alert>
+      )}
+
+      {/* Medication Entry Cards */}
+      <Stack spacing={3}>
+        {prescriptions.map((med, index) => (
+          <Paper 
+            key={index} 
+            variant="outlined" 
+            sx={{ 
+              p: 3, 
+              borderRadius: 4, 
+              position: 'relative', 
+              transition: 'all 0.2s',
+              '&:hover': { borderColor: 'primary.main', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }
+            }}
+          >
+            {/* Remove Button */}
+            <Tooltip title="Remove Medication">
+              <IconButton 
+                onClick={() => handleRemoveMedication(index)}
+                sx={{ 
+                  position: 'absolute', 
+                  top: 12, 
+                  right: 12, 
+                  color: 'error.light',
+                  '&:hover': { bgcolor: 'error.50' } 
+                }}
+              >
                 <DeleteIcon />
               </IconButton>
-            </Paper>
-          ))}
-        </Box>
-      )}
+            </Tooltip>
+
+            <Grid container spacing={3}>
+              {/* Row 1: Medicine Selection & Dosage */}
+              <Grid item xs={12} md={6}>
+                <Autocomplete
+                  freeSolo
+                  options={MEDICATION_DATABASE.map(m => m.name)}
+                  value={med.medicationName}
+                  onInputChange={(_, newVal) => updateMedication(index, 'medicationName', newVal)}
+                  renderInput={(params) => (
+                    <TextField 
+                      {...params} 
+                      label="Medication Name" 
+                      placeholder="Search or type name..."
+                      InputProps={{
+                        ...params.InputProps,
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <MedicationIcon color="primary" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  )}
+                />
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Dosage Strength"
+                  placeholder="e.g., 500mg or 5ml"
+                  value={med.dosage}
+                  onChange={(e) => updateMedication(index, 'dosage', e.target.value)}
+                />
+              </Grid>
+
+              <Grid item xs={12}><Divider sx={{ borderStyle: 'dashed' }} /></Grid>
+
+              {/* Row 2: Frequency, Duration, and Total Quantity */}
+              <Grid item xs={12} md={4}>
+                <Autocomplete
+                  freeSolo
+                  options={['1 time daily', '2 times daily', '3 times daily', '4 times daily', 'Once weekly']}
+                  value={med.frequency}
+                  onInputChange={(_, val) => updateMedication(index, 'frequency', val)}
+                  renderInput={(params) => <TextField {...params} label="Frequency" />}
+                />
+              </Grid>
+
+              <Grid item xs={12} md={4}>
+                <Autocomplete
+                  freeSolo
+                  options={['3 days', '5 days', '7 days', '2 weeks', '1 month']}
+                  value={med.duration}
+                  onInputChange={(_, val) => updateMedication(index, 'duration', val)}
+                  renderInput={(params) => <TextField {...params} label="Duration" />}
+                />
+              </Grid>
+
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Total Quantity to Prescribe"
+                  value={med.quantity}
+                  onChange={(e) => updateMedication(index, 'quantity', Number(e.target.value))}
+                  helperText={`Course minimum: ${parseFrequencyToNumber(med.frequency) * parseDurationToDays(med.duration)}`}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <CalculateIcon color="primary" />
+                      </InputAdornment>
+                    ),
+                    sx: { fontWeight: 900, color: 'primary.dark' }
+                  }}
+                />
+              </Grid>
+
+              {/* Row 3: Patient Instructions */}
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  label="Pharmacist/Patient Instructions"
+                  placeholder="e.g., Take after meals, complete the full course even if feeling better..."
+                  value={med.instructions}
+                  onChange={(e) => updateMedication(index, 'instructions', e.target.value)}
+                  sx={{ bgcolor: '#fafafa' }}
+                />
+              </Grid>
+            </Grid>
+          </Paper>
+        ))}
+      </Stack>
+      
+      {/* Footer Disclaimer */}
+      <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', color: 'text.secondary' }}>
+        <InfoIcon sx={{ fontSize: 16, mr: 1 }} />
+        <Typography variant="caption" fontWeight="500">
+          The 'Total Quantity' is automatically calculated based on Frequency and Duration to prevent dispensing errors.
+        </Typography>
+      </Box>
     </Box>
   );
 };
