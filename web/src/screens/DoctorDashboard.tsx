@@ -336,7 +336,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
       <Box>
         <Box sx={{ mb: isMobile ? 2 : 4, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexDirection: isMobile ? 'column' : 'row', gap: 2 }}>
           <Box sx={{ display: 'flex', gap: 2, width: isMobile ? '100%' : 'auto' }}>
-            <Button variant="contained" color="primary" onClick={handleCallNextPatient} disabled={waitingList.length === 0} fullWidth={isMobile} sx={{ fontWeight: 700, borderRadius: 2 }}>
+            <Button variant="contained" color="primary" onClick={handleCallNextPatient} disabled={waitingList.length === 0} fullWidth={isMobile} sx={{ fontWeight: 700, borderRadius: 2, minHeight: '44px' }}>
               Call Next Patient
             </Button>
           </Box>
@@ -396,8 +396,9 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
                                 <Button 
                                   variant={item.status === 'IN_CONSULTATION' ? "outlined" : "contained"} 
                                   color={item.status === 'IN_CONSULTATION' ? "secondary" : "primary"}
-                                  size="small" 
+                                  size="large" 
                                   onClick={() => handleOpenConsult(item)}
+                                  sx={{ minHeight: '44px', borderRadius: 2 }}
                                 >
                                   {item.status === 'IN_CONSULTATION' ? 'Resume' : 'Start'}
                                 </Button>
@@ -440,8 +441,9 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
                                   <Button 
                                     variant={item.status === 'IN_CONSULTATION' ? "outlined" : "contained"} 
                                     color={item.status === 'IN_CONSULTATION' ? "secondary" : "primary"}
-                                    size="small" 
+                                    size="large" 
                                     onClick={() => handleOpenConsult(item)}
+                                    sx={{ minHeight: '44px', borderRadius: 2 }}
                                   >
                                     {item.status === 'IN_CONSULTATION' ? 'Resume' : 'Start'}
                                   </Button>
@@ -515,13 +517,13 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
                 <ConsultationPanel data={consultData} onChange={setConsultData} />
                 
                 <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <Button fullWidth variant="outlined" color="secondary" onClick={() => handleSaveConsult('WAITING_FOR_PHARMACY')} disabled={!consultData.diagnosis} sx={{ fontWeight: 700, py: 1.5 }}>
+                  <Button fullWidth variant="outlined" color="secondary" onClick={() => handleSaveConsult('WAITING_FOR_PHARMACY')} disabled={!consultData.diagnosis} sx={{ fontWeight: 700, py: 1.5, minHeight: '44px' }}>
                     Send to Pharmacy
                   </Button>
-                  <Button fullWidth variant="contained" color="secondary" onClick={() => handleSaveConsult('COMPLETED')} disabled={!consultData.diagnosis} size="large" sx={{ fontWeight: 800, py: 2 }}>
+                  <Button fullWidth variant="contained" color="secondary" onClick={() => handleSaveConsult('COMPLETED')} disabled={!consultData.diagnosis} size="large" sx={{ fontWeight: 800, py: 2, minHeight: '48px' }}>
                     Complete Consultation
                   </Button>
-                  <Button fullWidth color="error" variant="text" onClick={handleCancelEncounter}>
+                  <Button fullWidth color="error" variant="text" onClick={handleCancelEncounter} sx={{ minHeight: '44px' }}>
                     Cancel Encounter
                   </Button>
                 </Box>

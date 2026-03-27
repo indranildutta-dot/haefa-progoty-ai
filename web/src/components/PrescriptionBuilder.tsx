@@ -170,7 +170,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
                   <TextField
                     {...params}
                     label="Search Clinic Inventory"
-                    size="small"
+                    slotProps={{ htmlInput: { ...params.inputProps, style: { minHeight: '44px' } } }}
                     InputProps={{
                       ...params.InputProps,
                       endAdornment: (
@@ -187,12 +187,12 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                 <TextField 
                   fullWidth 
-                  size="small" 
                   label="Manual Medication Name" 
                   value={newMed.medicationName} 
                   onChange={(e) => setNewMed({ ...newMed, medicationName: e.target.value, medicationId: e.target.value.toLowerCase().replace(/\s+/g, '-') })} 
+                  slotProps={{ htmlInput: { style: { minHeight: '44px' } } }}
                 />
-                <Button size="small" onClick={() => setIsNewMedicine(false)}>Cancel</Button>
+                <Button onClick={() => setIsNewMedicine(false)} sx={{ minHeight: '44px' }}>Cancel</Button>
               </Box>
             )}
           </Grid>
@@ -203,26 +203,27 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <TextField 
                   fullWidth 
-                  size="small" 
                   label="Dose" 
                   type="number"
                   value={newMed.dosage} 
                   onChange={(e) => setNewMed({ ...newMed, dosage: e.target.value })} 
+                  slotProps={{ htmlInput: { style: { minHeight: '44px' } } }}
                 />
-                <FormControl sx={{ minWidth: 80 }} size="small">
+                <FormControl sx={{ minWidth: 100 }}>
                   <InputLabel>Unit</InputLabel>
-                  <Select value={dosageUnit} onChange={(e) => setDosageUnit(e.target.value)} label="Unit">
+                  <Select value={dosageUnit} onChange={(e) => setDosageUnit(e.target.value)} label="Unit" sx={{ minHeight: '44px' }}>
                     {DOSAGE_UNITS.map(unit => <MenuItem key={unit} value={unit}>{unit}</MenuItem>)}
                   </Select>
                 </FormControl>
               </Box>
             ) : (
-              <FormControl fullWidth size="small" disabled={availableDosages.length <= 1}>
+              <FormControl fullWidth disabled={availableDosages.length <= 1}>
                 <InputLabel>Dosage</InputLabel>
                 <Select 
                   value={newMed.dosage} 
                   onChange={(e) => setNewMed({ ...newMed, dosage: e.target.value })} 
                   label="Dosage"
+                  sx={{ minHeight: '44px' }}
                 >
                   {availableDosages.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
                 </Select>
@@ -234,11 +235,11 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
           <Grid size={{ xs: 12, sm: 6 }}>
             <TextField 
               fullWidth 
-              size="small" 
               label="Total Quantity to Prescribe" 
               type="number"
               value={newMed.quantity || ''} 
               onChange={(e) => setNewMed({ ...newMed, quantity: Number(e.target.value) })} 
+              slotProps={{ htmlInput: { style: { minHeight: '44px' } } }}
             />
           </Grid>
 
@@ -246,26 +247,26 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
           <Grid size={{ xs: 12, sm: 4 }}>
             <TextField 
               fullWidth 
-              size="small" 
               label="Frequency (e.g., 3x daily)" 
               value={newMed.frequency} 
               onChange={(e) => setNewMed({ ...newMed, frequency: e.target.value })} 
+              slotProps={{ htmlInput: { style: { minHeight: '44px' } } }}
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 4 }}>
             <TextField 
               fullWidth 
-              size="small" 
               label="Duration" 
               type="number"
               value={durationValue} 
               onChange={(e) => setDurationValue(e.target.value)} 
+              slotProps={{ htmlInput: { style: { minHeight: '44px' } } }}
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 4 }}>
-            <FormControl fullWidth size="small">
+            <FormControl fullWidth>
               <InputLabel>Unit</InputLabel>
-              <Select value={durationUnit} onChange={(e) => setDurationUnit(e.target.value)} label="Unit">
+              <Select value={durationUnit} onChange={(e) => setDurationUnit(e.target.value)} label="Unit" sx={{ minHeight: '44px' }}>
                 {DURATION_UNITS.map(unit => <MenuItem key={unit} value={unit}>{unit}</MenuItem>)}
               </Select>
             </FormControl>
@@ -275,10 +276,10 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
           <Grid size={{ xs: 12 }}>
             <TextField 
               fullWidth 
-              size="small" 
               label="Instructions (e.g., After meals)" 
               value={newMed.instructions} 
               onChange={(e) => setNewMed({ ...newMed, instructions: e.target.value })} 
+              slotProps={{ htmlInput: { style: { minHeight: '44px' } } }}
             />
           </Grid>
 
@@ -289,7 +290,7 @@ const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({ prescriptions
               startIcon={<AddIcon />} 
               onClick={handleAdd}
               disabled={!newMed.medicationName || !newMed.dosage || !newMed.frequency || !durationValue || !newMed.quantity}
-              sx={{ borderRadius: 2, fontWeight: 700 }}
+              sx={{ borderRadius: 2, fontWeight: 700, minHeight: '44px' }}
             >
               Add to Prescription
             </Button>

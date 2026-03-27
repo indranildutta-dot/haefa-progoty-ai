@@ -33,22 +33,30 @@ import {
   Tabs,
   Tab
 } from '@mui/material';
-import InventoryView from '../components/InventoryView';
+
+// Icons
 import MedicationIcon from '@mui/icons-material/Medication';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PersonIcon from '@mui/icons-material/Person';
+import LocalPrintshopIcon from '@mui/icons-material/LocalPrintshop';
+import HistoryIcon from '@mui/icons-material/History';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+
+// Services & Context
 import { subscribeToQueue, updateQueueStatus } from '../services/queueService';
 import { 
   getDiagnosisByEncounter, 
   getPrescriptionByEncounter, 
-  markPrescriptionDispensed,
   getVitalsByEncounter,
   getEncounterById
 } from '../services/encounterService';
 import { getTriageAssessmentByEncounter } from '../services/triageService';
 import { getPatientById } from '../services/patientService';
 import { getPatientByQrToken } from '../services/qrService';
+import { dispenseMedication } from '../services/pharmacyService';
+
+// Firestore
 import { 
   collection, 
   query, 
@@ -56,15 +64,16 @@ import {
   getDocs 
 } from "firebase/firestore";
 import { db } from "../firebase";
+
+// Components & Hooks
 import { QueueItem, DiagnosisRecord, PrescriptionRecord, Patient, VitalsRecord, TriageAssessment, Encounter } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import QrScannerModal from '../components/QrScannerModal';
 import StationLayout from '../components/StationLayout';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import PrescriptionPrintView from '../components/PrescriptionPrintView';
-import LocalPrintshopIcon from '@mui/icons-material/LocalPrintshop';
+import InventoryView from '../components/InventoryView';
 import BatchEntry from '../components/BatchEntry';
-import { dispenseMedication } from '../services/pharmacyService';
 
 interface PharmacyStationProps {
   countryId: string;
@@ -73,30 +82,12 @@ interface PharmacyStationProps {
 const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
   const { notify, selectedCountry, selectedClinic, userProfile } = useAppStore();
   const { isMobile, isTablet } = useResponsiveLayout();
+  
+  // -- Queue & Permissions State --
   const [waitingList, setWaitingList] = useState<QueueItem[]>([]);
   const [permissionError, setPermissionError] = useState(false);
   
-  if (!selectedClinic) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Typography variant="h6">Please select a clinic to use the Pharmacy Station.</Typography>
-      </Box>
-    );
-  }
-
-  if (userProfile && !userProfile.isApproved) {
-    return (
-      <StationLayout title="Medication Dispensing" stationName="Pharmacy" showPatientContext={false}>
-        <Box sx={{ p: 3, textAlign: 'center' }}>
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            Account Pending Approval: Your account must be approved by an administrator before you can access the patient queue.
-          </Alert>
-          <Typography variant="body1">Please contact your country or global administrator for approval.</Typography>
-        </Box>
-      </StationLayout>
-    );
-  }
-
+  // -- Clinical Context State --
   const [selectedItem, setSelectedItem] = useState<QueueItem | null>(null);
   const [currentDiagnosis, setCurrentDiagnosis] = useState<DiagnosisRecord | null>(null);
   const [currentPrescription, setCurrentPrescription] = useState<PrescriptionRecord | null>(null);
@@ -104,21 +95,27 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
   const [currentVitals, setCurrentVitals] = useState<VitalsRecord | null>(null);
   const [currentTriage, setCurrentTriage] = useState<TriageAssessment | null>(null);
   const [currentEncounter, setCurrentEncounter] = useState<Encounter | null>(null);
+  
+  // -- Dispensing Transaction State --
   const [openDispenseDialog, setOpenDispenseDialog] = useState(false);
   const [openBatchDialog, setOpenBatchDialog] = useState(false);
   const [dispensedItems, setDispensedItems] = useState<Record<number, boolean>>({});
   const [dispensedQuantities, setDispensedQuantities] = useState<Record<number, number>>({});
   const [dispenseSummary, setDispenseSummary] = useState<any>(null);
   const [openSummaryDialog, setOpenSummaryDialog] = useState(false);
+  
+  // -- UI Feedback & Controls --
   const [dispensedCount, setDispensedCount] = useState(0);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [pharmacyNote, setPharmacyNote] = useState('');
   const [pharmacyAction, setPharmacyAction] = useState<'DISPENSE' | 'HOLD' | 'CANCEL'>('DISPENSE');
-  const [tabValue, setTabValue] = useState(0);
   const [returnDate, setReturnDate] = useState<string>('');
+  const [tabValue, setTabValue] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // 1. Hook: Fetch Daily Dispensing Statistics
   useEffect(() => {
-    const fetchDispensedCount = async () => {
+    const fetchStats = async () => {
       try {
         if (!selectedCountry || !selectedClinic || !userProfile?.isApproved) return;
         const startOfDay = new Date();
@@ -126,7 +123,6 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
         
         const q = query(
           collection(db, "prescriptions"),
-          where("country_code", "==", selectedCountry.id),
           where("clinic_id", "==", selectedClinic.id),
           where("status", "==", "DISPENSED"),
           where("created_at", ">=", startOfDay)
@@ -134,14 +130,13 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
         const snapshot = await getDocs(q);
         setDispensedCount(snapshot.size);
       } catch (err) {
-        console.error("Error fetching dispensed count:", err);
+        console.error("Error fetching daily stats:", err);
       }
     };
-    fetchDispensedCount();
-  }, [selectedCountry, selectedClinic, userProfile?.isApproved]);
-  
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    fetchStats();
+  }, [selectedCountry, selectedClinic, userProfile]);
 
+  // 2. Hook: Real-time Listener for the Pharmacy Queue
   useEffect(() => {
     if (!selectedClinic || !userProfile?.isApproved) return;
 
@@ -154,12 +149,17 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
       }
     });
     return () => unsubscribe();
-  }, [selectedClinic, userProfile?.isApproved]);
+  }, [selectedClinic, userProfile]);
 
+  // 3. Logic: Fetch Full Clinical Context for Selection
   const handleOpenDispense = async (item: QueueItem) => {
     setSelectedItem(item);
+    setIsLoading(true);
+    setErrorMsg(null);
+    
     try {
-      const [diagnosis, prescription, patient, vitals, triage, encounter] = await Promise.all([
+      // Parallel fetch for speed - critical for high-volume clinics
+      const [diag, pres, pat, vit, tri, enc] = await Promise.all([
         getDiagnosisByEncounter(item.encounter_id),
         getPrescriptionByEncounter(item.encounter_id),
         getPatientById(item.patient_id),
@@ -167,46 +167,63 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
         getTriageAssessmentByEncounter(item.encounter_id),
         getEncounterById(item.encounter_id)
       ]);
-      setCurrentDiagnosis(diagnosis);
-      setCurrentPrescription(prescription);
-      setCurrentPatient(patient);
-      setCurrentVitals(vitals);
-      setCurrentTriage(triage);
-      setCurrentEncounter(encounter);
-      setDispensedItems({});
+      
+      setCurrentDiagnosis(diag);
+      setCurrentPrescription(pres);
+      setCurrentPatient(pat);
+      setCurrentVitals(vit);
+      setCurrentTriage(tri);
+      setCurrentEncounter(enc);
+      
+      // Setup initial dispensing quantities based on prescription
       const initialQtys: Record<number, number> = {};
-      prescription?.prescriptions.forEach((p, idx) => {
+      pres?.prescriptions.forEach((p, idx) => {
         initialQtys[idx] = p.quantity || 0;
       });
+      
       setDispensedQuantities(initialQtys);
+      setDispensedItems({});
       setPharmacyNote('');
       setReturnDate('');
       setPharmacyAction('DISPENSE');
       setOpenDispenseDialog(true);
     } catch (err) {
-      console.error(err);
-      setErrorMsg("Failed to load prescription data.");
-      setSelectedItem(null);
+      console.error("Critical error loading patient context:", err);
+      setErrorMsg("Failed to load patient records. Check internet connection.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleToggleDispense = (index: number) => {
-    setDispensedItems(prev => ({ ...prev, [index]: !prev[index] }));
+    setDispensedItems(prev => ({ 
+      ...prev, 
+      [index]: !prev[index] 
+    }));
   };
 
   const handleQtyChange = (index: number, qty: number) => {
-    setDispensedQuantities(prev => ({ ...prev, [index]: qty }));
+    setDispensedQuantities(prev => ({ 
+      ...prev, 
+      [index]: qty 
+    }));
   };
 
+  // 4. Logic: Finalize Dispensing & Handle IOUs
   const handleCompleteDispensing = async () => {
     if (!currentPrescription || !selectedItem || !selectedClinic) return;
+    
+    setIsLoading(true);
     try {
       if (pharmacyAction === 'DISPENSE') {
-        const medications = currentPrescription.prescriptions.map((p, idx) => {
+        const medsPayload = currentPrescription.prescriptions.map((p, idx) => {
           const dispensed = dispensedQuantities[idx] || 0;
+          
+          // Safety Check: Prevent over-dispensing beyond prescribed amount
           if (dispensed > (p.quantity || 0)) {
-            throw new Error(`Dispensed quantity for ${p.medicationId} cannot exceed prescribed quantity (${p.quantity})`);
+            throw new Error(`Dispensed quantity for ${p.medicationName} exceeds doctor's order.`);
           }
+          
           return {
             medication_id: p.medicationId,
             dosage: p.dosage,
@@ -215,57 +232,75 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
           };
         });
 
-        const hasShortfall = medications.some(m => m.dispensed_qty < m.quantity);
-        const result = await dispenseMedication(selectedClinic.id, selectedItem.patient_id, selectedItem.encounter_id, medications, hasShortfall ? returnDate : undefined);
+        // Determine if any medicine resulted in a shortfall
+        const hasShortfall = medsPayload.some(m => m.dispensed_qty < m.quantity);
+        
+        const result = await dispenseMedication(
+          selectedClinic.id, 
+          selectedItem.patient_id, 
+          selectedItem.encounter_id, 
+          medsPayload, 
+          hasShortfall ? returnDate : undefined
+        );
+        
         setDispenseSummary(result);
         setOpenSummaryDialog(true);
         
+        // Mark station as completed in the queue
         await updateQueueStatus(selectedItem.id!, 'COMPLETED' as any);
-        notify(`Medication dispensed for ${selectedItem.patient_name}`, 'success');
+        notify(`Successfully dispensed to ${selectedItem.patient_name}`, 'success');
+        
       } else if (pharmacyAction === 'HOLD') {
-        await updateQueueStatus(selectedItem.id!, 'WAITING_FOR_PHARMACY'); // Keep in queue
-        notify(`Prescription for ${selectedItem.patient_name} put on hold: ${pharmacyNote}`, 'info');
+        await updateQueueStatus(selectedItem.id!, 'WAITING_FOR_PHARMACY');
+        notify(`Patient ${selectedItem.patient_name} remains in queue (On Hold).`, 'info');
       } else if (pharmacyAction === 'CANCEL') {
-        await updateQueueStatus(selectedItem.id!, 'COMPLETED' as any); // Or a specific CANCELLED status if supported
-        notify(`Prescription for ${selectedItem.patient_name} cancelled: ${pharmacyNote}`, 'warning');
+        await updateQueueStatus(selectedItem.id!, 'COMPLETED' as any);
+        notify(`Prescription cancelled for ${selectedItem.patient_name}.`, 'warning');
       }
       
       setOpenDispenseDialog(false);
       setSelectedItem(null);
     } catch (err: any) {
-      console.error(err);
-      const errorMessage = err.message || "Failed to complete dispensing.";
-      setErrorMsg(errorMessage);
-      notify(errorMessage, "error");
+      console.error("Dispensing failed:", err);
+      notify(err.message || "Dispensing error. Try again.", "error");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const allDispensed = currentPrescription?.prescriptions?.every((_, i) => dispensedItems[i]) ?? false;
 
+  // -- UI Component: Responsive Queue Item --
   const renderQueueItem = (item: QueueItem) => {
-    const waitTime = item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : 0;
-    const waitTimeColor = waitTime < 15 ? 'success.main' : waitTime < 30 ? 'warning.main' : 'error.main';
+    const arrivalTime = item.created_at?.toDate();
+    const waitTime = arrivalTime ? Math.floor((Date.now() - arrivalTime.getTime()) / 60000) : 0;
+    
+    // Triage color logic for quick visual identification
+    const getTriageColor = (level?: string) => {
+      switch (level?.toLowerCase()) {
+        case 'emergency': return 'error';
+        case 'urgent': return 'warning';
+        case 'stable': return 'success';
+        default: return 'default';
+      }
+    };
 
     if (isMobile || isTablet) {
       return (
-        <Card key={item.id} sx={{ mb: 2, borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+        <Card key={item.id} sx={{ mb: 2, borderRadius: 3, border: '1px solid #e0e0e0', boxShadow: 'none' }}>
           <CardContent sx={{ p: 2 }}>
             <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1.5}>
               <Box display="flex" alignItems="center">
                 <PersonIcon sx={{ color: 'text.secondary', mr: 1, fontSize: 20 }} />
                 <Typography variant="subtitle1" fontWeight="700">
-                  {item.patient_name || item.patient_id}
+                  {item.patient_name}
                 </Typography>
               </Box>
               <Chip 
                 label={item.triage_level?.toUpperCase() || 'STANDARD'} 
                 size="small" 
-                color={
-                  item.triage_level === 'emergency' ? 'error' :
-                  item.triage_level === 'urgent' ? 'warning' :
-                  item.triage_level === 'low' ? 'success' : 'default'
-                }
-                sx={{ fontWeight: 700, borderRadius: 1, height: 24 }}
+                color={getTriageColor(item.triage_level) as any}
+                sx={{ fontWeight: 800, borderRadius: 1 }}
               />
             </Box>
             
@@ -273,12 +308,7 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
               <Box display="flex" alignItems="center">
                 <AccessTimeIcon sx={{ color: 'text.secondary', mr: 0.5, fontSize: 16 }} />
                 <Typography variant="body2" color="text.secondary">
-                  {item.created_at?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Typography>
-              </Box>
-              <Box display="flex" alignItems="center">
-                <Typography variant="body2" sx={{ color: waitTimeColor, fontWeight: 'bold' }}>
-                  {waitTime} mins wait
+                  {waitTime}m in queue
                 </Typography>
               </Box>
             </Stack>
@@ -287,7 +317,7 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
               fullWidth 
               variant="contained" 
               onClick={() => handleOpenDispense(item)}
-              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
+              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 800, minHeight: '48px' }}
             >
               Dispense Medication
             </Button>
@@ -298,10 +328,10 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
 
     return (
       <TableRow key={item.id} hover>
-        <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_name || item.patient_id}</TableCell>
-        <TableCell>{item.created_at?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
+        <TableCell sx={{ fontWeight: '600' }}>{item.patient_name}</TableCell>
+        <TableCell>{arrivalTime?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
         <TableCell>
-          <Typography variant="body2" sx={{ color: waitTimeColor, fontWeight: 'bold' }}>
+          <Typography variant="body2" sx={{ color: waitTime > 30 ? 'error.main' : 'text.primary', fontWeight: 'bold' }}>
             {waitTime} mins
           </Typography>
         </TableCell>
@@ -309,12 +339,8 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
           <Chip 
             label={item.triage_level?.toUpperCase() || 'STANDARD'} 
             size="small" 
-            color={
-              item.triage_level === 'emergency' ? 'error' :
-              item.triage_level === 'urgent' ? 'warning' :
-              item.triage_level === 'low' ? 'success' : 'default'
-            }
-            sx={{ fontWeight: 700, borderRadius: 1 }}
+            color={getTriageColor(item.triage_level) as any}
+            sx={{ fontWeight: 800 }}
           />
         </TableCell>
         <TableCell align="right">
@@ -326,6 +352,16 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
     );
   };
 
+  // --- Main Render Logic ---
+
+  if (!selectedClinic) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <Typography variant="h5" color="textSecondary">Please select a clinic to begin dispensing.</Typography>
+      </Box>
+    );
+  }
+
   return (
     <StationLayout
       title="Medication Dispensing"
@@ -333,78 +369,70 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
       showPatientContext={false}
     >
       <Box sx={{ mb: isMobile ? 2 : 4 }}>
-        <Typography variant="subtitle1" color="text.secondary">
-          Dispense prescribed medications to patients.
+        <Typography variant="h4" fontWeight="900" sx={{ color: 'primary.main', mb: 1 }}>
+          PHARMACY STATION
         </Typography>
-        <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)} sx={{ mt: 2 }}>
-          <Tab label="Dispensing Queue" />
-          <Tab label="Inventory" />
+        <Typography variant="body1" color="text.secondary">
+          Confirm prescriptions, manage stock levels, and dispense to patients.
+        </Typography>
+        
+        <Tabs 
+          value={tabValue} 
+          onChange={(_, newValue) => setTabValue(newValue)} 
+          sx={{ mt: 3, borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab label="Dispensing Queue" sx={{ fontWeight: 700 }} />
+          <Tab label="Inventory Management" sx={{ fontWeight: 700 }} />
         </Tabs>
       </Box>
 
-      {successMsg && <Alert severity="success" sx={{ mb: 3, borderRadius: 3 }}>{successMsg}</Alert>}
-      {errorMsg && <Alert severity="error" sx={{ mb: 3, borderRadius: 3 }}>{errorMsg}</Alert>}
+      {errorMsg && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{errorMsg}</Alert>}
 
       {tabValue === 0 ? (
-        <Grid container spacing={isMobile ? 2 : 3}>
-          <Grid size={{ xs: 12, lg: 9 }}>
-            <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+        <Grid container spacing={3}>
+          {/* Main Queue Content */}
+          <Grid item xs={12} lg={9}>
+            <Card sx={{ borderRadius: 3, border: '1px solid #efefef', boxShadow: 'none' }}>
               <CardContent sx={{ p: { xs: 2, md: 3 } }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
                   <Box display="flex" alignItems="center">
-                    <MedicationIcon color="warning" sx={{ mr: 1 }} />
-                    <Typography variant="h6" fontWeight="800">
-                      {isMobile ? 'Queue' : 'Prescriptions Waiting'}
-                    </Typography>
+                    <MedicationIcon color="primary" sx={{ mr: 1.5 }} />
+                    <Typography variant="h6" fontWeight="800">Patients Waiting</Typography>
                   </Box>
-                  <Button 
-                    variant="outlined" 
-                    onClick={() => setOpenBatchDialog(true)}
-                    sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
-                  >
-                    Batch Inventory Entry
-                  </Button>
-                  <QrScannerModal onScan={async (token) => {
-                    const patient = await getPatientByQrToken(token);
-                    if (patient) {
-                      const item = waitingList.find(i => i.patient_id === patient.id);
-                      if (item) {
-                        handleOpenDispense(item);
-                      } else {
-                        notify("Patient not found in queue.", "error");
-                      }
-                    } else {
-                      notify("Patient not found.", "error");
-                    }
-                  }} />
+                  
+                  <Stack direction="row" spacing={1}>
+                    <Button 
+                      variant="outlined" 
+                      onClick={() => setOpenBatchDialog(true)}
+                      sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
+                    >
+                      Batch Update
+                    </Button>
+                    <QrScannerModal onScan={async (token) => {
+                      const patient = await getPatientByQrToken(token);
+                      const item = waitingList.find(i => i.patient_id === patient?.id);
+                      if (item) handleOpenDispense(item); else notify("Patient not in queue", "error");
+                    }} />
+                  </Stack>
                 </Box>
                 
-                {permissionError ? (
-                  <Box sx={{ p: 4, textAlign: 'center' }}>
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                      Permission Error: You do not have the required permissions to view the pharmacy queue.
-                    </Alert>
-                    <Typography variant="body2" color="textSecondary">
-                      This may be due to incorrect security rules or your user role. Please contact support.
-                    </Typography>
-                  </Box>
-                ) : isMobile || isTablet ? (
+                {isMobile || isTablet ? (
                   <Box>
                     {waitingList.length === 0 ? (
-                      <Typography color="textSecondary" align="center" sx={{ py: 4 }}>
-                        No patients waiting for medication.
+                      <Typography align="center" color="textSecondary" sx={{ py: 6 }}>
+                        No patients currently waiting.
                       </Typography>
                     ) : (
                       waitingList.map(renderQueueItem)
                     )}
                   </Box>
                 ) : (
-                  <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                  <TableContainer>
                     <Table>
-                      <TableHead sx={{ bgcolor: 'grey.50' }}>
+                      <TableHead sx={{ bgcolor: '#f8f9fa' }}>
                         <TableRow>
                           <TableCell sx={{ fontWeight: 700 }}>Patient Name</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>Registration Time</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Registered</TableCell>
                           <TableCell sx={{ fontWeight: 700 }}>Wait Time</TableCell>
                           <TableCell sx={{ fontWeight: 700 }}>Priority</TableCell>
                           <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
@@ -414,7 +442,9 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
                         {waitingList.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={5} align="center">
-                              <Typography color="textSecondary" sx={{ py: 4 }}>No patients waiting for medication.</Typography>
+                              <Typography color="textSecondary" sx={{ py: 4 }}>
+                                Queue is currently empty.
+                              </Typography>
                             </TableCell>
                           </TableRow>
                         ) : (
@@ -428,252 +458,293 @@ const PharmacyStation: React.FC<PharmacyStationProps> = ({ countryId }) => {
             </Card>
           </Grid>
 
-          <Grid size={{ xs: 12, lg: 3 }}>
-            <Card sx={{ 
-              borderRadius: 3, 
-              border: '1px solid', 
-              borderColor: 'divider', 
-              boxShadow: 'none', 
-              bgcolor: 'warning.light', 
-              color: 'warning.contrastText',
-              height: '100%'
-            }}>
-              <CardContent sx={{ textAlign: { xs: 'center', lg: 'left' } }}>
-                <Typography variant="subtitle2" sx={{ opacity: 0.8, fontWeight: 'bold', textTransform: 'uppercase' }}>
-                  Dispensed Today
-                </Typography>
-                <Typography variant="h3" fontWeight="800">
-                  {dispensedCount}
-                </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.9, mt: 1 }}>
-                  Patients served since morning
-                </Typography>
-              </CardContent>
-            </Card>
+          {/* Stats Sidebar */}
+          <Grid item xs={12} lg={3}>
+            <Stack spacing={3}>
+              <Card sx={{ borderRadius: 3, bgcolor: 'primary.main', color: 'white', p: 1 }}>
+                <CardContent>
+                  <Typography variant="overline" sx={{ opacity: 0.8, fontWeight: 800 }}>COMPLETED TODAY</Typography>
+                  <Typography variant="h2" fontWeight="900">{dispensedCount}</Typography>
+                  <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
+                    Total prescriptions filled since opening.
+                  </Typography>
+                </CardContent>
+              </Card>
+              
+              <Alert severity="info" icon={<HistoryIcon />} sx={{ borderRadius: 3 }}>
+                Records older than 18 months are automatically archived.
+              </Alert>
+            </Stack>
           </Grid>
         </Grid>
       ) : (
         <InventoryView />
       )}
 
-      {/* Dispensing Dialog */}
+      {/* --- PHARMACY DISPENSING DIALOG --- */}
       <Dialog 
         open={openDispenseDialog} 
         onClose={() => setOpenDispenseDialog(false)} 
-        maxWidth="sm" 
+        maxWidth="md" 
         fullWidth
         fullScreen={isMobile}
+        PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3 } }}
       >
-        <DialogTitle sx={{ fontWeight: '900', pb: 0, textTransform: 'uppercase', fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
-          Dispense: {selectedItem?.patient_name}
+        <DialogTitle sx={{ fontWeight: 900, fontSize: '1.4rem', pt: 3, pb: 1 }}>
+          DISPENSING SESSION: {selectedItem?.patient_name}
         </DialogTitle>
-        <DialogContent sx={{ pt: 2 }}>
-          <Box mb={3} sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
-            <Typography variant="subtitle2" color="textSecondary" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>Diagnosis</Typography>
-            <Typography variant="body1" fontWeight="medium">{currentDiagnosis?.diagnosis || 'N/A'}</Typography>
-          </Box>
-          
-          <Divider sx={{ my: 2 }} />
-          
-          <Box sx={{ mb: 3 }}>
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>Action</InputLabel>
-              <Select value={pharmacyAction} onChange={(e) => setPharmacyAction(e.target.value as any)} label="Action">
-                <MenuItem value="DISPENSE">Dispense</MenuItem>
-                <MenuItem value="HOLD">Put on Hold</MenuItem>
-                <MenuItem value="CANCEL">Cancel</MenuItem>
-              </Select>
-            </FormControl>
-            <TextField 
-              fullWidth 
-              label="Pharmacy Note" 
-              value={pharmacyNote} 
-              onChange={(e) => setPharmacyNote(e.target.value)} 
-              multiline
-              rows={2}
-              placeholder="Add any internal notes here..."
-            />
-          </Box>
+        
+        <DialogContent dividers sx={{ pt: 3 }}>
+          <Grid container spacing={4}>
+            
+            {/* Left Column: Clinical Context */}
+            <Grid item xs={12} md={5}>
+              <Stack spacing={3}>
+                <Box sx={{ p: 2, bgcolor: '#f4f6f8', borderRadius: 2 }}>
+                  <Typography variant="caption" color="textSecondary" fontWeight="900" sx={{ letterSpacing: 1 }}>
+                    CLINICAL DIAGNOSIS
+                  </Typography>
+                  <Typography variant="h6" fontWeight="700" color="primary" sx={{ mt: 0.5 }}>
+                    {currentDiagnosis?.diagnosis || 'N/A'}
+                  </Typography>
+                </Box>
+                
+                <Box>
+                  <Typography variant="caption" color="textSecondary" fontWeight="900" sx={{ letterSpacing: 1 }}>
+                    VITALS OVERVIEW
+                  </Typography>
+                  <Grid container spacing={1} sx={{ mt: 0.5 }}>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" display="block">BP: {currentVitals?.blood_pressure || '--'}</Typography>
+                      <Typography variant="caption" display="block">Temp: {currentVitals?.temperature || '--'}°C</Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" display="block">Weight: {currentVitals?.weight || '--'}kg</Typography>
+                      <Typography variant="caption" display="block">Pulse: {currentVitals?.heart_rate || '--'}bpm</Typography>
+                    </Grid>
+                  </Grid>
+                </Box>
+                
+                <Divider />
+                
+                <Box>
+                  <Typography variant="caption" color="textSecondary" fontWeight="900" sx={{ letterSpacing: 1 }}>
+                    PHARMACY NOTES
+                  </Typography>
+                  <TextField 
+                    fullWidth 
+                    multiline 
+                    rows={3} 
+                    placeholder="Enter any notes for follow-up..." 
+                    variant="filled"
+                    value={pharmacyNote}
+                    onChange={(e) => setPharmacyNote(e.target.value)}
+                    sx={{ mt: 1 }}
+                  />
+                </Box>
+              </Stack>
+            </Grid>
 
-          <Typography variant="subtitle2" color="primary" gutterBottom sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>
-            Prescribed Medications
-          </Typography>
-          
-          {currentPrescription?.prescriptions && currentPrescription.prescriptions.length > 0 ? (
-            <FormGroup>
-              {currentPrescription.prescriptions.map((p, index) => (
-                <Paper 
-                  key={index} 
-                  variant="outlined" 
-                  sx={{ 
-                    p: 2, 
-                    mb: 1.5, 
-                    borderRadius: 2, 
-                    bgcolor: dispensedItems[index] ? 'success.50' : 'white', 
-                    borderColor: dispensedItems[index] ? 'success.main' : 'divider',
-                    transition: 'all 0.2s'
-                  }}
+            {/* Right Column: Prescription Fulfillment */}
+            <Grid item xs={12} md={7}>
+              <FormControl fullWidth sx={{ mb: 3 }}>
+                <InputLabel>Station Action</InputLabel>
+                <Select 
+                  value={pharmacyAction} 
+                  onChange={(e) => setPharmacyAction(e.target.value as any)} 
+                  label="Station Action"
                 >
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <FormControlLabel
-                      sx={{ m: 0, flex: 1 }}
-                      control={
-                        <Checkbox 
-                          checked={!!dispensedItems[index]} 
-                          onChange={() => handleToggleDispense(index)} 
-                          color="success" 
-                          disabled={pharmacyAction !== 'DISPENSE'} 
-                        />
-                      }
-                      label={
-                        <Box sx={{ ml: 1 }}>
-                          <Typography variant="body1" fontWeight="bold">{p.medicationName}</Typography>
-                          <Typography variant="body2" color="textSecondary">
-                            Prescribed: {p.quantity} | {p.dosage}
-                          </Typography>
-                          <Typography variant="body2" color="textSecondary">
-                            {p.frequency} | {p.duration}
-                          </Typography>
-                          {p.instructions && (
-                            <Typography variant="caption" sx={{ fontStyle: 'italic', display: 'block', mt: 0.5, color: 'primary.main' }}>
-                              Note: {p.instructions}
-                            </Typography>
-                          )}
-                        </Box>
-                      }
-                    />
-                    <Box sx={{ width: 100, ml: 2 }}>
-                      <TextField
-                        label="Dispensed"
-                        type="number"
-                        size="small"
-                        value={dispensedQuantities[index] ?? ''}
-                        onChange={(e) => handleQtyChange(index, Number(e.target.value))}
-                        disabled={pharmacyAction !== 'DISPENSE'}
-                        inputProps={{ min: 0 }}
-                      />
-                    </Box>
-                  </Box>
-                </Paper>
-              ))}
-            </FormGroup>
-          ) : (
-            <Typography color="textSecondary">No medications prescribed.</Typography>
-          )}
+                  <MenuItem value="DISPENSE">Confirm & Dispense All</MenuItem>
+                  <MenuItem value="HOLD">Place on Temporary Hold</MenuItem>
+                  <MenuItem value="CANCEL">Cancel Prescription Order</MenuItem>
+                </Select>
+              </FormControl>
 
-          {pharmacyAction === 'DISPENSE' && currentPrescription?.prescriptions.some((p, idx) => (dispensedQuantities[idx] || 0) < (p.quantity || 0)) && (
-            <Box sx={{ mt: 3, p: 2, bgcolor: 'warning.50', borderRadius: 2, border: '1px solid', borderColor: 'warning.200' }}>
-              <Typography variant="subtitle2" color="warning.dark" fontWeight="bold" gutterBottom>
-                Shortfall Detected
+              <Typography variant="subtitle1" fontWeight="900" gutterBottom>
+                MEDICATION LIST
               </Typography>
-              <TextField
-                fullWidth
-                label="Expected Restock / Patient Return Date"
-                type="date"
-                size="small"
-                value={returnDate}
-                onChange={(e) => setReturnDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-                sx={{ bgcolor: 'white' }}
-              />
-            </Box>
-          )}
+              
+              <FormGroup>
+                {currentPrescription?.prescriptions.map((p, idx) => (
+                  <Paper 
+                    key={idx} 
+                    variant="outlined" 
+                    sx={{ 
+                      p: 2, mb: 2, borderRadius: 2,
+                      bgcolor: dispensedItems[idx] ? '#f0f9f0' : 'white',
+                      borderColor: dispensedItems[idx] ? 'success.main' : 'divider'
+                    }}
+                  >
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <FormControlLabel
+                        sx={{ m: 0, flex: 1 }}
+                        control={
+                          <Checkbox 
+                            checked={!!dispensedItems[idx]} 
+                            onChange={() => handleToggleDispense(idx)} 
+                            color="success" 
+                          />
+                        }
+                        label={
+                          <Box sx={{ ml: 1 }}>
+                            <Typography variant="body1" fontWeight="800">{p.medicationName}</Typography>
+                            <Typography variant="body2" color="textSecondary">
+                              Order: {p.quantity} ({p.dosage})
+                            </Typography>
+                            <Typography variant="caption" sx={{ fontStyle: 'italic' }}>
+                              {p.frequency} | {p.duration}
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                      <Box sx={{ width: 100 }}>
+                        <TextField 
+                          label="Dispense" 
+                          type="number" 
+                          size="small"
+                          value={dispensedQuantities[idx] ?? ''}
+                          onChange={(e) => handleQtyChange(idx, Number(e.target.value))}
+                          disabled={pharmacyAction !== 'DISPENSE'}
+                        />
+                      </Box>
+                    </Box>
+                  </Paper>
+                ))}
+              </FormGroup>
+
+              {/* Dynamic IOU / Return Date logic */}
+              {pharmacyAction === 'DISPENSE' && currentPrescription?.prescriptions.some((p, i) => (dispensedQuantities[i] || 0) < (p.quantity || 0)) && (
+                <Box sx={{ mt: 3, p: 2, bgcolor: '#fff4e5', borderRadius: 2, border: '1px solid #ffe2b7' }}>
+                  <Box display="flex" alignItems="center" mb={1}>
+                    <WarningAmberIcon sx={{ color: 'warning.dark', mr: 1, fontSize: 20 }} />
+                    <Typography variant="subtitle2" color="warning.dark" fontWeight="900">
+                      MEDICATION SHORTFALL (IOU)
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                    Please specify when the patient should return to collect the remainder.
+                  </Typography>
+                  <TextField 
+                    fullWidth 
+                    type="date" 
+                    label="Patient Return Date" 
+                    InputLabelProps={{ shrink: true }}
+                    value={returnDate}
+                    onChange={(e) => setReturnDate(e.target.value)}
+                    sx={{ bgcolor: 'white' }}
+                  />
+                </Box>
+              )}
+            </Grid>
+          </Grid>
         </DialogContent>
-        <DialogActions sx={{ p: 2, bgcolor: 'grey.50', justifyContent: 'space-between' }}>
+
+        <DialogActions sx={{ p: 3, bgcolor: '#f9fafb', justifyContent: 'space-between' }}>
           <Button 
-            variant="outlined" 
-            onClick={() => {
-              const printWindow = window.open('', '_blank');
-              if (printWindow) {
-                printWindow.document.write('<html><head><title>Prescription</title>');
-                printWindow.document.write('<style>@media print { body { visibility: visible; } }</style>');
-                printWindow.document.write('</head><body>');
-                const printContent = document.querySelector('.printable')?.innerHTML;
-                if (printContent) {
-                  printWindow.document.write(printContent);
-                }
-                printWindow.document.write('</body></html>');
-                printWindow.document.close();
-                printWindow.focus();
-                printWindow.print();
-              }
-            }} 
             startIcon={<LocalPrintshopIcon />} 
+            variant="outlined"
+            onClick={() => window.print()}
             sx={{ fontWeight: 700, borderRadius: 2 }}
           >
-            Print Prescription
+            Generate Print Template
           </Button>
+          
           <Box>
-            <Button onClick={() => setOpenDispenseDialog(false)} color="inherit" sx={{ mr: 1 }}>
+            <Button onClick={() => setOpenDispenseDialog(false)} color="inherit" sx={{ mr: 2 }}>
               Cancel
             </Button>
             <Button 
               variant="contained" 
               onClick={handleCompleteDispensing} 
               startIcon={<CheckCircleIcon />} 
-              disabled={pharmacyAction === 'DISPENSE' && !allDispensed} 
-              sx={{ fontWeight: 700, borderRadius: 2, px: 3 }}
+              disabled={isLoading || (pharmacyAction === 'DISPENSE' && !allDispensed)}
+              sx={{ fontWeight: 900, px: 4, minHeight: '48px', borderRadius: 2 }}
             >
-              {pharmacyAction === 'DISPENSE' ? 'Finalize Dispensing' : 'Submit Action'}
+              Finalize Session
             </Button>
           </Box>
         </DialogActions>
       </Dialog>
 
-      {/* Dispensing Summary Dialog */}
-      <Dialog open={openSummaryDialog} onClose={() => setOpenSummaryDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: '900' }}>Dispensing Summary</DialogTitle>
-        <DialogContent dividers>
-          {dispenseSummary && (
-            <Box>
-              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>Dispensing Results:</Typography>
-              {dispenseSummary.summary.map((item: any, idx: number) => (
-                <Box key={idx} sx={{ mb: 1, p: 1.5, bgcolor: item.shortfall > 0 ? 'warning.50' : 'success.50', borderRadius: 2, border: '1px solid', borderColor: item.shortfall > 0 ? 'warning.200' : 'success.200' }}>
-                  <Typography variant="body2" fontWeight="700" color="primary">{item.medication}</Typography>
-                  <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    <strong>Dispensed:</strong> {item.dispensed}, <strong>Owed:</strong> {item.shortfall}
-                  </Typography>
-                </Box>
-              ))}
-              
-              {dispenseSummary.summary.some((s: any) => s.shortfall > 0) && (
-                <>
-                  {returnDate && (
-                    <Box sx={{ mt: 2, mb: 1, p: 1.5, bgcolor: 'info.50', borderRadius: 2, border: '1px dashed', borderColor: 'info.300' }}>
-                      <Typography variant="body2">
-                        <strong>Return Date:</strong> {returnDate}
-                      </Typography>
-                    </Box>
-                  )}
-                  <Alert severity="warning" sx={{ mt: 1, borderRadius: 2 }}>
-                    Procurement requests have been automatically created for the shortfalls (IOUs).
-                  </Alert>
-                </>
-              )}
+      {/* --- DISPENSING SUMMARY DIALOG --- */}
+      <Dialog 
+        open={openSummaryDialog} 
+        onClose={() => setOpenSummaryDialog(false)} 
+        maxWidth="xs" 
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 900, textAlign: 'center' }}>
+          SESSION COMPLETED
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="textSecondary" align="center" sx={{ mb: 3 }}>
+            The following items have been logged and stock levels updated.
+          </Typography>
+          
+          {dispenseSummary?.summary.map((s: any, i: number) => (
+            <Box 
+              key={i} 
+              sx={{ 
+                mb: 1.5, p: 2, 
+                bgcolor: s.shortfall > 0 ? '#fff4e5' : '#f0f9f0', 
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: s.shortfall > 0 ? '#ffe2b7' : '#c3e6cb'
+              }}
+            >
+              <Typography variant="body2" fontWeight="800" color="primary">
+                {s.medication}
+              </Typography>
+              <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                Dispensed: {s.dispensed} | <strong>Owed: {s.shortfall}</strong>
+              </Typography>
+            </Box>
+          ))}
+          
+          {returnDate && (
+            <Box sx={{ mt: 3, p: 2, bgcolor: '#e3f2fd', borderRadius: 2, textAlign: 'center' }}>
+              <Typography variant="caption" fontWeight="900" color="primary">
+                IOU RETURN DATE
+              </Typography>
+              <Typography variant="h6" fontWeight="800">
+                {new Date(returnDate).toLocaleDateString()}
+              </Typography>
             </Box>
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenSummaryDialog(false)} variant="contained" sx={{ borderRadius: 2, fontWeight: 700, px: 4 }}>
-            Close
+          <Button 
+            onClick={() => setOpenSummaryDialog(false)} 
+            fullWidth 
+            variant="contained" 
+            size="large"
+            sx={{ borderRadius: 2, fontWeight: 800, minHeight: '48px' }}
+          >
+            Confirm & Close
           </Button>
         </DialogActions>
       </Dialog>
-      
-      <BatchEntry open={openBatchDialog} onClose={() => setOpenBatchDialog(false)} onSuccess={() => {}} />
 
-      {/* Hidden Print View */}
+      {/* External Modal Components */}
+      <BatchEntry 
+        open={openBatchDialog} 
+        onClose={() => setOpenBatchDialog(false)} 
+        onSuccess={() => notify("Clinic inventory updated successfully.", "success")} 
+      />
+
+      {/* --- HIDDEN PRINT VIEW (Accessed via window.print) --- */}
       {currentPatient && currentEncounter && (
-        <Box className="printable" sx={{ display: 'none' }}>
+        <Box sx={{ display: 'none' }}>
           <PrescriptionPrintView 
-            patient={currentPatient}
-            encounter={currentEncounter}
-            vitals={currentVitals}
-            diagnosis={currentDiagnosis}
-            prescription={currentPrescription}
+            patient={currentPatient} 
+            encounter={currentEncounter} 
+            vitals={currentVitals} 
+            diagnosis={currentDiagnosis} 
+            prescription={currentPrescription} 
             triage={currentTriage}
-            countryCode={selectedCountry?.id || 'BD'}
-            clinicName={selectedClinic?.name}
+            countryCode={selectedCountry?.id || 'BD'} 
+            clinicName={selectedClinic?.name} 
           />
         </Box>
       )}

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom';
 import { 
   CssBaseline,
   ThemeProvider,
@@ -19,7 +19,6 @@ import ClinicSelection from './screens/ClinicSelection';
 import { useAuth } from './hooks/useAuth';
 import { useAppStore } from './store/useAppStore';
 import { Snackbar, Alert as MuiAlert } from '@mui/material';
-import StationLayout from './components/StationLayout';
 import ErrorBoundary from './components/ErrorBoundary';
 
 const NotificationSystem: React.FC = () => {
@@ -121,16 +120,48 @@ const theme = createTheme({
 });
 
 const App: React.FC = () => {
-  const { selectedCountry, selectedClinic, clearCountry, clearClinic, setUser: setStoreUser } = useAppStore();
+  const { selectedCountry, selectedClinic, clearCountry, setUser: setStoreUser } = useAppStore();
   const { user, userProfile, loading } = useAuth();
 
   useEffect(() => {
     setStoreUser(user, userProfile);
   }, [user, userProfile, setStoreUser]);
 
-  const isAdmin = userProfile?.role === 'global_admin' || userProfile?.role === 'country_admin';
-
   const handleClearCountry = () => clearCountry();
+
+  const router = React.useMemo(() => createBrowserRouter([
+    {
+      path: '/',
+      element: (
+        <ErrorBoundary>
+          {!selectedCountry ? (
+            <LandingPage onSelectCountry={(c) => useAppStore.getState().setSession(c, null)} />
+          ) : !user ? (
+            <LoginPage selectedCountry={selectedCountry} onBack={handleClearCountry} />
+          ) : !selectedClinic ? (
+            <ClinicSelection 
+              selectedCountry={selectedCountry} 
+              onSelectClinic={(c) => useAppStore.getState().setSession(selectedCountry, c)} 
+              onBack={handleClearCountry} 
+            />
+          ) : (
+            <Outlet />
+          )}
+        </ErrorBoundary>
+      ),
+      children: [
+        { index: true, element: <RegistrationStation countryId={selectedCountry?.id || ''} /> },
+        { path: 'admin', element: <AdminDashboard /> },
+        { path: 'admin/users', element: <AdminUserManagement /> },
+        { path: 'clinic-dashboard', element: <ClinicOperationsDashboard countryId={selectedCountry?.id || ''} /> },
+        { path: 'vitals', element: <VitalsStation countryId={selectedCountry?.id || ''} /> },
+        { path: 'doctor', element: <DoctorDashboard countryId={selectedCountry?.id || ''} /> },
+        { path: 'pharmacy', element: <PharmacyStation countryId={selectedCountry?.id || ''} /> },
+        { path: 'queue', element: <QueueBoard countryId={selectedCountry?.id || ''} /> },
+        { path: '*', element: <Navigate to="/" replace /> },
+      ]
+    }
+  ]), [selectedCountry, selectedClinic, user, userProfile, loading]);
 
   if (loading) {
     return <div>Loading...</div>;
@@ -139,27 +170,7 @@ const App: React.FC = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <ErrorBoundary>
-        {!selectedCountry ? (
-          <LandingPage onSelectCountry={(c) => useAppStore.getState().setSession(c, null)} />
-        ) : !user ? (
-          <LoginPage selectedCountry={selectedCountry} onBack={handleClearCountry} />
-        ) : !selectedClinic ? (
-          <ClinicSelection selectedCountry={selectedCountry} onSelectClinic={(c) => useAppStore.getState().setSession(selectedCountry, c)} onBack={handleClearCountry} />
-        ) : (
-          <Routes>
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/users" element={<AdminUserManagement />} />
-            <Route path="/clinic-dashboard" element={<ClinicOperationsDashboard countryId={selectedCountry.id} />} />
-            <Route path="/" element={<RegistrationStation countryId={selectedCountry.id} />} />
-            <Route path="/vitals" element={<VitalsStation countryId={selectedCountry.id} />} />
-            <Route path="/doctor" element={<DoctorDashboard countryId={selectedCountry.id} />} />
-            <Route path="/pharmacy" element={<PharmacyStation countryId={selectedCountry.id} />} />
-            <Route path="/queue" element={<QueueBoard countryId={selectedCountry.id} />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        )}
-      </ErrorBoundary>
+      <RouterProvider router={router} />
       <NotificationSystem />
     </ThemeProvider>
   );

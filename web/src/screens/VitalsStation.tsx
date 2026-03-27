@@ -26,7 +26,10 @@ import {
   Select,
   FormControl,
   InputLabel,
-  Container
+  Container,
+  Stepper,
+  Step,
+  StepLabel
 } from '@mui/material';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import MonitorWeightIcon from '@mui/icons-material/MonitorWeight';
@@ -63,6 +66,8 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
   // Triage State
   const [triageResult, setTriageResult] = useState<TriageResult | null>(null);
   const [manualTriageLevel, setManualTriageLevel] = useState<TriageLevel | null>(null);
+  const [activeStep, setActiveStep] = useState(0);
+  const steps = ['Vital Signs', 'Triage Assessment'];
 
   // Vitals Form State
   const [vitals, setVitals] = useState<Vitals>({
@@ -120,6 +125,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
         setSelectedPatient(patient);
         setSelectedQueueItem(item);
         setManualTriageLevel(null);
+        setActiveStep(0);
         setVitals({
           systolic: 120,
           diastolic: 80,
@@ -139,6 +145,19 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
   const handleCancel = () => {
     setSelectedPatient(null);
     setSelectedQueueItem(null);
+    setActiveStep(0);
+  };
+
+  const handleNext = () => {
+    if (activeStep === steps.length - 1) {
+      handleSaveVitals();
+    } else {
+      setActiveStep((prev) => prev + 1);
+    }
+  };
+
+  const handleBack = () => {
+    setActiveStep((prev) => prev - 1);
   };
 
   const handleSaveVitals = async () => {
@@ -339,83 +358,108 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
         <Button variant="outlined" color="inherit" onClick={handleCancel} size={isMobile ? "small" : "medium"}>Cancel</Button>
       </Box>
 
-      <Grid container spacing={isMobile ? 2 : 3}>
-        {/* Vital Signs Grid */}
-        <Grid size={{ xs: 12, lg: 8 }}>
+      <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+        {steps.map((label) => (
+          <Step key={label}>
+            <StepLabel>{label}</StepLabel>
+          </Step>
+        ))}
+      </Stepper>
+
+      <Grid container spacing={isMobile ? 2 : 3} justifyContent="center">
+        <Grid size={{ xs: 12, md: 8, lg: 6 }}>
           <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', mb: 3 }}>
             <CardContent sx={{ p: isMobile ? 2 : 3 }}>
-              <Typography variant="h6" fontWeight="800" gutterBottom color="info.main">VITAL SIGNS</Typography>
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 6, sm: 4 }}>
-                  <TextField fullWidth label="Systolic" type="number" value={vitals.systolic} onChange={(e) => setVitals({ ...vitals, systolic: parseInt(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">mmHg</InputAdornment> }} />
-                </Grid>
-                <Grid size={{ xs: 6, sm: 4 }}>
-                  <TextField fullWidth label="Diastolic" type="number" value={vitals.diastolic} onChange={(e) => setVitals({ ...vitals, diastolic: parseInt(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">mmHg</InputAdornment> }} />
-                </Grid>
-                <Grid size={{ xs: 6, sm: 4 }}>
-                  <TextField fullWidth label="Heart Rate" type="number" value={vitals.heartRate} onChange={(e) => setVitals({ ...vitals, heartRate: parseInt(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">bpm</InputAdornment> }} />
-                </Grid>
-                <Grid size={{ xs: 6, sm: 4 }}>
-                  <TextField fullWidth label="Temp" type="number" value={vitals.temperature} onChange={(e) => setVitals({ ...vitals, temperature: parseFloat(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">°C</InputAdornment> }} />
-                </Grid>
-                <Grid size={{ xs: 6, sm: 4 }}>
-                  <TextField fullWidth label="Weight" type="number" value={vitals.weight} onChange={(e) => setVitals({ ...vitals, weight: parseFloat(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">kg</InputAdornment> }} />
-                </Grid>
-                <Grid size={{ xs: 6, sm: 4 }}>
-                  <TextField fullWidth label="Height" type="number" value={vitals.height} onChange={(e) => setVitals({ ...vitals, height: parseFloat(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">cm</InputAdornment> }} />
-                </Grid>
-                <Grid size={{ xs: 6, sm: 4 }}>
-                  <TextField fullWidth label="BMI" type="number" disabled value={vitals.bmi} />
-                </Grid>
-                <Grid size={{ xs: 6, sm: 4 }}>
-                  <TextField fullWidth label="SpO2" type="number" value={vitals.oxygenSaturation} onChange={(e) => setVitals({ ...vitals, oxygenSaturation: parseInt(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }} />
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-        </Grid>
+              {activeStep === 0 ? (
+                <>
+                  <Typography variant="h6" fontWeight="800" gutterBottom color="info.main">VITAL SIGNS</Typography>
+                  <Grid container spacing={2}>
+                    <Grid size={{ xs: 6, sm: 4 }}>
+                      <TextField fullWidth label="Systolic" type="number" value={vitals.systolic} onChange={(e) => setVitals({ ...vitals, systolic: parseInt(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">mmHg</InputAdornment> }} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
+                    </Grid>
+                    <Grid size={{ xs: 6, sm: 4 }}>
+                      <TextField fullWidth label="Diastolic" type="number" value={vitals.diastolic} onChange={(e) => setVitals({ ...vitals, diastolic: parseInt(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">mmHg</InputAdornment> }} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
+                    </Grid>
+                    <Grid size={{ xs: 6, sm: 4 }}>
+                      <TextField fullWidth label="Heart Rate" type="number" value={vitals.heartRate} onChange={(e) => setVitals({ ...vitals, heartRate: parseInt(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">bpm</InputAdornment> }} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
+                    </Grid>
+                    <Grid size={{ xs: 6, sm: 4 }}>
+                      <TextField fullWidth label="Temp" type="number" value={vitals.temperature} onChange={(e) => setVitals({ ...vitals, temperature: parseFloat(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">°C</InputAdornment> }} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
+                    </Grid>
+                    <Grid size={{ xs: 6, sm: 4 }}>
+                      <TextField fullWidth label="Weight" type="number" value={vitals.weight} onChange={(e) => setVitals({ ...vitals, weight: parseFloat(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">kg</InputAdornment> }} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
+                    </Grid>
+                    <Grid size={{ xs: 6, sm: 4 }}>
+                      <TextField fullWidth label="Height" type="number" value={vitals.height} onChange={(e) => setVitals({ ...vitals, height: parseFloat(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">cm</InputAdornment> }} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
+                    </Grid>
+                    <Grid size={{ xs: 6, sm: 4 }}>
+                      <TextField fullWidth label="BMI" type="number" disabled value={vitals.bmi} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
+                    </Grid>
+                    <Grid size={{ xs: 6, sm: 4 }}>
+                      <TextField fullWidth label="SpO2" type="number" value={vitals.oxygenSaturation} onChange={(e) => setVitals({ ...vitals, oxygenSaturation: parseInt(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
+                    </Grid>
+                  </Grid>
+                </>
+              ) : (
+                <>
+                  <Typography variant="h6" fontWeight="800" gutterBottom color="info.main">TRIAGE ASSESSMENT</Typography>
+                  
+                  {triageResult?.isCritical && (
+                    <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                      <Typography variant="subtitle2" fontWeight="bold">CRITICAL VITALS</Typography>
+                      Immediate attention required.
+                    </Alert>
+                  )}
 
-        {/* Triage Assessment Column */}
-        <Grid size={{ xs: 12, lg: 4 }}>
-          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: 'grey.50', height: '100%' }}>
-            <CardContent sx={{ p: isMobile ? 2 : 3 }}>
-              <Typography variant="h6" fontWeight="800" gutterBottom color="info.main">TRIAGE ASSESSMENT</Typography>
-              
-              {triageResult?.isCritical && (
-                <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
-                  <Typography variant="subtitle2" fontWeight="bold">CRITICAL VITALS</Typography>
-                  Immediate attention required.
-                </Alert>
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="caption" color="textSecondary" sx={{ textTransform: 'uppercase', fontWeight: 'bold' }}>Suggested Level</Typography>
+                    <Typography variant="h4" sx={{ 
+                      color: triageResult?.triage_level === 'emergency' ? 'error.main' : 
+                             triageResult?.triage_level === 'urgent' ? 'warning.main' : 'success.main',
+                      fontWeight: '900',
+                      textTransform: 'uppercase',
+                      fontSize: isMobile ? '2rem' : '2.5rem'
+                    }}>
+                      {triageResult?.triage_level || 'STANDARD'}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">{triageResult?.triage_reason}</Typography>
+                  </Box>
+
+                  <FormControl fullWidth sx={{ mb: 3 }}>
+                    <InputLabel>Manual Override</InputLabel>
+                    <Select 
+                      value={manualTriageLevel || ''} 
+                      label="Manual Override" 
+                      onChange={(e) => setManualTriageLevel(e.target.value as TriageLevel)}
+                      sx={{ minHeight: '44px' }}
+                    >
+                      <MenuItem value=""><em>Use Suggested</em></MenuItem>
+                      <MenuItem value="emergency">Emergency</MenuItem>
+                      <MenuItem value="urgent">Urgent</MenuItem>
+                      <MenuItem value="standard">Standard</MenuItem>
+                      <MenuItem value="low">Low</MenuItem>
+                    </Select>
+                  </FormControl>
+                </>
               )}
 
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="caption" color="textSecondary" sx={{ textTransform: 'uppercase', fontWeight: 'bold' }}>Suggested Level</Typography>
-                <Typography variant="h4" sx={{ 
-                  color: triageResult?.triage_level === 'emergency' ? 'error.main' : 
-                         triageResult?.triage_level === 'urgent' ? 'warning.main' : 'success.main',
-                  fontWeight: '900',
-                  textTransform: 'uppercase',
-                  fontSize: isMobile ? '2rem' : '2.5rem'
-                }}>
-                  {triageResult?.triage_level || 'STANDARD'}
-                </Typography>
-                <Typography variant="body2" color="textSecondary">{triageResult?.triage_reason}</Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
+                <Button
+                  disabled={activeStep === 0}
+                  onClick={handleBack}
+                  sx={{ minHeight: '44px', minWidth: '100px' }}
+                >
+                  Back
+                </Button>
+                <Button
+                  variant="contained"
+                  color="info"
+                  onClick={handleNext}
+                  sx={{ minHeight: '44px', minWidth: '100px', fontWeight: 'bold' }}
+                >
+                  {activeStep === steps.length - 1 ? 'Save & Send' : 'Next'}
+                </Button>
               </Box>
-
-              <FormControl fullWidth sx={{ mb: 3 }}>
-                <InputLabel>Manual Override</InputLabel>
-                <Select value={manualTriageLevel || ''} label="Manual Override" onChange={(e) => setManualTriageLevel(e.target.value as TriageLevel)}>
-                  <MenuItem value=""><em>Use Suggested</em></MenuItem>
-                  <MenuItem value="emergency">Emergency</MenuItem>
-                  <MenuItem value="urgent">Urgent</MenuItem>
-                  <MenuItem value="standard">Standard</MenuItem>
-                  <MenuItem value="low">Low</MenuItem>
-                </Select>
-              </FormControl>
-
-              <Button variant="contained" color="info" fullWidth size="large" onClick={handleSaveVitals} sx={{ py: 2, borderRadius: 2, fontWeight: 'bold' }}>
-                Save & Send to Doctor
-              </Button>
             </CardContent>
           </Card>
         </Grid>

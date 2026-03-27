@@ -122,6 +122,46 @@ export const deleteUser = onCall(
   }
 );
 
+/**
+ * RECURSIVE TEST DATA WIPER
+ * Safely deletes 50,000+ documents by batching in chunks of 500
+ */
+export const wipeTestData = onCall(
+  { region: "us-central1", timeoutSeconds: 540, memory: "1GiB" }, 
+  async (request: any) => {
+    if (!checkIsGlobalAdmin(request.auth)) {
+      throw new HttpsError("permission-denied", "Unauthorized.");
+    }
+
+    const collections = ["patients", "encounters", "queues_active", "procurement_requests"];
+    let totalDeleted = 0;
+
+    for (const colName of collections) {
+      let hasMore = true;
+      while (hasMore) {
+        const query = db.collection(colName)
+          .where("is_test_data", "==", true)
+          .limit(500);
+
+        const snapshot = await query.get();
+        if (snapshot.empty) {
+          hasMore = false;
+          break;
+        }
+
+        const batch = db.batch();
+        snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+        await batch.commit();
+        totalDeleted += snapshot.size;
+        
+        // Anti-throttling delay
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    return { success: true, deletedCount: totalDeleted };
+  }
+);
+
 export const wipeDemoData = onCall(
   { region: "us-central1" },
   async (request: any) => {
@@ -255,6 +295,8 @@ export const dispenseMedication = onCall(
         const medIdLower = med.medication_id.toString().toLowerCase().replace(/\s+/g, '');
         const dosageNormalized = (med.dosage || '').toString().toLowerCase().replace(/\s+/g, '');
         const prescribedQty = Number(med.quantity) || 0;
+        
+        // Robust target quantity calculation to handle potential NaN/Empty inputs
         const dispensedQtyVal = (typeof med.dispensed_qty !== 'undefined' && med.dispensed_qty !== null && med.dispensed_qty !== '') ? Number(med.dispensed_qty) : prescribedQty;
         const targetQty = isNaN(dispensedQtyVal) ? prescribedQty : dispensedQtyVal;
               
@@ -307,9 +349,9 @@ export const dispenseMedication = onCall(
             dispensed_qty: actualDispensed,
             shortfall_qty: shortfall,
             status: 'PENDING_ORDER',
+            return_date: returnDate || null, // Capture the patient return date
             created_at: admin.firestore.FieldValue.serverTimestamp(),
-            encounter_id: encounterId,
-            return_date: returnDate ? (typeof returnDate === 'string' ? returnDate : admin.firestore.Timestamp.fromDate(new Date(returnDate))) : null
+            encounter_id: encounterId
           });
         }
 
@@ -359,13 +401,31 @@ export const bulkUpload = onCall(
     await (workbook as any).xlsx.load(Buffer.from(fileBase64, 'base64'));
     const worksheet = workbook.getWorksheet(1);
     const batch = db.batch();
+    
     worksheet?.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return; // Skip the header row
+      
       const medId = row.getCell(1).value?.toString().trim() || "";
+      const batchId = row.getCell(2).value?.toString() || "N/A";
+      const expiryDateRaw = row.getCell(3).value;
+      const qty = Number(row.getCell(4).value) || 0;
       const dosage = row.getCell(7).value?.toString().trim() || "N/A";
+      
       if (!medId || medId.toUpperCase().includes('EXAMPLE')) return;
+      
       const docRef = db.collection(`clinics/${clinicId}/inventory`).doc();
-      batch.set(docRef, { medication_id: medId, med_id_lower: medId.toLowerCase().replace(/\s+/g, ''), dosage, dosage_normalized: dosage.toLowerCase().replace(/\s+/g, ''), expiry_date: Timestamp.fromDate(new Date(row.getCell(3).value as any)), quantity: Number(row.getCell(4).value) || 0, created_at: admin.firestore.FieldValue.serverTimestamp() });
+      batch.set(docRef, { 
+        medication_id: medId, 
+        med_id_lower: medId.toLowerCase().replace(/\s+/g, ''), 
+        batch_id: batchId,
+        dosage, 
+        dosage_normalized: dosage.toLowerCase().replace(/\s+/g, ''), 
+        expiry_date: Timestamp.fromDate(new Date(expiryDateRaw as any)), 
+        quantity: qty, 
+        created_at: admin.firestore.FieldValue.serverTimestamp() 
+      });
     });
+    
     await batch.commit();
     return { success: true };
   }

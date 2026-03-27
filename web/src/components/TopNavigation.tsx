@@ -10,10 +10,26 @@ import {
   Menu,
   MenuItem,
   IconButton,
-  Chip
+  Chip,
+  SwipeableDrawer,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Divider
 } from '@mui/material';
-import { Logout, AccountCircle } from '@mui/icons-material';
-import { NavLink } from 'react-router-dom';
+import { 
+  Logout, 
+  AccountCircle, 
+  Menu as MenuIcon,
+  Dashboard as DashboardIcon,
+  PersonAdd as PersonAddIcon,
+  LocalHospital as LocalHospitalIcon,
+  Medication as MedicationIcon,
+  People as PeopleIcon
+} from '@mui/icons-material';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { logout } from '../services/authService';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
@@ -21,7 +37,9 @@ import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 const TopNavigation: React.FC = () => {
   const { selectedCountry, selectedClinic, clearCountry, clearClinic, user } = useAppStore();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const { isMobile } = useResponsiveLayout();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const { isMobile, isTablet } = useResponsiveLayout();
+  const location = useLocation();
 
   const handleLogout = async () => {
     await logout();
@@ -30,92 +48,155 @@ const TopNavigation: React.FC = () => {
 
   if (!user || !selectedCountry || !selectedClinic) return null;
 
+  const navItems = [
+    { label: 'Operations', to: '/admin', icon: <DashboardIcon /> },
+    { label: 'Registration', to: '/', icon: <PersonAddIcon /> },
+    { label: 'Vitals', to: '/vitals', icon: <LocalHospitalIcon /> },
+    { label: 'Doctor', to: '/doctor', icon: <MedicationIcon /> },
+    { label: 'Pharmacy', to: '/pharmacy', icon: <MedicationIcon /> },
+    { label: 'Queue Board', to: '/queue', icon: <PeopleIcon /> },
+  ];
+
+  const toggleDrawer = (open: boolean) => (event: React.KeyboardEvent | React.MouseEvent) => {
+    if (
+      event &&
+      event.type === 'keydown' &&
+      ((event as React.KeyboardEvent).key === 'Tab' ||
+        (event as React.KeyboardEvent).key === 'Shift')
+    ) {
+      return;
+    }
+    setDrawerOpen(open);
+  };
+
+  const drawer = (
+    <Box
+      sx={{ width: 280 }}
+      role="presentation"
+      onClick={toggleDrawer(false)}
+      onKeyDown={toggleDrawer(false)}
+    >
+      <Box sx={{ p: 3, bgcolor: 'primary.main', color: 'white' }}>
+        <Typography variant="h6" fontWeight="900" sx={{ mb: 0.5 }}>HAEFA PROGOTY</Typography>
+        <Typography variant="caption" sx={{ opacity: 0.8 }}>{user.email}</Typography>
+      </Box>
+      <Divider />
+      <List sx={{ px: 1, py: 2 }}>
+        {navItems.map((item) => (
+          <ListItem key={item.to} disablePadding sx={{ mb: 0.5 }}>
+            <ListItemButton 
+              component={NavLink} 
+              to={item.to}
+              selected={location.pathname === item.to}
+              sx={{ 
+                borderRadius: 2,
+                minHeight: '48px',
+                '&.active': {
+                  bgcolor: 'primary.light',
+                  color: 'primary.contrastText',
+                  '& .MuiListItemIcon-root': { color: 'inherit' }
+                }
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
+              <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: 700 }} />
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
+      <Divider />
+      <List sx={{ px: 1 }}>
+        <ListItem disablePadding>
+          <ListItemButton onClick={handleLogout} sx={{ borderRadius: 2, minHeight: '48px' }}>
+            <ListItemIcon sx={{ minWidth: 40 }}><Logout color="error" /></ListItemIcon>
+            <ListItemText primary="Logout" primaryTypographyProps={{ fontWeight: 700, color: 'error.main' }} />
+          </ListItemButton>
+        </ListItem>
+      </List>
+    </Box>
+  );
+
   return (
     <AppBar position="sticky" elevation={0} sx={{ borderBottom: '1px solid rgba(0,0,0,0.08)', bgcolor: 'white', color: 'text.primary' }}>
       <Container maxWidth="xl">
-        <Toolbar disableGutters sx={{ minHeight: 60, flexWrap: isMobile ? 'wrap' : 'nowrap', py: isMobile ? 1 : 0 }}>
+        <Toolbar disableGutters sx={{ minHeight: 64 }}>
+          {(isMobile || isTablet) && (
+            <IconButton
+              color="inherit"
+              aria-label="open drawer"
+              edge="start"
+              onClick={toggleDrawer(true)}
+              sx={{ mr: 2, p: 1.5 }}
+            >
+              <MenuIcon />
+            </IconButton>
+          )}
+
           <Box component={NavLink} to="/" sx={{ display: 'flex', alignItems: 'center', mr: 3, textDecoration: 'none' }}>
-            <img src="/logo.png" alt="HAEFA Logo" style={{ height: 40, marginRight: 12 }} />
+            <img src="/logo.png" alt="HAEFA Logo" style={{ height: 32, marginRight: 12 }} />
             <Typography
               variant="h6"
               noWrap
               sx={{ 
-                fontWeight: 800, 
+                fontWeight: 900, 
                 letterSpacing: '-0.02em', 
-                color: 'primary.main', 
-                flexGrow: isMobile ? 1 : 0,
+                color: 'primary.main',
+                fontSize: isMobile ? '1.1rem' : '1.25rem'
               }}
             >
               HAEFA PROGOTY
             </Typography>
           </Box>
           
-          {!isMobile && (
+          {!isMobile && !isTablet && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 3, borderRight: '1px solid rgba(0,0,0,0.08)', pr: 3 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase' }}>Context:</Typography>
               <Chip 
                 label={`${selectedCountry.name} ${selectedCountry.flag}`} 
                 onClick={clearCountry}
-                sx={{ fontWeight: 800, cursor: 'pointer', bgcolor: 'primary.light', color: 'primary.contrastText', px: 1, fontSize: '0.875rem' }}
-                size="medium"
+                sx={{ fontWeight: 800, cursor: 'pointer', bgcolor: 'primary.light', color: 'primary.contrastText', px: 1 }}
+                size="small"
               />
               {selectedClinic && (
                 <Chip 
                   label={selectedClinic.name} 
                   onClick={clearClinic}
-                  sx={{ fontWeight: 800, cursor: 'pointer', bgcolor: 'secondary.light', color: 'secondary.contrastText', px: 1, fontSize: '0.875rem' }}
-                  size="medium"
+                  sx={{ fontWeight: 800, cursor: 'pointer', bgcolor: 'secondary.light', color: 'secondary.contrastText', px: 1 }}
+                  size="small"
                   color="secondary"
                 />
               )}
             </Box>
           )}
 
-          <Box sx={{ 
-            flexGrow: 1, 
-            display: 'flex', 
-            gap: 1, 
-            overflowX: 'auto', 
-            pb: isMobile ? 1 : 0,
-            '&::-webkit-scrollbar': { display: 'none' },
-            msOverflowStyle: 'none',
-            scrollbarWidth: 'none',
-          }}>
-            {[
-              { label: 'Ops', to: '/admin' },
-              { label: 'Reg', to: '/' },
-              { label: 'Vitals', to: '/vitals' },
-              { label: 'Doctor', to: '/doctor' },
-              { label: 'Pharmacy', to: '/pharmacy' },
-              { label: 'Queue', to: '/queue' },
-            ].map((item) => (
-              <Button 
-                key={item.to}
-                component={NavLink} 
-                to={item.to} 
-                size={isMobile ? "small" : "medium"}
-                sx={{ 
-                  fontWeight: 700, 
-                  color: 'text.secondary',
-                  whiteSpace: 'nowrap',
-                  borderRadius: 2,
-                  px: 2,
-                  '&.active': { 
-                    color: 'white', 
-                    bgcolor: 'primary.main',
-                    '&:hover': { bgcolor: 'primary.dark' }
-                  }
-                }}
-              >
-                {item.label}
-              </Button>
-            ))}
-          </Box>
+          <Box sx={{ flexGrow: 1 }} />
 
-          <Box sx={{ flexGrow: 0, display: 'flex', alignItems: 'center', gap: 1, borderLeft: !isMobile ? '1px solid rgba(0,0,0,0.08)' : 'none', pl: !isMobile ? 2 : 0 }}>
-            {!isMobile && <Typography variant="body2" sx={{ fontWeight: 600 }}>{user.email?.split('@')[0]}</Typography>}
-            <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ p: 0 }}>
-              <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32 }}>
+          {!isMobile && !isTablet && (
+            <Box sx={{ display: 'flex', gap: 0.5, mr: 2 }}>
+              {navItems.map((item) => (
+                <Button 
+                  key={item.to}
+                  component={NavLink} 
+                  to={item.to} 
+                  sx={{ 
+                    fontWeight: 700, 
+                    color: 'text.secondary',
+                    borderRadius: 2,
+                    px: 2,
+                    '&.active': { 
+                      color: 'primary.main', 
+                      bgcolor: 'rgba(15, 23, 42, 0.04)',
+                    }
+                  }}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </Box>
+          )}
+
+          <Box sx={{ flexGrow: 0, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ p: 0.5 }}>
+              <Avatar sx={{ bgcolor: 'primary.main', width: 36, height: 36 }}>
                 <AccountCircle />
               </Avatar>
             </IconButton>
@@ -124,10 +205,13 @@ const TopNavigation: React.FC = () => {
               open={Boolean(anchorEl)}
               onClose={() => setAnchorEl(null)}
               sx={{ mt: 1 }}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
             >
               <MenuItem disabled>
-                <Typography variant="body2">{user.email}</Typography>
+                <Typography variant="body2" fontWeight="700">{user.email}</Typography>
               </MenuItem>
+              <Divider />
               <MenuItem onClick={handleLogout}>
                 <Logout fontSize="small" sx={{ mr: 1 }} />
                 Logout
@@ -136,6 +220,17 @@ const TopNavigation: React.FC = () => {
           </Box>
         </Toolbar>
       </Container>
+
+      <SwipeableDrawer
+        anchor="left"
+        open={drawerOpen}
+        onClose={toggleDrawer(false)}
+        onOpen={toggleDrawer(true)}
+        disableBackdropTransition={!isMobile}
+        disableDiscovery={isMobile}
+      >
+        {drawer}
+      </SwipeableDrawer>
     </AppBar>
   );
 };

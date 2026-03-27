@@ -102,8 +102,8 @@ const ClinicalAssessmentPanel: React.FC<Props> = ({ data, onChange }) => {
     <Box key={`${section}-${field}`} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', my: 1 }}>
       <Typography>{label}</Typography>
       <RadioGroup row value={(data[section] as any)[field] || ''} onChange={(e) => handleRadioChange(section, field, e.target.value)}>
-        <FormControlLabel value="No" control={<Radio size="small" />} label="No" />
-        <FormControlLabel value="Yes" control={<Radio size="small" />} label="Yes" />
+        <FormControlLabel value="No" control={<Radio />} label="No" sx={{ minHeight: '44px', mr: 2 }} />
+        <FormControlLabel value="Yes" control={<Radio />} label="Yes" sx={{ minHeight: '44px' }} />
       </RadioGroup>
     </Box>
   );
@@ -123,21 +123,21 @@ const ClinicalAssessmentPanel: React.FC<Props> = ({ data, onChange }) => {
           </Box>
           {data.complaints.map((complaint, index) => (
             <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: 'white', p: 1.5, borderRadius: 5, mb: 1 }}>
-              <TextField size="small" type="date" value={complaint.date} onChange={(e) => {
+              <TextField type="date" value={complaint.date} onChange={(e) => {
                 const newComplaints = [...data.complaints];
                 newComplaints[index].date = e.target.value;
                 onChange({ ...data, complaints: newComplaints });
-              }} />
-              <TextField size="small" fullWidth placeholder="Complaint description" value={complaint.description} onChange={(e) => {
+              }} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
+              <TextField fullWidth placeholder="Complaint description" value={complaint.description} onChange={(e) => {
                 const newComplaints = [...data.complaints];
                 newComplaints[index].description = e.target.value;
                 onChange({ ...data, complaints: newComplaints });
-              }} />
-              <TextField size="small" placeholder="Duration" value={complaint.duration} onChange={(e) => {
+              }} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
+              <TextField placeholder="Duration" value={complaint.duration} onChange={(e) => {
                 const newComplaints = [...data.complaints];
                 newComplaints[index].duration = e.target.value;
                 onChange({ ...data, complaints: newComplaints });
-              }} />
+              }} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
               <IconButton color="error" onClick={() => {
                 const newComplaints = data.complaints.filter((_, i) => i !== index);
                 onChange({ ...data, complaints: newComplaints });
@@ -204,7 +204,7 @@ const ClinicalAssessmentPanel: React.FC<Props> = ({ data, onChange }) => {
       <Accordion expanded={expanded === 'physicalExamSystemic'} onChange={handleChange('physicalExamSystemic')} disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
         {renderAccordionHeader('physicalExamSystemic', 'Physical Examination - Systemic', 'physicalExamSystemic')}
         <AccordionDetails sx={{ bgcolor: 'grey.100' }}>
-          <TextField fullWidth multiline rows={4} placeholder="Enter systemic physical examination details..." value={data.physicalExamSystemic} onChange={(e) => onChange({ ...data, physicalExamSystemic: e.target.value })} />
+          <TextField fullWidth multiline rows={4} placeholder="Enter systemic physical examination details..." value={data.physicalExamSystemic} onChange={(e) => onChange({ ...data, physicalExamSystemic: e.target.value })} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
         </AccordionDetails>
       </Accordion>
 
@@ -212,7 +212,7 @@ const ClinicalAssessmentPanel: React.FC<Props> = ({ data, onChange }) => {
       <Accordion expanded={expanded === 'currentRx'} onChange={handleChange('currentRx')} disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
         {renderAccordionHeader('currentRx', 'Current Rx taken', 'currentRx')}
         <AccordionDetails sx={{ bgcolor: 'grey.100' }}>
-          <TextField fullWidth multiline rows={4} placeholder="Enter current medications..." value={data.currentRx} onChange={(e) => onChange({ ...data, currentRx: e.target.value })} />
+          <TextField fullWidth multiline rows={4} placeholder="Enter current medications..." value={data.currentRx} onChange={(e) => onChange({ ...data, currentRx: e.target.value })} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
         </AccordionDetails>
       </Accordion>
 
@@ -250,10 +250,10 @@ const ClinicalAssessmentPanel: React.FC<Props> = ({ data, onChange }) => {
             <Box key={vax} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', my: 1 }}>
               <Typography sx={{ width: '30%' }}>{vax}</Typography>
               <RadioGroup row value={data.vaccination[vax]?.received || ''} onChange={(e) => onChange({ ...data, vaccination: { ...data.vaccination, [vax]: { ...data.vaccination[vax], received: e.target.value } } })}>
-                <FormControlLabel value="No" control={<Radio size="small" />} label="No" />
-                <FormControlLabel value="Yes" control={<Radio size="small" />} label="Yes" />
+                <FormControlLabel value="No" control={<Radio />} label="No" sx={{ minHeight: '44px', mr: 2 }} />
+                <FormControlLabel value="Yes" control={<Radio />} label="Yes" sx={{ minHeight: '44px' }} />
               </RadioGroup>
-              <Checkbox checked={data.vaccination[vax]?.givenByNirog || false} onChange={(e) => onChange({ ...data, vaccination: { ...data.vaccination, [vax]: { ...data.vaccination[vax], givenByNirog: e.target.checked } } })} />
+              <Checkbox checked={data.vaccination[vax]?.givenByNirog || false} onChange={(e) => onChange({ ...data, vaccination: { ...data.vaccination, [vax]: { ...data.vaccination[vax], givenByNirog: e.target.checked } } })} sx={{ p: 1.5 }} />
             </Box>
           ))}
         </AccordionDetails>
@@ -284,50 +284,50 @@ const ClinicalAssessmentPanel: React.FC<Props> = ({ data, onChange }) => {
 
           <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>1. Have you been a happy person?</Typography>
           <RadioGroup row value={data.wellbeing.happyPerson || ''} onChange={(e) => handleRadioChange('wellbeing', 'happyPerson', e.target.value)}>
-            <FormControlLabel value="Always" control={<Radio size="small" />} label="Always" />
-            <FormControlLabel value="Sometime" control={<Radio size="small" />} label="Sometime" />
-            <FormControlLabel value="Never" control={<Radio size="small" />} label="Never" />
+            <FormControlLabel value="Always" control={<Radio />} label="Always" sx={{ minHeight: '44px', mr: 2 }} />
+            <FormControlLabel value="Sometime" control={<Radio />} label="Sometime" sx={{ minHeight: '44px', mr: 2 }} />
+            <FormControlLabel value="Never" control={<Radio />} label="Never" sx={{ minHeight: '44px' }} />
           </RadioGroup>
 
           <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>2. Do you feel nervous/tense?</Typography>
           <RadioGroup row value={data.wellbeing.nervousTense || ''} onChange={(e) => handleRadioChange('wellbeing', 'nervousTense', e.target.value)}>
-            <FormControlLabel value="Always" control={<Radio size="small" />} label="Always" />
-            <FormControlLabel value="Sometime" control={<Radio size="small" />} label="Sometime" />
-            <FormControlLabel value="Never" control={<Radio size="small" />} label="Never" />
+            <FormControlLabel value="Always" control={<Radio />} label="Always" sx={{ minHeight: '44px', mr: 2 }} />
+            <FormControlLabel value="Sometime" control={<Radio />} label="Sometime" sx={{ minHeight: '44px', mr: 2 }} />
+            <FormControlLabel value="Never" control={<Radio />} label="Never" sx={{ minHeight: '44px' }} />
           </RadioGroup>
 
           <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>3. Do you feel sad/downhearted?</Typography>
           <RadioGroup row value={data.wellbeing.sadDownhearted || ''} onChange={(e) => handleRadioChange('wellbeing', 'sadDownhearted', e.target.value)}>
-            <FormControlLabel value="Always" control={<Radio size="small" />} label="Always" />
-            <FormControlLabel value="Sometime" control={<Radio size="small" />} label="Sometime" />
-            <FormControlLabel value="Never" control={<Radio size="small" />} label="Never" />
+            <FormControlLabel value="Always" control={<Radio />} label="Always" sx={{ minHeight: '44px', mr: 2 }} />
+            <FormControlLabel value="Sometime" control={<Radio />} label="Sometime" sx={{ minHeight: '44px', mr: 2 }} />
+            <FormControlLabel value="Never" control={<Radio />} label="Never" sx={{ minHeight: '44px' }} />
           </RadioGroup>
 
           <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>4. In the past 1 month, have you visited family/friends?</Typography>
           <RadioGroup row value={data.wellbeing.visitedFamilyFriends || ''} onChange={(e) => handleRadioChange('wellbeing', 'visitedFamilyFriends', e.target.value)}>
-            <FormControlLabel value="Yes" control={<Radio size="small" />} label="Yes" />
-            <FormControlLabel value="No" control={<Radio size="small" />} label="No" />
+            <FormControlLabel value="Yes" control={<Radio />} label="Yes" sx={{ minHeight: '44px', mr: 2 }} />
+            <FormControlLabel value="No" control={<Radio />} label="No" sx={{ minHeight: '44px' }} />
           </RadioGroup>
 
           <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>5. In the past 1 month, have your mental state negatively affected your work/productivity?</Typography>
           <RadioGroup row value={data.wellbeing.mentalStateAffectedWork || ''} onChange={(e) => handleRadioChange('wellbeing', 'mentalStateAffectedWork', e.target.value)}>
-            <FormControlLabel value="Yes" control={<Radio size="small" />} label="Yes" />
-            <FormControlLabel value="No" control={<Radio size="small" />} label="No" />
+            <FormControlLabel value="Yes" control={<Radio />} label="Yes" sx={{ minHeight: '44px', mr: 2 }} />
+            <FormControlLabel value="No" control={<Radio />} label="No" sx={{ minHeight: '44px' }} />
           </RadioGroup>
 
           <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>6. How do you feel about your health?</Typography>
           <RadioGroup row value={data.wellbeing.healthFeeling || ''} onChange={(e) => handleRadioChange('wellbeing', 'healthFeeling', e.target.value)}>
-            <FormControlLabel value="Excellent" control={<Radio size="small" />} label="Excellent" />
-            <FormControlLabel value="Good" control={<Radio size="small" />} label="Good" />
-            <FormControlLabel value="Fair" control={<Radio size="small" />} label="Fair" />
-            <FormControlLabel value="Poor" control={<Radio size="small" />} label="Poor" />
+            <FormControlLabel value="Excellent" control={<Radio />} label="Excellent" sx={{ minHeight: '44px', mr: 2 }} />
+            <FormControlLabel value="Good" control={<Radio />} label="Good" sx={{ minHeight: '44px', mr: 2 }} />
+            <FormControlLabel value="Fair" control={<Radio />} label="Fair" sx={{ minHeight: '44px', mr: 2 }} />
+            <FormControlLabel value="Poor" control={<Radio />} label="Poor" sx={{ minHeight: '44px' }} />
           </RadioGroup>
 
           <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>7. Compared to 1 year ago, your general health is</Typography>
           <RadioGroup row value={data.wellbeing.healthComparedToLastYear || ''} onChange={(e) => handleRadioChange('wellbeing', 'healthComparedToLastYear', e.target.value)}>
-            <FormControlLabel value="Better" control={<Radio size="small" />} label="Better" />
-            <FormControlLabel value="Same" control={<Radio size="small" />} label="Same" />
-            <FormControlLabel value="Worse" control={<Radio size="small" />} label="Worse" />
+            <FormControlLabel value="Better" control={<Radio />} label="Better" sx={{ minHeight: '44px', mr: 2 }} />
+            <FormControlLabel value="Same" control={<Radio />} label="Same" sx={{ minHeight: '44px', mr: 2 }} />
+            <FormControlLabel value="Worse" control={<Radio />} label="Worse" sx={{ minHeight: '44px' }} />
           </RadioGroup>
 
           <Typography variant="subtitle1" fontWeight="bold" sx={{ mt: 3, mb: 2, bgcolor: 'grey.300', p: 1 }}>Does your health limit you to do the following?</Typography>
@@ -345,9 +345,9 @@ const ClinicalAssessmentPanel: React.FC<Props> = ({ data, onChange }) => {
             <Box key={item.id} sx={{ mb: 2 }}>
               <Typography variant="subtitle2">{item.label}</Typography>
               <RadioGroup row value={data.wellbeing[item.id] || ''} onChange={(e) => handleRadioChange('wellbeing', item.id, e.target.value)}>
-                <FormControlLabel value="Limited a lot" control={<Radio size="small" />} label="Limited a lot" />
-                <FormControlLabel value="Limited a little" control={<Radio size="small" />} label="Limited a little" />
-                <FormControlLabel value="Not limited" control={<Radio size="small" />} label="Not limited" />
+                <FormControlLabel value="Limited a lot" control={<Radio />} label="Limited a lot" sx={{ minHeight: '44px', mr: 2 }} />
+                <FormControlLabel value="Limited a little" control={<Radio />} label="Limited a little" sx={{ minHeight: '44px', mr: 2 }} />
+                <FormControlLabel value="Not limited" control={<Radio />} label="Not limited" sx={{ minHeight: '44px' }} />
               </RadioGroup>
             </Box>
           ))}

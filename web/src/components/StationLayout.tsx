@@ -1,5 +1,21 @@
-import React from 'react';
-import { Box, Container, CssBaseline, ThemeProvider, createTheme, Typography } from '@mui/material';
+import { 
+  Box, 
+  Container, 
+  CssBaseline, 
+  ThemeProvider, 
+  createTheme, 
+  Typography,
+  BottomNavigation,
+  BottomNavigationAction,
+  Paper
+} from '@mui/material';
+import { 
+  PersonAdd as PersonAddIcon,
+  LocalHospital as LocalHospitalIcon,
+  Medication as MedicationIcon,
+  Dashboard as DashboardIcon
+} from '@mui/icons-material';
+import { useNavigate, useLocation } from 'react-router-dom';
 import TopNavigation from './TopNavigation';
 import PatientContextBar from './PatientContextBar';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
@@ -20,6 +36,15 @@ const StationLayout: React.FC<StationLayoutProps> = ({
   actions
 }) => {
   const { isMobile, isTablet } = useResponsiveLayout();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const navItems = [
+    { label: 'Reg', to: '/', icon: <PersonAddIcon /> },
+    { label: 'Vitals', to: '/vitals', icon: <LocalHospitalIcon /> },
+    { label: 'Doctor', to: '/doctor', icon: <MedicationIcon /> },
+    { label: 'Pharmacy', to: '/pharmacy', icon: <MedicationIcon /> },
+  ];
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -27,7 +52,7 @@ const StationLayout: React.FC<StationLayoutProps> = ({
       
       {showPatientContext && <PatientContextBar />}
       
-      <Box component="main" sx={{ flexGrow: 1, pb: 10 }}> {/* pb for footer space */}
+      <Box component="main" sx={{ flexGrow: 1, pb: (isMobile || isTablet) ? 12 : 10 }}>
         <Container maxWidth="xl" sx={{ mt: isMobile ? 2 : 3 }}>
           {(title || stationName) && (
             <Box sx={{ 
@@ -78,6 +103,36 @@ const StationLayout: React.FC<StationLayoutProps> = ({
           {children}
         </Container>
       </Box>
+
+      {(isMobile || isTablet) && (
+        <Paper sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1100 }} elevation={3}>
+          <BottomNavigation
+            showLabels
+            value={location.pathname}
+            onChange={(event, newValue) => {
+              navigate(newValue);
+            }}
+            sx={{ height: 72 }}
+          >
+            {navItems.map((item) => (
+              <BottomNavigationAction 
+                key={item.to}
+                label={item.label} 
+                value={item.to} 
+                icon={item.icon} 
+                sx={{
+                  '&.Mui-selected': {
+                    color: 'primary.main',
+                    '& .MuiBottomNavigationAction-label': {
+                      fontWeight: 800
+                    }
+                  }
+                }}
+              />
+            ))}
+          </BottomNavigation>
+        </Paper>
+      )}
     </Box>
   );
 };

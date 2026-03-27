@@ -58,6 +58,7 @@ const ConsultationPanel: React.FC<ConsultationPanelProps> = ({ data, onChange })
           value={data.notes} 
           onChange={(e) => onChange({ ...data, notes: e.target.value })} 
           sx={{ mb: 2, bgcolor: 'white', borderRadius: 2 }}
+          slotProps={{ htmlInput: { style: { minHeight: '44px' } } }}
         />
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <Typography variant="caption" color="textSecondary" sx={{ alignSelf: 'center', mr: 1, fontWeight: 'bold' }}>Quick Add:</Typography>
@@ -89,6 +90,7 @@ const ConsultationPanel: React.FC<ConsultationPanelProps> = ({ data, onChange })
           value={data.diagnosis} 
           onChange={(e) => onChange({ ...data, diagnosis: e.target.value })} 
           sx={{ bgcolor: 'white', borderRadius: 2 }}
+          slotProps={{ htmlInput: { style: { minHeight: '44px' } } }}
         />
       </Box>
 
@@ -131,6 +133,7 @@ const ConsultationPanel: React.FC<ConsultationPanelProps> = ({ data, onChange })
               variant="outlined"
               placeholder="Add lab tests..."
               sx={{ bgcolor: 'white', borderRadius: 2 }}
+              slotProps={{ htmlInput: { ...params.inputProps, style: { minHeight: '44px' } } }}
             />
           )}
         />
@@ -165,6 +168,7 @@ const ConsultationPanel: React.FC<ConsultationPanelProps> = ({ data, onChange })
               variant="outlined"
               placeholder="Add referrals..."
               sx={{ bgcolor: 'white', borderRadius: 2 }}
+              slotProps={{ htmlInput: { ...params.inputProps, style: { minHeight: '44px' } } }}
             />
           )}
         />
@@ -186,6 +190,7 @@ const ConsultationPanel: React.FC<ConsultationPanelProps> = ({ data, onChange })
           value={data.treatmentNotes} 
           onChange={(e) => onChange({ ...data, treatmentNotes: e.target.value })} 
           sx={{ bgcolor: 'white', borderRadius: 2 }}
+          slotProps={{ htmlInput: { style: { minHeight: '44px' } } }}
         />
       </Box>
     </Box>
