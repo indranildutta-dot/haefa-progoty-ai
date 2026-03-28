@@ -1,178 +1,118 @@
-import React, { useEffect } from 'react';
-import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom';
-import { 
-  CssBaseline,
-  ThemeProvider,
-  createTheme,
-} from '@mui/material';
-import AdminDashboard from './screens/AdminDashboard';
-import AdminUserManagement from './screens/AdminUserManagement';
-import RegistrationStation from './screens/RegistrationStation';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from './firebase';
+import { useAppStore } from './store/useAppStore';
+
+// Screens
+import Login from './screens/Login';
+import CountrySelection from './screens/CountrySelection';
+import ClinicSelection from './screens/ClinicSelection';
+import Dashboard from './screens/Dashboard';
 import VitalsStation from './screens/VitalsStation';
 import DoctorDashboard from './screens/DoctorDashboard';
 import PharmacyStation from './screens/PharmacyStation';
 import QueueBoard from './screens/QueueBoard';
-import ClinicOperationsDashboard from './screens/ClinicOperationsDashboard';
-import LandingPage from './screens/LandingPage';
-import LoginPage from './screens/LoginPage';
-import ClinicSelection from './screens/ClinicSelection';
-import { useAuth } from './hooks/useAuth';
-import { useAppStore } from './store/useAppStore';
-import { Snackbar, Alert as MuiAlert } from '@mui/material';
-import ErrorBoundary from './components/ErrorBoundary';
-
-const NotificationSystem: React.FC = () => {
-  const { notifications, removeNotification } = useAppStore();
-
-  return (
-    <>
-      {notifications.map((note) => (
-        <Snackbar 
-          key={note.id} 
-          open={true} 
-          autoHideDuration={5000} 
-          onClose={() => removeNotification(note.id)}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-          sx={{ mb: notifications.indexOf(note) * 8 }}
-        >
-          <MuiAlert 
-            onClose={() => removeNotification(note.id)} 
-            severity={note.type} 
-            variant="filled" 
-            sx={{ width: '100%', borderRadius: 2 }}
-          >
-            {note.message}
-          </MuiAlert>
-        </Snackbar>
-      ))}
-    </>
-  );
-};
-
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#0f172a', // Deep Navy
-      light: '#334155',
-    },
-    secondary: {
-      main: '#f59e0b', // Amber
-      light: '#fbbf24',
-    },
-    background: {
-      default: '#f1f5f9', // Slate 100
-      paper: '#ffffff',
-    },
-    text: {
-      primary: '#0f172a',
-      secondary: '#475569',
-    },
-    success: { main: '#10b981' },
-    warning: { main: '#f59e0b' },
-    error: { main: '#ef4444' },
-    info: { main: '#3b82f6' },
-  },
-  typography: {
-    fontFamily: '"Inter", "Helvetica", "Arial", sans-serif',
-    h4: { fontWeight: 800, fontSize: '1.5rem', letterSpacing: '-0.02em' },
-    h6: { fontWeight: 700, fontSize: '1.1rem' },
-    subtitle1: { fontSize: '0.95rem' },
-    body1: { fontSize: '1rem' }, // Default for tablet/desktop
-    button: { textTransform: 'none', fontWeight: 600, fontSize: '1rem' },
-  },
-  shape: {
-    borderRadius: 12,
-  },
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: { 
-          borderRadius: 8, 
-          padding: '12px 24px', 
-          textTransform: 'none',
-          minHeight: 48, // Touch friendly
-        },
-        sizeSmall: {
-          minHeight: 40,
-          padding: '8px 16px',
-        }
-      },
-    },
-    MuiCard: {
-      styleOverrides: {
-        root: { borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
-      },
-    },
-    MuiTextField: {
-      defaultProps: {
-        variant: 'outlined',
-        fullWidth: true,
-      },
-    },
-    MuiInputBase: {
-      styleOverrides: {
-        root: {
-          minHeight: 48, // Touch friendly
-        }
-      }
-    }
-  },
-});
+import { CircularProgress, Box, Typography } from '@mui/material';
 
 const App: React.FC = () => {
-  const { selectedCountry, selectedClinic, clearCountry, setUser: setStoreUser } = useAppStore();
-  const { user, userProfile, loading } = useAuth();
+  const { 
+    user, 
+    userProfile, 
+    setUser, 
+    selectedCountry, 
+    selectedClinic, 
+    setSession,
+    clearCountry 
+  } = useAppStore();
+  
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setStoreUser(user, userProfile);
-  }, [user, userProfile, setStoreUser]);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const docRef = doc(db, "users", firebaseUser.uid);
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists()) {
+            setUser(firebaseUser, docSnap.data() as any);
+          } else {
+            setUser(firebaseUser, null);
+          }
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+          setUser(firebaseUser, null);
+        }
+      } else {
+        setUser(null, null);
+      }
+      setLoading(false);
+    });
 
-  const handleClearCountry = () => clearCountry();
-
-  const router = React.useMemo(() => createBrowserRouter([
-    {
-      path: '/',
-      element: (
-        <ErrorBoundary>
-          {!selectedCountry ? (
-            <LandingPage onSelectCountry={(c) => useAppStore.getState().setSession(c, null)} />
-          ) : !user ? (
-            <LoginPage selectedCountry={selectedCountry} onBack={handleClearCountry} />
-          ) : !selectedClinic ? (
-            <ClinicSelection 
-              selectedCountry={selectedCountry} 
-              onSelectClinic={(c) => useAppStore.getState().setSession(selectedCountry, c)} 
-              onBack={handleClearCountry} 
-            />
-          ) : (
-            <Outlet />
-          )}
-        </ErrorBoundary>
-      ),
-      children: [
-        { index: true, element: <RegistrationStation countryId={selectedCountry?.id || ''} /> },
-        { path: 'admin', element: <AdminDashboard /> },
-        { path: 'admin/users', element: <AdminUserManagement /> },
-        { path: 'clinic-dashboard', element: <ClinicOperationsDashboard countryId={selectedCountry?.id || ''} /> },
-        { path: 'vitals', element: <VitalsStation countryId={selectedCountry?.id || ''} /> },
-        { path: 'doctor', element: <DoctorDashboard countryId={selectedCountry?.id || ''} /> },
-        { path: 'pharmacy', element: <PharmacyStation countryId={selectedCountry?.id || ''} /> },
-        { path: 'queue', element: <QueueBoard countryId={selectedCountry?.id || ''} /> },
-        { path: '*', element: <Navigate to="/" replace /> },
-      ]
-    }
-  ]), [selectedCountry, selectedClinic, user, userProfile, loading]);
+    return () => unsubscribe();
+  }, [setUser]);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100vh">
+        <CircularProgress size={40} />
+        <Typography sx={{ mt: 2, fontWeight: 900, color: 'primary.main' }}>VERIFYING CREDENTIALS...</Typography>
+      </Box>
+    );
   }
 
+  // Helper for Route Guarding
+  const IsAuthorized = () => {
+    if (!user) return false;
+    if (userProfile?.role === 'global_admin') return true;
+    return userProfile?.isApproved === true;
+  };
+
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <RouterProvider router={router} />
-      <NotificationSystem />
-    </ThemeProvider>
+    <Router>
+      <Routes>
+        <Route path="/login" element={!user ? <Login /> : <Navigate to="/country-selection" />} />
+
+        <Route path="/country-selection" element={
+          user ? <CountrySelection /> : <Navigate to="/login" />
+        } />
+
+        <Route path="/clinic-selection" element={
+          user && selectedCountry ? (
+            <ClinicSelection 
+              selectedCountry={selectedCountry}
+              onSelectClinic={(clinic) => setSession(selectedCountry, clinic)}
+              onBack={() => clearCountry()}
+            />
+          ) : <Navigate to="/country-selection" />
+        } />
+
+        {/* CLINICAL ROUTES - Require Login, Approved Profile, and Selected Clinic */}
+        <Route path="/dashboard" element={
+          IsAuthorized() && selectedClinic ? <Dashboard /> : <Navigate to="/clinic-selection" />
+        } />
+
+        <Route path="/vitals" element={
+          IsAuthorized() && selectedClinic ? <VitalsStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+        } />
+
+        <Route path="/doctor" element={
+          IsAuthorized() && selectedClinic ? <DoctorDashboard countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+        } />
+
+        <Route path="/pharmacy" element={
+          IsAuthorized() && selectedClinic ? <PharmacyStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+        } />
+
+        <Route path="/queue" element={
+          IsAuthorized() && selectedClinic ? <QueueBoard countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+        } />
+
+        <Route path="/" element={<Navigate to="/dashboard" />} />
+      </Routes>
+    </Router>
   );
 };
 

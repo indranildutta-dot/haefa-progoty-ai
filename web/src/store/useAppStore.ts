@@ -72,9 +72,11 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'haefa-progoty-storage',
+      // Ensure session and profile metadata are persisted across refreshes
       partialize: (state) => ({ 
         selectedCountry: state.selectedCountry, 
-        selectedClinic: state.selectedClinic 
+        selectedClinic: state.selectedClinic,
+        userProfile: state.userProfile
       }),
     }
   )
