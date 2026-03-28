@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { 
   Box, Typography, TextField, Chip, Divider, Button, 
-  Autocomplete, Stack, CircularProgress, Alert 
-} from '@mui/material';
+  Autocomplete, Stack, CircularProgress, Alert, Paper 
+} from '@mui/material'; // Added Paper here
 import PrescriptionBuilder from './PrescriptionBuilder';
 import ClinicalAssessmentPanel, { ClinicalAssessmentData, initialClinicalAssessment } from './ClinicalAssessmentPanel';
 import { Prescription } from '../types';
@@ -11,7 +11,6 @@ import { useAppStore } from '../store/useAppStore';
 
 // Icons
 import SendIcon from '@mui/icons-material/Send';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import InfoIcon from '@mui/icons-material/Info';
 
 export interface ConsultationData {
@@ -29,7 +28,7 @@ interface ConsultationPanelProps {
   encounterId: string;
   data: ConsultationData;
   onChange: (data: ConsultationData) => void;
-  onComplete?: () => void; // Callback to refresh the queue or close the view
+  onComplete?: () => void;
 }
 
 const COMMON_SYMPTOMS = ['Fever', 'Cough', 'Headache', 'Diarrhea', 'Vomiting', 'Abdominal pain'];
@@ -51,12 +50,6 @@ const ConsultationPanel: React.FC<ConsultationPanelProps> = ({
     onChange({ ...data, notes: newNotes });
   };
 
-  /**
-   * THE FINAL HANDSHAKE:
-   * This calls the backend Cloud Function to process the consultation.
-   * If any medications were flagged as requisitions, the backend will 
-   * automatically create the requisition orders.
-   */
   const handleFinalizeConsultation = async () => {
     if (!data.diagnosis) {
       notify("Provisional Diagnosis is required before finalizing.", "error");
@@ -65,7 +58,6 @@ const ConsultationPanel: React.FC<ConsultationPanelProps> = ({
 
     setIsSubmitting(true);
     try {
-      // 1. Send data to the Cloud Function Transaction in the backend
       await saveConsultation(
         {
           encounter_id: encounterId,
@@ -86,7 +78,6 @@ const ConsultationPanel: React.FC<ConsultationPanelProps> = ({
 
       notify("Consultation finalized. Patient moved to Pharmacy queue.", "success");
       
-      // 2. Trigger the parent callback (e.g., to go back to the patient list)
       if (onComplete) onComplete();
       
     } catch (error: any) {
@@ -164,7 +155,7 @@ const ConsultationPanel: React.FC<ConsultationPanelProps> = ({
 
       <Divider />
 
-      {/* Section 4: Prescribed Medicines (The Prescription Builder) */}
+      {/* Section 4: Prescribed Medicines */}
       <Box>
         <PrescriptionBuilder 
           initialData={data.prescriptions} 
