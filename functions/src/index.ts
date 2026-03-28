@@ -226,8 +226,8 @@ export const registerPatient = onCall(
       throw new HttpsError("invalid-argument", "Missing registration data");
     }
     try {
-      const patientId = generateId();
-      const encounterId = generateId();
+      const patientId = crypto.randomUUID();
+      const encounterId = crypto.randomUUID();
       let photoUrl = "";
       
       if (photoBase64 && photoBase64.includes(",")) {
@@ -266,15 +266,13 @@ export const registerPatient = onCall(
   }
 );
 
-/**
- * Handles Doctor Consultation and Automatic Requisition triggers
- */
 export const saveConsultation = onCall(
   { region: "us-central1" },
   async (request: any) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
     const { encounterId, patientId, clinicId, prescriptions, diagnosis, notes } = request.data;
     
+    // Optimization: Check the queue existence before the heavy transaction
     const qSnap = await db.collection("queues_active").where("encounter_id", "==", encounterId).get();
 
     return await db.runTransaction(async (transaction) => {
@@ -379,16 +377,17 @@ export const dispenseMedication = onCall(
 );
 
 /**
- * BULK UPLOAD: Uses Lazy Loading to fix deployment timeouts
+ * BULK UPLOAD: Uses DYNAMIC IMPORT to prevent discovery timeouts
  */
 export const bulkUpload = onCall(
   { region: "us-central1" },
   async (request: any) => {
     const { clinicId, fileBase64 } = request.data;
-    // CRITICAL: Loading inside function body to bypass CLI timeout
+    
+    // DYNAMIC IMPORT: This keeps the initial load of index.ts lightning fast
     const ExcelJS = await import('exceljs');
     const workbook = new ExcelJS.Workbook();
-    // Type-cast to any to fix Buffer error from image_1e363e.png
+    
     await workbook.xlsx.load(Buffer.from(fileBase64, 'base64') as any);
     const worksheet = workbook.getWorksheet(1);
     const batch = db.batch();
@@ -430,7 +429,6 @@ export const getInventoryTemplate = onCall(
       { header: 'dosage', key: 'dosage', width: 15 }
     ];
     const buffer = await workbook.xlsx.writeBuffer();
-    // Type-cast to any to fix Buffer error from image_1e363e.png
     return { fileBase64: (buffer as any).toString('base64') };
   }
 );
