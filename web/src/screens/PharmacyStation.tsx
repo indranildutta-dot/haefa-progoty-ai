@@ -1,231 +1,176 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Typography, Box, Paper, Grid, Table, TableBody, TableCell, 
-  TableContainer, TableHead, TableRow, Button, Chip, Dialog,
-  DialogTitle, DialogContent, DialogActions, Alert, Divider,
-  Card, CardContent, Checkbox, FormControlLabel, FormGroup,
-  Select, MenuItem, FormControl, InputLabel, TextField, Stack,
-  IconButton, Tabs, Tab, Tooltip
+  Typography, Box, Paper, Grid, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
+  Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Stack, IconButton, Tabs, Tab,
+  Select, MenuItem, FormControl, InputLabel, Autocomplete, Divider, Alert
 } from '@mui/material';
-
-// --- Icons (Fixed missing CloudUploadIcon) ---
-import MedicationIcon from '@mui/icons-material/Medication';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import PersonIcon from '@mui/icons-material/Person';
-import LocalPrintshopIcon from '@mui/icons-material/LocalPrintshop';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-
-// --- Services & Logic ---
-import { subscribeToQueue, updateQueueStatus } from '../services/queueService';
-import { 
-  getDiagnosisByEncounter, getPrescriptionByEncounter, 
-  getVitalsByEncounter, getEncounterById
-} from '../services/encounterService';
-import { getTriageAssessmentByEncounter } from '../services/triageService';
-import { getPatientById } from '../services/patientService';
-import { getPatientByQrToken } from '../services/qrService';
-import { dispenseMedication } from '../services/pharmacyService';
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 
-// --- Components ---
-import { QueueItem, DiagnosisRecord, PrescriptionRecord, Patient, VitalsRecord, TriageAssessment, Encounter } from '../types';
+// Icons
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import InfoIcon from '@mui/icons-material/Info';
+
+// Services
+import { subscribeToQueue, updateQueueStatus } from '../services/queueService';
+import { getDiagnosisByEncounter, getPrescriptionByEncounter, getVitalsByEncounter } from '../services/encounterService';
+import { dispenseMedication } from '../services/pharmacyService';
 import { useAppStore } from '../store/useAppStore';
-import QrScannerModal from '../components/QrScannerModal';
 import StationLayout from '../components/StationLayout';
-import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
-import PrescriptionPrintView from '../components/PrescriptionPrintView';
 import InventoryView from '../components/InventoryView';
 import BatchEntry from '../components/BatchEntry';
 
 const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const { notify, selectedClinic } = useAppStore();
-  const { isMobile, isTablet } = useResponsiveLayout();
+  const [waitingList, setWaitingList] = useState<any[]>([]);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [currentPrescription, setCurrentPrescription] = useState<any>(null);
+  const [inventory, setInventory] = useState<any[]>([]);
   
-  // State Management
-  const [waitingList, setWaitingList] = useState<QueueItem[]>([]);
-  const [selectedItem, setSelectedItem] = useState<QueueItem | null>(null);
-  const [currentDiagnosis, setCurrentDiagnosis] = useState<DiagnosisRecord | null>(null);
-  const [currentPrescription, setCurrentPrescription] = useState<PrescriptionRecord | null>(null);
-  const [currentPatient, setCurrentPatient] = useState<Patient | null>(null);
-  const [currentVitals, setCurrentVitals] = useState<VitalsRecord | null>(null);
-  const [currentTriage, setCurrentTriage] = useState<TriageAssessment | null>(null);
-  const [currentEncounter, setCurrentEncounter] = useState<Encounter | null>(null);
-  
+  // Fulfillment States
   const [openDispenseDialog, setOpenDispenseDialog] = useState(false);
   const [openBatchDialog, setOpenBatchDialog] = useState(false);
-  const [dispensedQuantities, setDispensedQuantities] = useState<Record<number, number>>({});
-  const [dispenseSummary, setDispenseSummary] = useState<any>(null);
-  const [openSummaryDialog, setOpenSummaryDialog] = useState(false);
   const [tabValue, setTabValue] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
 
-  // 1. Real-time Queue Subscription
+  // Per-medication Dispensing States
+  const [dispenseModes, setDispenseModes] = useState<Record<number, string>>({});
+  const [dispensedQtys, setDispensedQtys] = useState<Record<number, number>>({});
+  const [subsMeds, setSubsMeds] = useState<Record<number, string>>({});
+  const [reasons, setReasons] = useState<Record<number, string>>({});
+  const [returnDates, setReturnDates] = useState<Record<number, string>>({});
+
   useEffect(() => {
     if (!selectedClinic?.id) return;
-    const unsubscribe = subscribeToQueue('WAITING_FOR_PHARMACY', (items) => setWaitingList(items), (err) => notify(err.message, "error"));
-    return () => unsubscribe();
+    const q = query(collection(db, "inventory"), where("clinic_id", "==", selectedClinic.id));
+    return onSnapshot(q, (snap) => setInventory(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, [selectedClinic]);
 
-  // 2. Load Clinical Context for Fulfillment
-  const handleOpenDispense = async (item: QueueItem) => {
-    setSelectedItem(item); setIsLoading(true);
-    try {
-      const [diag, pres, pat, vit, tri, enc] = await Promise.all([
-        getDiagnosisByEncounter(item.encounter_id), getPrescriptionByEncounter(item.encounter_id),
-        getPatientById(item.patient_id), getVitalsByEncounter(item.encounter_id),
-        getTriageAssessmentByEncounter(item.encounter_id), getEncounterById(item.encounter_id)
-      ]);
-      setCurrentDiagnosis(diag); setCurrentPrescription(pres); setCurrentPatient(pat);
-      setCurrentVitals(vit); setCurrentTriage(tri); setCurrentEncounter(enc);
-      
-      const qtys: Record<number, number> = {};
-      pres?.prescriptions.forEach((p, i) => qtys[i] = p.quantity || 0);
-      setDispensedQuantities(qtys);
-      setOpenDispenseDialog(true);
-    } catch (err) { notify("Critical: Patient data failed to load.", "error"); } 
-    finally { setIsLoading(false); }
+  useEffect(() => {
+    if (!selectedClinic?.id) return;
+    return subscribeToQueue('WAITING_FOR_PHARMACY', (items) => setWaitingList(items), (err) => notify(err.message, "error"));
+  }, [selectedClinic]);
+
+  const handleOpenDispense = async (item: any) => {
+    setSelectedItem(item);
+    const pres = await getPrescriptionByEncounter(item.encounter_id);
+    setCurrentPrescription(pres);
+    
+    // Initialize defaults
+    const modes: Record<number, string> = {};
+    const qtys: Record<number, number> = {};
+    pres?.prescriptions.forEach((p: any, i: number) => {
+      modes[i] = 'FULL';
+      qtys[i] = p.quantity;
+    });
+    setDispenseModes(modes);
+    setDispensedQtys(qtys);
+    setOpenDispenseDialog(true);
   };
 
   const handleFinalize = async () => {
-    if (!currentPrescription || !selectedItem || !selectedClinic) return;
     try {
-      const medsPayload = currentPrescription.prescriptions.map((p, i) => {
-        const dispensed = dispensedQuantities[i] || 0;
-        // SMART OVERRIDE Logic for Math Errors
-        if (dispensed > (p.quantity || 0) && !window.confirm(`Alert: Dispensing ${dispensed} but record shows only ${p.quantity} prescribed. Proceed anyway?`)) {
-          throw new Error("Cancelled for verification");
-        }
-        return { medication_id: p.medicationId, dosage: p.dosage, quantity: p.quantity || 0, dispensed_qty: dispensed };
-      });
-      const result = await dispenseMedication(selectedClinic.id, selectedItem.patient_id, selectedItem.encounter_id, medsPayload);
-      setDispenseSummary(result); setOpenSummaryDialog(true);
-      await updateQueueStatus(selectedItem.id!, 'COMPLETED' as any);
+      const payload = currentPrescription.prescriptions.map((p: any, i: number) => ({
+        original_medication: p.medicationName,
+        dispense_mode: dispenseModes[i],
+        dispensed_qty: dispensedQtys[i],
+        substitution: subsMeds[i] || null,
+        reason: reasons[i] || '',
+        return_date: returnDates[i] || null,
+        needs_requisition: (inventory.find(inv => inv.medication === p.medicationName)?.quantity - dispensedQtys[i]) < 500
+      }));
+      
+      await dispenseMedication(selectedClinic!.id, selectedItem.patient_id, selectedItem.encounter_id, payload);
+      await updateQueueStatus(selectedItem.id, 'COMPLETED' as any);
       setOpenDispenseDialog(false);
+      notify("Dispensing session finalized", "success");
     } catch (err: any) { notify(err.message, "error"); }
   };
 
-  const renderQueueItem = (item: QueueItem) => (
-    <TableRow key={item.id} hover>
-      <TableCell sx={{ fontWeight: 700 }}>{item.patient_name}</TableCell>
-      <TableCell>
-        <Chip label={item.triage_level || 'Stable'} size="small" color={item.triage_level === 'Emergency' ? 'error' : 'default'} />
-      </TableCell>
-      <TableCell align="right">
-        <Button variant="contained" onClick={() => handleOpenDispense(item)} sx={{ borderRadius: 2 }}>Fulfill</Button>
-      </TableCell>
-    </TableRow>
-  );
-
   return (
-    <StationLayout title="Pharmacy Station" stationName="Pharmacy" showPatientContext={false}>
+    <StationLayout title="Pharmacy" stationName="Pharmacy" showPatientContext={false}>
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" fontWeight="900" color="primary">PHARMACY OPERATIONS</Typography>
         <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} sx={{ mt: 3 }}>
           <Tab label="Patient Queue" sx={{ fontWeight: 800 }} />
-          <Tab label="Live Inventory" sx={{ fontWeight: 800 }} />
+          <Tab label="Inventory Management" sx={{ fontWeight: 800 }} />
         </Tabs>
       </Box>
 
       {tabValue === 0 ? (
-        <Grid container spacing={4}>
-          <Grid item xs={12} lg={9}>
-            <Paper sx={{ p: 4, borderRadius: 4, boxShadow: 'none', border: '1px solid #eee' }}>
-              <Box display="flex" justifyContent="space-between" mb={4}>
-                <Typography variant="h6" fontWeight="900">Dispensing Queue</Typography>
-                <Stack direction="row" spacing={2}>
-                  <Button variant="outlined" startIcon={<CloudUploadIcon />} onClick={() => setOpenBatchDialog(true)} sx={{ borderRadius: 2 }}>Batch Upload</Button>
-                  <QrScannerModal onScan={async (t) => {
-                    const p = await getPatientByQrToken(t);
-                    const i = waitingList.find(w => w.patient_id === p?.id);
-                    if (i) handleOpenDispense(i);
-                  }} />
-                </Stack>
-              </Box>
-              <TableContainer>
-                <Table>
-                  <TableHead sx={{ bgcolor: '#f8f9fa' }}>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 800 }}>PATIENT</TableCell>
-                      <TableCell sx={{ fontWeight: 800 }}>TRIAGE</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 800 }}>ACTION</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {waitingList.length === 0 ? (
-                      <TableRow><TableCell colSpan={3} align="center">Queue is empty.</TableCell></TableRow>
-                    ) : (
-                      waitingList.map(renderQueueItem)
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Paper>
-          </Grid>
-          <Grid item xs={12} lg={3}>
-             <Card sx={{ bgcolor: 'primary.main', color: 'white', borderRadius: 4 }}>
-                <CardContent>
-                  <Typography variant="overline" sx={{ fontWeight: 800, opacity: 0.8 }}>ACTIVE QUEUE</Typography>
-                  <Typography variant="h2" fontWeight="900">{waitingList.length}</Typography>
-                </CardContent>
-             </Card>
-          </Grid>
-        </Grid>
+        <Paper sx={{ p: 4, borderRadius: 4 }}>
+          <Box display="flex" justifyContent="space-between" mb={4}>
+            <Typography variant="h6" fontWeight="900">Current Queue</Typography>
+            <Button variant="outlined" startIcon={<CloudUploadIcon />} onClick={() => setOpenBatchDialog(true)}>Batch Update</Button>
+          </Box>
+          <TableContainer>
+            <Table>
+              <TableHead><TableRow><TableCell sx={{ fontWeight: 800 }}>PATIENT</TableCell><TableCell align="right">ACTION</TableCell></TableRow></TableHead>
+              <TableBody>
+                {waitingList.map(item => (
+                  <TableRow key={item.id} hover>
+                    <TableCell sx={{ fontWeight: 700 }}>{item.patient_name}</TableCell>
+                    <TableCell align="right"><Button variant="contained" onClick={() => handleOpenDispense(item)}>Process</Button></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
       ) : <InventoryView />}
 
-      <Dialog open={openDispenseDialog} onClose={() => setOpenDispenseDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ fontWeight: 900 }}>FULFILLMENT SESSION: {selectedItem?.patient_name}</DialogTitle>
+      <Dialog open={openDispenseDialog} onClose={() => setOpenDispenseDialog(false)} maxWidth="lg" fullWidth>
+        <DialogTitle sx={{ fontWeight: 900 }}>PHARMACY FULFILLMENT: {selectedItem?.patient_name}</DialogTitle>
         <DialogContent dividers sx={{ p: 4 }}>
-          <Grid container spacing={4}>
-            <Grid item xs={12} md={5}>
-              <Box sx={{ p: 3, bgcolor: '#f4f6f8', borderRadius: 3, mb: 3 }}>
-                <Typography variant="caption" fontWeight="900" color="textSecondary">DIAGNOSIS</Typography>
-                <Typography variant="h6" fontWeight="800" color="primary" gutterBottom>{currentDiagnosis?.diagnosis || 'N/A'}</Typography>
-                <Divider sx={{ my: 1.5 }} />
-                <Typography variant="caption" fontWeight="900" color="textSecondary">VITALS LOG</Typography>
-                <Typography variant="body2" display="block">BP: {currentVitals?.blood_pressure || '--'}</Typography>
-                <Typography variant="body2" display="block">Pulse: {currentVitals?.heart_rate || '--'} bpm</Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={7}>
-              <Typography variant="subtitle2" fontWeight="900" color="primary" sx={{ mb: 2 }}>PRESCRIBED REGIMEN</Typography>
-              {currentPrescription?.prescriptions.map((p, i) => (
-                <Paper key={i} variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Box>
-                    <Typography variant="body2" fontWeight="800">{p.medicationName}</Typography>
-                    <Typography variant="caption" color="textSecondary">{p.dosage} | {p.frequency}</Typography>
-                  </Box>
-                  <TextField 
-                    size="small" type="number" label="Dispensed"
-                    value={dispensedQuantities[i] ?? ''} 
-                    onChange={(e) => setDispensedQuantities({...dispensedQuantities, [i]: Number(e.target.value)})} 
-                    sx={{ width: 100 }} 
-                  />
-                </Paper>
-              ))}
-            </Grid>
-          </Grid>
+          <Stack spacing={4}>
+            {currentPrescription?.prescriptions.map((p: any, i: number) => (
+              <Paper key={i} variant="outlined" sx={{ p: 3, borderRadius: 3, bgcolor: '#fcfdff' }}>
+                <Grid container spacing={3} alignItems="center">
+                  <Grid item xs={12} md={3}>
+                    <Typography variant="body1" fontWeight="800">{p.medicationName}</Typography>
+                    <Typography variant="caption" color="textSecondary">Order: {p.quantity} units | {p.instructions}</Typography>
+                  </Grid>
+
+                  <Grid item xs={12} md={3}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Status</InputLabel>
+                      <Select value={dispenseModes[i]} label="Status" onChange={(e) => setDispenseModes({...dispenseModes, [i]: e.target.value})}>
+                        <MenuItem value="FULL">Dispense Full</MenuItem>
+                        <MenuItem value="PARTIAL">Partial Dispense</MenuItem>
+                        <MenuItem value="OUT_OF_STOCK">Out of Stock</MenuItem>
+                        <MenuItem value="SUBSTITUTE">Substitute Item</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <Grid container spacing={2}>
+                      {dispenseModes[i] === 'PARTIAL' && (
+                        <>
+                          <Grid item xs={6}><TextField fullWidth size="small" type="number" label="Qty Available" onChange={(e) => setDispensedQtys({...dispensedQtys, [i]: Number(e.target.value)})}/></Grid>
+                          <Grid item xs={6}><TextField fullWidth size="small" type="date" label="Return Date" InputLabelProps={{ shrink: true }} onChange={(e) => setReturnDates({...returnDates, [i]: e.target.value})}/></Grid>
+                        </>
+                      )}
+                      {dispenseModes[i] === 'SUBSTITUTE' && (
+                        <>
+                          <Grid item xs={6}><Autocomplete options={inventory.map(m => m.medication)} size="small" renderInput={(p) => <TextField {...p} label="Select Generic"/>} onChange={(_, v) => setSubsMeds({...subsMeds, [i]: v || ''})}/></Grid>
+                          <Grid item xs={6}><TextField fullWidth size="small" label="Reason" onChange={(e) => setReasons({...reasons, [i]: e.target.value})}/></Grid>
+                        </>
+                      )}
+                      {dispenseModes[i] === 'OUT_OF_STOCK' && (
+                        <Grid item xs={12}><TextField fullWidth size="small" type="date" label="Instruction: Come back on" InputLabelProps={{ shrink: true }} onChange={(e) => setReturnDates({...returnDates, [i]: e.target.value})}/></Grid>
+                      )}
+                    </Grid>
+                  </Grid>
+                </Grid>
+              </Paper>
+            ))}
+          </Stack>
         </DialogContent>
-        <DialogActions sx={{ p: 4 }}>
-           <Button onClick={() => setOpenDispenseDialog(false)} sx={{ fontWeight: 700 }}>Cancel</Button>
-           <Button variant="contained" onClick={handleFinalize} sx={{ fontWeight: 900, px: 6, borderRadius: 2 }}>Complete Session</Button>
-        </DialogActions>
+        <DialogActions sx={{ p: 3 }}><Button onClick={() => setOpenDispenseDialog(false)}>Cancel</Button><Button variant="contained" onClick={handleFinalize} sx={{ fontWeight: 900, px: 6 }}>Process Order</Button></DialogActions>
       </Dialog>
-      
       <BatchEntry open={openBatchDialog} onClose={() => setOpenBatchDialog(false)} onSuccess={() => setOpenBatchDialog(false)} />
-      
-      <Dialog open={openSummaryDialog} onClose={() => setOpenSummaryDialog(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 900 }}>SESSION SUMMARY</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">Medications updated successfully in clinic inventory.</Typography>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button fullWidth variant="contained" onClick={() => setOpenSummaryDialog(false)} sx={{ fontWeight: 800 }}>Done</Button>
-        </DialogActions>
-      </Dialog>
     </StationLayout>
   );
 };
