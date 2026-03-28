@@ -3,16 +3,18 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useAppStore } from './store/useAppStore';
 import { getUserProfile, subscribeToAuthChanges } from './services/authService';
 
-// FULL SCREEN IMPORTS - Verified from Explorer
+// FULL SCREEN IMPORTS - Matches your File Explorer exactly
 import LandingPage from './screens/LandingPage';
-import LoginPage from './screens/LoginPage';
+import LoginPage from './screens/LoginPage'; 
 import ClinicSelection from './screens/ClinicSelection';
-import ClinicOperationDashboard from './screens/ClinicOperationDashboard'; // Fixed from "Dashboard"
+import ClinicOperationsDashboard from './screens/ClinicOperationsDashboard'; // FIXED: Added 's' to match filename
 import RegistrationStation from './screens/RegistrationStation';
 import VitalsStation from './screens/VitalsStation';
 import DoctorDashboard from './screens/DoctorDashboard';
 import PharmacyStation from './screens/PharmacyStation';
 import QueueBoard from './screens/QueueBoard';
+import AdminDashboard from './screens/AdminDashboard';
+import AdminUserManagement from './screens/AdminUserManagement';
 
 import { CircularProgress, Box, Typography, Container, Paper } from '@mui/material';
 
@@ -31,14 +33,13 @@ const App: React.FC = () => {
       try {
         if (firebaseUser) {
           const profile = await getUserProfile(firebaseUser.uid);
-          // profile may be null if user exists in Auth but not in Firestore 'users'
           setUser(firebaseUser, profile);
         } else {
           setUser(null, null);
         }
         setAuthError(null);
       } catch (err) {
-        console.error("Critical Auth/Profile Fetch Error:", err);
+        console.error("Critical Auth/Profile Sync Error:", err);
         setAuthError("Failed to synchronize your medical profile. Please refresh.");
       } finally {
         setLoading(false);
@@ -109,7 +110,7 @@ const App: React.FC = () => {
 
         {/* STEP 4: PROTECTED CLINICAL STATIONS (Requires Authorized Profile + Active Clinic Session) */}
         <Route path="/dashboard" element={
-          isAuthorized() && selectedClinic ? <ClinicOperationDashboard /> : <Navigate to="/clinic-selection" />
+          isAuthorized() && selectedClinic ? <ClinicOperationsDashboard /> : <Navigate to="/clinic-selection" />
         } />
 
         <Route path="/registration" element={
@@ -130,6 +131,14 @@ const App: React.FC = () => {
 
         <Route path="/queue" element={
           isAuthorized() && selectedClinic ? <QueueBoard countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+        } />
+
+        <Route path="/admin" element={
+          userProfile?.role === 'global_admin' ? <AdminDashboard /> : <Navigate to="/" />
+        } />
+
+        <Route path="/admin/users" element={
+          userProfile?.role === 'global_admin' ? <AdminUserManagement /> : <Navigate to="/" />
         } />
 
         {/* CATCH-ALL REDIRECT */}
