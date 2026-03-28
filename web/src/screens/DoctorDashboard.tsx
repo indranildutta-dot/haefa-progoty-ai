@@ -1,85 +1,62 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { 
-  Typography, 
-  Box, 
-  Grid, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow, 
-  Button, 
-  Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Alert,
-  Card,
-  CardContent,
-  Container,
-  Paper,
-  Divider,
-  CircularProgress
+  Typography, Box, Grid, Table, TableBody, TableCell, 
+  TableContainer, TableHead, TableRow, Button, Chip,
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  TextField, Alert, Card, CardContent, Paper, Divider,
+  Stack, Tooltip
 } from '@mui/material';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import WarningIcon from '@mui/icons-material/Warning';
 import { 
-  collection, 
-  query, 
-  where, 
-  getDocs 
+  Assignment as AssignmentIcon, 
+  Warning as WarningIcon,
+  Error as ErrorIcon,
+  PregnantWoman as PregnancyIcon,
+  LocalHospital as TriageIcon,
+  Timer as TimerIcon
+} from '@mui/icons-material';
+import { 
+  collection, query, where, getDocs 
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
 import { subscribeToQueue, updateQueueStatus, callNextPatient } from '../services/queueService';
 import { 
-  saveConsultation, 
-  getVitalsByEncounter,
-  getEncounterById,
-  updateEncounterStatus,
-  getPatientHistory
+  saveConsultation, getVitalsByEncounter, getEncounterById,
+  updateEncounterStatus, getPatientHistory
 } from '../services/encounterService';
 import { getTriageAssessmentByEncounter } from '../services/triageService';
 import { updateQueueMetric } from '../services/queueMetricsService';
 import { getPatientById } from '../services/patientService';
 import { getPatientByQrToken } from '../services/qrService';
-import { QueueItem, Encounter, Patient, Prescription, VitalsRecord, TriageAssessment } from '../types';
+import { QueueItem, Encounter, Patient, Prescription, VitalsRecord, TriageAssessment, SafetyAlert } from '../types';
+
 import PatientHistoryTimeline from '../components/PatientHistoryTimeline';
 import PatientSummaryPanel from '../components/PatientSummaryPanel';
 import ConsultationPanel from '../components/ConsultationPanel';
 import VitalsSnapshot from '../components/VitalsSnapshot';
 import AlertBanner from '../components/AlertBanner';
 import QrScannerModal from '../components/QrScannerModal';
-import { auth } from '../firebase';
+import StationLayout from '../components/StationLayout';
+import PatientContextBar from '../components/PatientContextBar'; // Newly updated sidebar
 import { useAppStore } from '../store/useAppStore';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import { checkPrescriptionSafety } from '../services/medicationSafetyService';
-import { SafetyAlert } from '../types';
+import { initialClinicalAssessment } from '../components/ClinicalAssessmentPanel';
 
 interface DoctorDashboardProps {
   countryId: string;
 }
 
-import StationLayout from '../components/StationLayout';
-import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
-
-import { initialClinicalAssessment } from '../components/ClinicalAssessmentPanel';
-
 const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
-  const { notify, selectedCountry, selectedClinic, selectedPatient, setSelectedPatient, userProfile } = useAppStore();
+  const { notify, selectedCountry, selectedClinic, setSelectedPatient, userProfile } = useAppStore();
   const { isMobile, isTablet } = useResponsiveLayout();
+  
   const [waitingList, setWaitingList] = useState<QueueItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<QueueItem | null>(null);
   const [currentEncounter, setCurrentEncounter] = useState<Encounter | null>(null);
   const [currentPatient, setCurrentPatient] = useState<Patient | null>(null);
   const [currentVitals, setCurrentVitals] = useState<VitalsRecord | null>(null);
   const [currentTriage, setCurrentTriage] = useState<TriageAssessment | null>(null);
-  const [patientHistoryCount, setPatientHistoryCount] = useState<number>(0);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [permissionError, setPermissionError] = useState<boolean>(false);
+  const [consultationCount, setConsultationCount] = useState(0);
 
   // Consultation Form State
   const [consultData, setConsultData] = useState({
@@ -92,15 +69,13 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
     referrals: [] as string[]
   });
 
-  const [consultationCount, setConsultationCount] = useState(0);
-
   const [safetyAlerts, setSafetyAlerts] = useState<SafetyAlert[]>([]);
   const [openSafetyDialog, setOpenSafetyDialog] = useState(false);
   const [overrideJustification, setOverrideJustification] = useState('');
-  
   const [consultationStartTime, setConsultationStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState<string>('00:00');
 
+  // Timer logic
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (selectedItem && consultationStartTime) {
@@ -114,461 +89,143 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
     return () => clearInterval(interval);
   }, [selectedItem, consultationStartTime]);
 
+  // Queue Subscription
   useEffect(() => {
-    const fetchConsultationCount = async () => {
-      try {
-        if (!selectedCountry || !selectedClinic || !userProfile?.isApproved) return;
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
-        
-        const q = query(
-          collection(db, "diagnoses"),
-          where("country_code", "==", selectedCountry.id),
-          where("clinic_id", "==", selectedClinic.id),
-          where("created_at", ">=", startOfDay)
-        );
-        const snapshot = await getDocs(q);
-        setConsultationCount(snapshot.size);
-      } catch (err) {
-        console.error("Error fetching consultation count:", err);
-      }
-    };
-    fetchConsultationCount();
-  }, [selectedCountry, selectedClinic, userProfile?.isApproved]);
-
-  useEffect(() => {
-    if (!userProfile?.isApproved || !selectedClinic) {
-      setWaitingList([]);
-      return;
-    }
-
-    setPermissionError(false);
+    if (!selectedClinic) return;
     const unsubscribe = subscribeToQueue(
       ['READY_FOR_DOCTOR', 'IN_CONSULTATION'] as any, 
-      (items) => {
-        setWaitingList(items);
-      },
-      (error) => {
-        console.error("Queue subscription error:", error);
-        if (error.code === 'permission-denied' || error.message?.includes('permission')) {
-          setPermissionError(true);
-        }
-      }
+      setWaitingList,
+      (err) => notify("Queue sync error", "error")
     );
     return () => unsubscribe();
-  }, [userProfile?.isApproved, selectedClinic]);
-
-  const handleCallNextPatient = async () => {
-    const readyPatients = waitingList.filter(p => p.status === 'READY_FOR_DOCTOR');
-    if (readyPatients.length === 0) {
-      notify("No patients waiting for consultation.", "info");
-      return;
-    }
-    
-    const nextPatient = readyPatients[0];
-    
-    try {
-      await handleOpenConsult(nextPatient);
-      notify(`Called next patient: ${nextPatient.patient_name || nextPatient.patient_id}`, 'success');
-    } catch (err) {
-      console.error(err);
-      setErrorMsg("Failed to call next patient.");
-      notify("Failed to call next patient", "error");
-    }
-  };
+  }, [selectedClinic]);
 
   const handleOpenConsult = async (item: QueueItem) => {
     setSelectedItem(item);
     setConsultationStartTime(Date.now());
-    setElapsedTime('00:00');
     try {
-      const uid = auth.currentUser?.uid || 'unknown';
       if (item.status === 'READY_FOR_DOCTOR') {
-        await callNextPatient(item.id!, uid);
         await updateEncounterStatus(item.encounter_id, 'IN_CONSULTATION');
-        await updateQueueMetric(item.clinic_id, {
-          ready_for_doctor: -1,
-          in_consultation: 1
-        });
+        await updateQueueStatus(item.id!, 'IN_CONSULTATION' as any);
       }
 
-      const [patient, encounter, vitals, triage, history] = await Promise.all([
+      const [patient, encounter, vitals, triage] = await Promise.all([
         getPatientById(item.patient_id),
         getEncounterById(item.encounter_id),
         getVitalsByEncounter(item.encounter_id),
-        getTriageAssessmentByEncounter(item.encounter_id),
-        getPatientHistory(item.patient_id)
+        getTriageAssessmentByEncounter(item.encounter_id)
       ]);
-      setCurrentPatient(patient);
-      setSelectedPatient(patient);
+
+      // Attach vitals/triage to patient for the Sidebar Context
+      const patientWithVitals = { ...patient, currentVitals: vitals, triage_level: item.triage_level };
+      
+      setCurrentPatient(patientWithVitals);
+      setSelectedPatient(patientWithVitals);
       setCurrentEncounter(encounter);
       setCurrentVitals(vitals);
       setCurrentTriage(triage);
-      setPatientHistoryCount(history.filter(e => e.encounter_status === 'COMPLETED').length);
     } catch (err) {
-      console.error(err);
-      setErrorMsg("Failed to load patient data.");
-      setSelectedItem(null);
+      notify("Failed to load clinical data", "error");
     }
   };
 
-  const handleSaveConsult = async (forceStatus?: 'WAITING_FOR_PHARMACY' | 'COMPLETED') => {
-    if (!selectedItem) return;
-    
-    if (consultData.prescriptions.length > 0) {
-      const alerts = await checkPrescriptionSafety(selectedItem.patient_id, consultData.prescriptions);
-      if (alerts.length > 0) {
-        setSafetyAlerts(alerts);
-        setOpenSafetyDialog(true);
-        return;
-      }
-    }
-    
-    await executeSaveConsult(forceStatus);
-  };
-
-  const executeSaveConsult = async (forceStatus?: 'WAITING_FOR_PHARMACY' | 'COMPLETED') => {
-    if (!selectedItem) return;
-    try {
-      const uid = auth.currentUser?.uid || 'unknown';
-      
-      const finalNotes = overrideJustification 
-        ? `${consultData.notes}\n\n[Safety Override Justification]: ${overrideJustification}`
-        : consultData.notes;
-
-      const hasPrescriptions = consultData.prescriptions.length > 0;
-      await saveConsultation(
-        {
-          encounter_id: selectedItem.encounter_id,
-          patient_id: selectedItem.patient_id,
-          chief_complaint: consultData.treatmentNotes,
-          diagnosis: consultData.diagnosis,
-          notes: finalNotes,
-          clinicalAssessment: consultData.clinicalAssessment,
-          labInvestigations: consultData.labInvestigations,
-          referrals: consultData.referrals,
-          created_by: uid
-        },
-        hasPrescriptions ? {
-          encounter_id: selectedItem.encounter_id,
-          patient_id: selectedItem.patient_id,
-          prescriptions: consultData.prescriptions,
-          created_by: uid
-        } : undefined
-      );
-
-      let nextStatus = forceStatus;
-      if (hasPrescriptions && nextStatus === 'COMPLETED') {
-        nextStatus = 'WAITING_FOR_PHARMACY';
-      } else if (!forceStatus) {
-        nextStatus = hasPrescriptions ? 'WAITING_FOR_PHARMACY' : 'COMPLETED';
-      }
-
-      await updateQueueStatus(selectedItem.id!, nextStatus as any);
-      
-      if (selectedCountry && selectedClinic) {
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
-        const q = query(
-          collection(db, "diagnoses"), 
-          where("country_code", "==", selectedCountry.id),
-          where("clinic_id", "==", selectedClinic.id),
-          where("created_at", ">=", startOfDay)
-        );
-        const snapshot = await getDocs(q);
-        setConsultationCount(snapshot.size);
-      }
-
-      notify(`Consultation completed for ${currentPatient?.given_name}`, 'success');
-      setOpenSafetyDialog(false);
-      setOverrideJustification('');
-      setSelectedItem(null);
-      setSelectedPatient(null);
-      setConsultData({ diagnosis: '', notes: '', treatmentNotes: '', prescriptions: [], clinicalAssessment: initialClinicalAssessment, labInvestigations: [], referrals: [] });
-    } catch (err) {
-      console.error(err);
-      setErrorMsg("Failed to save consultation.");
-      notify("Failed to save consultation", "error");
-    }
-  };
-
-  const handleCancelEncounter = async () => {
-    if (!selectedItem) return;
-    try {
-      await updateQueueStatus(selectedItem.id!, 'READY_FOR_DOCTOR');
-      await updateEncounterStatus(selectedItem.encounter_id, 'READY_FOR_DOCTOR');
-      await updateQueueMetric(selectedItem.clinic_id, {
-        ready_for_doctor: 1,
-        in_consultation: -1
-      });
-      notify("Consultation cancelled. Patient returned to queue.", "info");
-    } catch (err) {
-      console.error("Failed to cancel encounter:", err);
-      notify("Failed to cancel encounter.", "error");
-    }
-    setSelectedItem(null);
-    setSelectedPatient(null);
-    setConsultData({ diagnosis: '', notes: '', treatmentNotes: '', prescriptions: [], clinicalAssessment: initialClinicalAssessment, labInvestigations: [], referrals: [] });
-    setConsultationStartTime(null);
-  };
-
-  const renderQueueView = () => {
-    if (!userProfile?.isApproved) {
-      return (
-        <Alert severity="warning" sx={{ borderRadius: 3, mb: 3 }}>
-          <Typography variant="subtitle2" fontWeight="bold">Account Pending Approval</Typography>
-          Your account must be approved by a Global Administrator before you can access the patient queue.
-        </Alert>
-      );
-    }
-
-    if (permissionError) {
-      return (
-        <Alert severity="error" sx={{ borderRadius: 3, mb: 3 }}>
-          <Typography variant="subtitle2" fontWeight="bold">Permission Error</Typography>
-          You do not have permission to view the patient queue for this clinic. 
-          Please contact your administrator to ensure your clinic assignments and security rules are correctly configured.
-        </Alert>
-      );
-    }
-
-    return (
-      <Box>
-        <Box sx={{ mb: isMobile ? 2 : 4, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexDirection: isMobile ? 'column' : 'row', gap: 2 }}>
-          <Box sx={{ display: 'flex', gap: 2, width: isMobile ? '100%' : 'auto' }}>
-            <Button variant="contained" color="primary" onClick={handleCallNextPatient} disabled={waitingList.length === 0} fullWidth={isMobile} sx={{ fontWeight: 700, borderRadius: 2, minHeight: '44px' }}>
-              Call Next Patient
-            </Button>
-          </Box>
-        </Box>
-
-        {successMsg && <Alert severity="success" sx={{ mb: 3, borderRadius: 3 }}>{successMsg}</Alert>}
-        {errorMsg && <Alert severity="error" sx={{ mb: 3, borderRadius: 3 }}>{errorMsg}</Alert>}
-
-        <Grid container spacing={3}>
-          <Grid size={{ xs: 12, lg: 9 }}>
-            <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-              <CardContent sx={{ p: isMobile ? 2 : 3 }}>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexDirection={isMobile ? 'column' : 'row'} gap={2}>
-                  <Box display="flex" alignItems="center">
-                    <AssignmentIcon color="primary" sx={{ mr: 1 }} />
-                    <Typography variant="h6" fontWeight="800">Patients Ready</Typography>
-                  </Box>
-                  <QrScannerModal onScan={async (token) => {
-                    const patient = await getPatientByQrToken(token);
-                    if (patient) {
-                      const item = waitingList.find(i => i.patient_id === patient.id);
-                      if (item) {
-                        handleOpenConsult(item);
-                      } else {
-                        notify("Patient not found in queue.", "error");
-                      }
-                    } else {
-                      notify("Patient not found.", "error");
-                    }
-                  }} />
-                </Box>
-                
-                {isMobile || isTablet ? (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {waitingList.length === 0 ? (
-                      <Typography color="textSecondary" align="center" sx={{ py: 4 }}>No patients waiting.</Typography>
-                    ) : (
-                      waitingList.map((item) => {
-                        const waitTime = item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : 0;
-                        return (
-                          <Card key={item.id} variant="outlined" sx={{ borderRadius: 2 }}>
-                            <CardContent sx={{ p: 2 }}>
-                              <Box display="flex" justifyContent="space-between" alignItems="start">
-                                <Box>
-                                  <Typography variant="subtitle1" fontWeight="bold">{item.patient_name || item.patient_id}</Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    Wait: {waitTime} mins
-                                  </Typography>
-                                </Box>
-                                <Chip 
-                                  label={item.triage_level?.toUpperCase() || 'STANDARD'} 
-                                  size="small" 
-                                  color={item.triage_level === 'emergency' ? 'error' : item.triage_level === 'urgent' ? 'warning' : 'default'}
-                                />
-                              </Box>
-                              <Box display="flex" justifyContent="flex-end" mt={2}>
-                                <Button 
-                                  variant={item.status === 'IN_CONSULTATION' ? "outlined" : "contained"} 
-                                  color={item.status === 'IN_CONSULTATION' ? "secondary" : "primary"}
-                                  size="large" 
-                                  onClick={() => handleOpenConsult(item)}
-                                  sx={{ minHeight: '44px', borderRadius: 2 }}
-                                >
-                                  {item.status === 'IN_CONSULTATION' ? 'Resume' : 'Start'}
-                                </Button>
-                              </Box>
-                            </CardContent>
-                          </Card>
-                        );
-                      })
-                    )}
-                  </Box>
-                ) : (
-                  <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-                    <Table>
-                      <TableHead sx={{ bgcolor: 'grey.50' }}>
-                        <TableRow>
-                          <TableCell sx={{ fontWeight: 700 }}>Patient Name</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>Wait Time</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>Priority</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {waitingList.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={4} align="center">
-                              <Typography color="textSecondary" sx={{ py: 4 }}>No patients waiting.</Typography>
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          waitingList.map((item) => {
-                            const waitTime = item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : 0;
-                            return (
-                              <TableRow key={item.id} hover>
-                                <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_name || item.patient_id}</TableCell>
-                                <TableCell>{waitTime} mins</TableCell>
-                                <TableCell>
-                                  <Chip label={item.triage_level?.toUpperCase() || 'STANDARD'} size="small" />
-                                </TableCell>
-                                <TableCell align="right">
-                                  <Button 
-                                    variant={item.status === 'IN_CONSULTATION' ? "outlined" : "contained"} 
-                                    color={item.status === 'IN_CONSULTATION' ? "secondary" : "primary"}
-                                    size="large" 
-                                    onClick={() => handleOpenConsult(item)}
-                                    sx={{ minHeight: '44px', borderRadius: 2 }}
-                                  >
-                                    {item.status === 'IN_CONSULTATION' ? 'Resume' : 'Start'}
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })
-                        )}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid size={{ xs: 12, lg: 3 }}>
-            <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', bgcolor: 'primary.light', color: 'primary.contrastText' }}>
-              <CardContent>
-                <Typography variant="subtitle2" sx={{ opacity: 0.8, fontWeight: 'bold', textTransform: 'uppercase' }}>Consultations Today</Typography>
-                <Typography variant="h3" fontWeight="800">{consultationCount}</Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      </Box>
-    );
-  };
-
-  const renderConsultationWorkspace = () => {
-    if (!selectedItem || !currentPatient) return null;
-    
-    return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: '#f1f5f9' }}>
-        {/* Workspace Area */}
-        <Box sx={{ flexGrow: 1, p: isMobile ? 1 : 2 }}>
-          <Grid container spacing={2}>
-            {/* Alerts Section */}
-            <Grid size={12}>
-              {currentTriage && currentTriage.allergies && currentTriage.allergies.length > 0 && (
-                <AlertBanner 
-                  type="allergy" 
-                  title="Allergy Alert" 
-                  message={`Patient is allergic to: ${currentTriage.allergies.join(', ')}`} 
-                />
-              )}
-              {selectedItem.triage_level === 'emergency' && (
-                <AlertBanner 
-                  type="critical" 
-                  title="Critical Triage" 
-                  message="Patient was triaged as EMERGENCY. Immediate attention required." 
-                />
-              )}
-            </Grid>
-
-            {/* Main Content Grid */}
-            <Grid size={{ xs: 12, lg: 3 }} sx={{ display: isMobile ? 'none' : 'block' }}>
-              <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-                <PatientSummaryPanel patient={currentPatient} triage={currentTriage} />
-                <Divider sx={{ my: 2 }} />
-                <VitalsSnapshot vitals={currentVitals} />
-              </Paper>
-            </Grid>
-
-            <Grid size={{ xs: 12, lg: 6 }}>
-              <Paper elevation={0} sx={{ p: isMobile ? 2 : 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                  <Typography variant="h6" fontWeight="800" color="secondary.main">CONSULTATION</Typography>
-                  <Typography variant="h5" fontWeight="900" sx={{ fontFamily: 'monospace' }}>{elapsedTime}</Typography>
-                </Box>
-                <ConsultationPanel data={consultData} onChange={setConsultData} />
-                
-                <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <Button fullWidth variant="outlined" color="secondary" onClick={() => handleSaveConsult('WAITING_FOR_PHARMACY')} disabled={!consultData.diagnosis} sx={{ fontWeight: 700, py: 1.5, minHeight: '44px' }}>
-                    Send to Pharmacy
-                  </Button>
-                  <Button fullWidth variant="contained" color="secondary" onClick={() => handleSaveConsult('COMPLETED')} disabled={!consultData.diagnosis} size="large" sx={{ fontWeight: 800, py: 2, minHeight: '48px' }}>
-                    Complete Consultation
-                  </Button>
-                  <Button fullWidth color="error" variant="text" onClick={handleCancelEncounter} sx={{ minHeight: '44px' }}>
-                    Cancel Encounter
-                  </Button>
-                </Box>
-              </Paper>
-            </Grid>
-
-            <Grid size={{ xs: 12, lg: 3 }}>
-              <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>PATIENT HISTORY</Typography>
-                <PatientHistoryTimeline patientId={currentPatient.id!} />
-              </Paper>
-            </Grid>
-          </Grid>
-        </Box>
-
-        {/* Safety Override Dialog */}
-        <Dialog open={openSafetyDialog} onClose={() => setOpenSafetyDialog(false)} maxWidth="sm" fullWidth>
-          <DialogTitle sx={{ color: 'error.main', fontWeight: '900', textTransform: 'uppercase' }}>Safety Alerts</DialogTitle>
-          <DialogContent dividers>
-            {safetyAlerts.map((alert, idx) => (
-              <Alert key={idx} severity={alert.severity === 'high' ? 'error' : 'warning'} sx={{ mb: 1 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>{alert.type} Alert</Typography>
-                <Typography variant="body2">{alert.description}</Typography>
-              </Alert>
-            ))}
-            <TextField fullWidth multiline rows={3} sx={{ mt: 2 }} label="Override Justification" value={overrideJustification} onChange={(e) => setOverrideJustification(e.target.value)} />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setOpenSafetyDialog(false)}>Cancel</Button>
-            <Button variant="contained" color="error" onClick={() => executeSaveConsult()} disabled={!overrideJustification.trim()}>Override & Save</Button>
-          </DialogActions>
-        </Dialog>
-      </Box>
-    );
-  };
-
-  return (
-    <StationLayout
-      title="Doctor Dashboard"
-      stationName="Doctor"
-      showPatientContext={!!selectedItem}
-    >
-      {!selectedItem ? renderQueueView() : renderConsultationWorkspace()}
-    </StationLayout>
+  // RISK BADGE RENDERER: This shows indicators in the queue list
+  const renderRiskBadges = (item: any) => (
+    <Stack direction="row" spacing={0.5}>
+      {/* Triage Chip */}
+      <Chip 
+        label={item.triage_level?.toUpperCase() || 'STANDARD'} 
+        size="small"
+        sx={{ 
+          fontWeight: 900, fontSize: '0.65rem',
+          bgcolor: item.triage_level === 'emergency' ? '#ef4444' : item.triage_level === 'urgent' ? '#f59e0b' : '#10b981',
+          color: 'white'
+        }}
+      />
+      {/* Pregnancy Alert Badge */}
+      {item.is_pregnant === 'yes' && (
+        <Tooltip title="Patient is Pregnant">
+          <Chip icon={<PregnancyIcon sx={{ fontSize: '12px !important', color: 'white !important' }} />} label="PREG" size="small" sx={{ bgcolor: '#be123c', color: 'white', fontWeight: 900, fontSize: '0.65rem' }} />
+        </Tooltip>
+      )}
+      {/* Allergy Alert Badge */}
+      {item.has_allergies && (
+        <Tooltip title="Known Allergies">
+          <Chip icon={<ErrorIcon sx={{ fontSize: '12px !important', color: 'white !important' }} />} label="ALGY" size="small" sx={{ bgcolor: '#e11d48', color: 'white', fontWeight: 900, fontSize: '0.65rem' }} />
+        </Tooltip>
+      )}
+    </Stack>
   );
-};
 
-export default DoctorDashboard;
+  const renderQueueView = () => (
+    <Container maxWidth="xl" sx={{ mt: 3 }}>
+      <Grid container spacing={3}>
+        <Grid item xs={12} lg={9}>
+          <Card sx={{ borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+                <Typography variant="h6" fontWeight="900">Patient Queue</Typography>
+                <Button variant="contained" onClick={() => handleOpenConsult(waitingList[0])} disabled={waitingList.length === 0}>Call Next Patient</Button>
+              </Box>
+              
+              <TableContainer>
+                <Table>
+                  <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 800 }}>Wait</TableCell>
+                      <TableCell sx={{ fontWeight: 800 }}>Patient Name</TableCell>
+                      <TableCell sx={{ fontWeight: 800 }}>Risk & Triage</TableCell>
+                      <TableCell align="right">Action</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {waitingList.map((item) => (
+                      <TableRow key={item.id} hover>
+                        <TableCell>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                                <TimerIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                                <Typography variant="body2" fontWeight="bold">
+                                    {Math.floor((Date.now() - (item.created_at?.toDate().getTime() || Date.now())) / 60000)}m
+                                </Typography>
+                            </Stack>
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>{item.patient_name}</TableCell>
+                        <TableCell>{renderRiskBadges(item)}</TableCell>
+                        <TableCell align="right">
+                          <Button variant="contained" size="small" onClick={() => handleOpenConsult(item)}>
+                            {item.status === 'IN_CONSULTATION' ? 'RESUME' : 'START'}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} lg={3}>
+          <Card sx={{ borderRadius: 4, bgcolor: 'primary.main', color: 'white', textAlign: 'center', p: 2 }}>
+            <Typography variant="overline">Waiting for Review</Typography>
+            <Typography variant="h2" fontWeight="900">{waitingList.length}</Typography>
+          </Card>
+        </Grid>
+      </Grid>
+    </Container>
+  );
+
+  const renderConsultationWorkspace = () => (
+    <Box sx={{ bgcolor: '#f1f5f9', minHeight: '100vh' }}>
+      <PatientContextBar /> {/* Sidebar with Color Coded Risk Alerts */}
+      
+      <Container maxWidth="xl" sx={{ py: 3 }}>
+        <Grid container spacing={3}>
+          {/* Left Panel: Clinical Data */}
+          <Grid item xs={12} lg={3}>
+             <Stack spacing={3}>
+                <Paper sx={{ p: 2, borderRadius: 4, border: '1px solid #e2e8f0' }}>
+                    <VitalsSnapshot vitals={currentVitals} />
+                </Paper>
+                <Paper sx={{ p: 2, borderRadius: 4, border: '1px solid #e2e8f0' }}>
+                    <Typography variant

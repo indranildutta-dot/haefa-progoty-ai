@@ -1,489 +1,397 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Typography, 
-  Box, 
-  Paper, 
-  Grid, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow, 
-  Button, 
-  Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  InputAdornment,
-  Alert,
-  Divider,
-  Card,
-  CardContent,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
-  Container,
-  Stepper,
-  Step,
-  StepLabel
+  Typography, Box, Paper, Grid, Table, TableBody, TableCell, 
+  TableContainer, TableHead, TableRow, Button, Chip, TextField, 
+  InputAdornment, Alert, Divider, Card, CardContent, MenuItem, 
+  Select, FormControl, InputLabel, Stepper, Step, StepLabel, 
+  CircularProgress, Stack, RadioGroup, FormControlLabel, Radio, 
+  Autocomplete
 } from '@mui/material';
-import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
-import MonitorWeightIcon from '@mui/icons-material/MonitorWeight';
-import ThermostatIcon from '@mui/icons-material/Thermostat';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import { 
+  MonitorWeight as WeightIcon, 
+  Height as HeightIcon, 
+  Favorite as HeartIcon, 
+  Bloodtype as BloodIcon, 
+  Thermostat as TempIcon,
+  SmokingRooms as SmokingIcon,
+  WineBar as AlcoholIcon,
+  Warning as WarningIcon,
+  ArrowForward as NextIcon,
+  ArrowBack as BackIcon,
+  Save as SaveIcon,
+  History as HistoryIcon,
+  Assignment as AssignmentIcon,
+  Opacity as OpacityIcon
+} from '@mui/icons-material';
+
 import { subscribeToQueue, updateQueueStatus, updateQueueTriage } from '../services/queueService';
 import { saveVitals } from '../services/encounterService';
-import { QueueItem, Vitals, Patient, TriageLevel } from '../types';
+import { QueueItem, Vitals, TriageLevel } from '../types';
 import { getPatientById } from '../services/patientService';
 import { getPatientByQrToken } from '../services/qrService';
 import { auth } from '../firebase';
-import { VitalsSchema } from '../schemas/clinical';
 import { useAppStore } from '../store/useAppStore';
 import { evaluateTriage, TriageResult } from '../utils/triage';
 import QrScannerModal from '../components/QrScannerModal';
-
-interface VitalsStationProps {
-  countryId: string;
-}
-
 import StationLayout from '../components/StationLayout';
-import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
-const VitalsStation: React.FC<VitalsStationProps> = ({ countryId }) => {
-  const { notify, selectedPatient, setSelectedPatient, userProfile, selectedClinic } = useAppStore();
-  const { isMobile, isTablet } = useResponsiveLayout();
+const VitalsStation: React.FC<{ countryId: string }> = ({ countryId }) => {
+  const { notify, selectedPatient, setSelectedPatient, selectedClinic } = useAppStore();
+  
   const [waitingList, setWaitingList] = useState<QueueItem[]>([]);
   const [selectedQueueItem, setSelectedQueueItem] = useState<QueueItem | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [permissionError, setPermissionError] = useState<boolean>(false);
-
-  // Triage State
-  const [triageResult, setTriageResult] = useState<TriageResult | null>(null);
-  const [manualTriageLevel, setManualTriageLevel] = useState<TriageLevel | null>(null);
   const [activeStep, setActiveStep] = useState(0);
-  const steps = ['Vital Signs', 'Triage Assessment'];
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Vitals Form State
-  const [vitals, setVitals] = useState<Vitals>({
-    systolic: 120,
-    diastolic: 80,
-    heartRate: 72,
-    temperature: 36.5,
-    weight: 70,
-    height: 170,
-    bmi: 24.2,
-    oxygenSaturation: 98
+  // Expanded Clinical & Social State
+  const [vitals, setVitals] = useState<any>({
+    systolic: 120, diastolic: 80, heartRate: 72, temperature: 36.5,
+    weight: 70, height: 170, bmi: 24.2, oxygenSaturation: 98,
+    blood_sugar: '', hemoglobin: '', 
+    chief_complaint: '', onset_date: '', duration_value: '', duration_unit: 'days',
+    is_pregnant: 'no', pregnancy_months: '',
+    alcohol_consumption: 'none', tobacco_use: 'none', 
+    allergies: '', chronic_conditions: [],
+    nurse_priority: '' // Field for Manual Triage Override
   });
 
-  useEffect(() => {
-    if (!userProfile?.isApproved || !selectedClinic) {
-      setWaitingList([]);
-      return;
-    }
+  const steps = ['Complaints', 'Station 1: Body', 'Station 2: Vitals', 'Station 3: Labs & Risk'];
 
-    setPermissionError(false);
-    const unsubscribe = subscribeToQueue(
-      'WAITING_FOR_VITALS' as any, 
-      (items) => {
-        setWaitingList(items);
-      },
-      (error) => {
-        console.error("Queue subscription error:", error);
-        if (error.code === 'permission-denied' || error.message?.includes('permission')) {
-          setPermissionError(true);
-        }
-      }
-    );
+  useEffect(() => {
+    if (!selectedClinic) return;
+    const unsubscribe = subscribeToQueue('WAITING_FOR_VITALS' as any, setWaitingList, (err) => console.error(err));
     return () => unsubscribe();
-  }, [userProfile?.isApproved, selectedClinic]);
+  }, [selectedClinic]);
 
-  // Calculate BMI automatically
-  useEffect(() => {
-    if (vitals.weight && vitals.height) {
-      const heightInMeters = vitals.height / 100;
-      const bmi = vitals.weight / (heightInMeters * heightInMeters);
-      setVitals(prev => ({ ...prev, bmi: parseFloat(bmi.toFixed(1)) }));
+  // Automated Triage Suggestion
+  const systemTriage = evaluateTriage(vitals);
+
+  // Status Indicator Logic
+  const getVitalStatus = (type: 'bp' | 'hr' | 'o2', val1: number, val2?: number) => {
+    if (type === 'bp') {
+      if (val1 >= 180 || (val2 && val2 >= 120)) return { color: '#ef4444', label: 'EMERGENCY' };
+      if (val1 >= 140 || (val2 && val2 >= 90)) return { color: '#f59e0b', label: 'URGENT' };
+      return { color: '#10b981', label: 'NORMAL' };
     }
-  }, [vitals.weight, vitals.height]);
-
-  // Evaluate Triage automatically
-  useEffect(() => {
-    const result = evaluateTriage(vitals);
-    setTriageResult(result);
-  }, [vitals]);
+    if (type === 'hr') {
+      if (val1 > 120 || val1 < 50) return { color: '#ef4444', label: 'EMERGENCY' };
+      if (val1 > 100 || val1 < 60) return { color: '#f59e0b', label: 'URGENT' };
+      return { color: '#10b981', label: 'NORMAL' };
+    }
+    if (type === 'o2') {
+      if (val1 < 90) return { color: '#ef4444', label: 'EMERGENCY' };
+      if (val1 < 95) return { color: '#f59e0b', label: 'URGENT' };
+      return { color: '#10b981', label: 'NORMAL' };
+    }
+    return { color: '#e2e8f0', label: '' };
+  };
 
   const handleSelectPatient = async (item: QueueItem) => {
-    try {
-      const patient = await getPatientById(item.patient_id);
-      if (patient) {
-        setSelectedPatient(patient);
-        setSelectedQueueItem(item);
-        setManualTriageLevel(null);
-        setActiveStep(0);
-        setVitals({
-          systolic: 120,
-          diastolic: 80,
-          heartRate: 72,
-          temperature: 36.5,
-          weight: 70,
-          height: 170,
-          bmi: 24.2,
-          oxygenSaturation: 98
-        });
-      }
-    } catch (err) {
-      notify("Error loading patient details", "error");
+    const patient = await getPatientById(item.patient_id);
+    if (patient) {
+      setSelectedPatient(patient);
+      setSelectedQueueItem(item);
+      setActiveStep(0);
+      setVitals({
+        systolic: 120, diastolic: 80, heartRate: 72, temperature: 36.5,
+        weight: 70, height: 170, bmi: 24.2, oxygenSaturation: 98,
+        blood_sugar: '', hemoglobin: '', 
+        chief_complaint: '', onset_date: '', duration_value: '', duration_unit: 'days',
+        is_pregnant: 'no', pregnancy_months: '',
+        alcohol_consumption: 'none', tobacco_use: 'none', 
+        allergies: '', chronic_conditions: [],
+        nurse_priority: ''
+      });
     }
-  };
-
-  const handleCancel = () => {
-    setSelectedPatient(null);
-    setSelectedQueueItem(null);
-    setActiveStep(0);
-  };
-
-  const handleNext = () => {
-    if (activeStep === steps.length - 1) {
-      handleSaveVitals();
-    } else {
-      setActiveStep((prev) => prev + 1);
-    }
-  };
-
-  const handleBack = () => {
-    setActiveStep((prev) => prev - 1);
   };
 
   const handleSaveVitals = async () => {
     if (!selectedQueueItem) return;
-    setErrorMsg(null);
+    setIsSaving(true);
     try {
-      // 1. Validate with Zod
-      const validatedVitals = VitalsSchema.parse(vitals);
+      const finalPriority = vitals.nurse_priority || systemTriage.triage_level;
 
-      // 2. Save Vitals
+      // 1. Save Full Clinical Record
       await saveVitals({
-        ...validatedVitals,
+        ...vitals,
+        suggested_priority: systemTriage.triage_level,
+        assigned_priority: finalPriority,
         encounter_id: selectedQueueItem.encounter_id,
         patient_id: selectedQueueItem.patient_id,
         created_by: auth.currentUser?.uid || 'unknown'
       });
 
-      // 3. Update Queue Triage
-      const finalTriageLevel = manualTriageLevel || triageResult?.triage_level || 'standard';
-      const isManual = !!manualTriageLevel && manualTriageLevel !== triageResult?.triage_level;
-      
-      let finalPriorityScore = triageResult?.priority_score || 50;
-      if (isManual) {
-        if (finalTriageLevel === 'emergency') finalPriorityScore = 100;
-        else if (finalTriageLevel === 'urgent') finalPriorityScore = 75;
-        else if (finalTriageLevel === 'standard') finalPriorityScore = 50;
-        else if (finalTriageLevel === 'low') finalPriorityScore = 25;
-      }
-
+      // 2. Update Queue with Nurse-Selected Priority
       await updateQueueTriage(selectedQueueItem.id!, {
-        triage_level: finalTriageLevel,
-        priority_score: finalPriorityScore,
-        triage_source: isManual ? 'manual' : 'automatic',
-        triage_reason: triageResult?.triage_reason || 'Normal vitals'
+        triage_level: finalPriority,
+        priority_score: finalPriority === 'emergency' ? 100 : finalPriority === 'urgent' ? 75 : 50,
+        triage_source: vitals.nurse_priority ? 'manual' : 'automatic'
       });
 
-      // 4. Update Queue Status
+      // 3. Push to Doctor Dashboard
       await updateQueueStatus(selectedQueueItem.id!, 'READY_FOR_DOCTOR' as any);
 
-      notify(`Vitals recorded for ${selectedQueueItem.patient_name}`, 'success');
-      handleCancel();
+      notify(`Triage complete for ${selectedQueueItem.patient_name}`, 'success');
+      setSelectedPatient(null);
+      setSelectedQueueItem(null);
+      setActiveStep(0);
     } catch (err: any) {
       console.error(err);
-      if (err.errors) {
-        setErrorMsg(err.errors[0].message);
-      } else {
-        setErrorMsg("Failed to save vitals.");
-      }
-      notify("Failed to save vitals", "error");
+      notify("Failed to finalize triage data", "error");
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const renderWaitingList = () => {
-    if (!userProfile?.isApproved) {
-      return (
-        <Alert severity="warning" sx={{ borderRadius: 3, mb: 3 }}>
-          <Typography variant="subtitle2" fontWeight="bold">Account Pending Approval</Typography>
-          Your account must be approved by a Global Administrator before you can access the patient queue.
-        </Alert>
-      );
-    }
-
-    if (permissionError) {
-      return (
-        <Alert severity="error" sx={{ borderRadius: 3, mb: 3 }}>
-          <Typography variant="subtitle2" fontWeight="bold">Permission Error</Typography>
-          You do not have permission to view the patient queue for this clinic. 
-          Please contact your administrator to ensure your clinic assignments and security rules are correctly configured.
-        </Alert>
-      );
-    }
-
-    return (
-      <Grid container spacing={isMobile ? 2 : 3}>
-        <Grid size={{ xs: 12, lg: 9 }}>
-          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-            <CardContent sx={{ p: isMobile ? 2 : 3 }}>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexDirection={isMobile ? 'column' : 'row'} gap={2}>
-                <Box display="flex" alignItems="center">
-                  <LocalHospitalIcon color="info" sx={{ mr: 1 }} />
-                  <Typography variant="h6" fontWeight="800">Patients Waiting</Typography>
-                </Box>
-                <QrScannerModal onScan={async (token) => {
-                  const patient = await getPatientByQrToken(token);
-                  if (patient) {
-                    const item = waitingList.find(i => i.patient_id === patient.id);
-                    if (item) {
-                      handleSelectPatient(item);
-                    } else {
-                      notify("Patient not found in queue.", "error");
-                    }
-                  } else {
-                    notify("Patient not found.", "error");
-                  }
-                }} />
-              </Box>
-              
-              {isMobile || isTablet ? (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {waitingList.length === 0 ? (
-                    <Typography color="textSecondary" align="center" sx={{ py: 4 }}>No patients waiting.</Typography>
-                  ) : (
-                    waitingList.map((item) => {
-                      const waitTime = item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : 0;
-                      return (
-                        <Card key={item.id} variant="outlined" sx={{ borderRadius: 2 }}>
-                          <CardContent sx={{ p: 2 }}>
-                            <Box display="flex" justifyContent="space-between" alignItems="start">
-                              <Box>
-                                <Typography variant="subtitle1" fontWeight="bold">{item.patient_name}</Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  Registered: {item.created_at?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </Typography>
-                              </Box>
-                              <Chip 
-                                label={item.triage_level?.toUpperCase() || 'STANDARD'} 
-                                size="small" 
-                                color={item.triage_level === 'emergency' ? 'error' : item.triage_level === 'urgent' ? 'warning' : 'default'}
-                              />
-                            </Box>
-                            <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
-                              <Typography variant="body2" sx={{ color: waitTime > 30 ? 'error.main' : 'success.main', fontWeight: 'bold' }}>
-                                {waitTime} mins wait
-                              </Typography>
-                              <Button variant="contained" color="info" size="small" onClick={() => handleSelectPatient(item)}>
-                                Take Vitals
-                              </Button>
-                            </Box>
-                          </CardContent>
-                        </Card>
-                      );
-                    })
-                  )}
-                </Box>
-              ) : (
-                <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-                  <Table>
-                    <TableHead sx={{ bgcolor: 'grey.50' }}>
-                      <TableRow>
-                        <TableCell sx={{ fontWeight: 700 }}>Patient Name</TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>Wait Time</TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>Priority</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700 }}>Action</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {waitingList.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={4} align="center">
-                            <Typography color="textSecondary" sx={{ py: 4 }}>No patients waiting.</Typography>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        waitingList.map((item) => {
-                          const waitTime = item.created_at ? Math.floor((Date.now() - item.created_at.toDate().getTime()) / 60000) : 0;
-                          return (
-                            <TableRow key={item.id} hover>
-                              <TableCell sx={{ fontWeight: 'medium' }}>{item.patient_name}</TableCell>
-                              <TableCell>{waitTime} mins</TableCell>
-                              <TableCell>
-                                <Chip label={item.triage_level?.toUpperCase() || 'STANDARD'} size="small" />
-                              </TableCell>
-                              <TableCell align="right">
-                                <Button variant="contained" color="info" size="small" onClick={() => handleSelectPatient(item)}>
-                                  Take Vitals
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              )}
-            </CardContent>
-          </Card>
+  // --- STEP 0: INITIAL COMPLAINTS ---
+  const renderIntakeStep = () => (
+    <Stack spacing={4}>
+      <Typography variant="h5" fontWeight="900" color="primary">PATIENT INTAKE: CHIEF COMPLAINT</Typography>
+      <TextField 
+        fullWidth multiline rows={4} label="Reason for Visit / Chief Complaint" 
+        placeholder="e.g. Sharp chest pain, Chronic headache, Follow-up for Diabetes..." 
+        value={vitals.chief_complaint} onChange={(e) => setVitals({...vitals, chief_complaint: e.target.value})}
+        sx={{ bgcolor: '#fff', borderRadius: 2 }}
+      />
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <TextField 
+            fullWidth label="Problem Started On (Approx)" type="date" InputLabelProps={{ shrink: true }}
+            value={vitals.onset_date} onChange={(e) => setVitals({...vitals, onset_date: e.target.value})}
+            sx={{ height: 70 }}
+          />
         </Grid>
-        <Grid size={{ xs: 12, lg: 3 }}>
-          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-            <CardContent>
-              <Typography variant="subtitle2" color="textSecondary" gutterBottom fontWeight="bold">QUEUE SUMMARY</Typography>
-              <Typography variant="h3" fontWeight="800" color="info.main">{waitingList.length}</Typography>
-              <Typography variant="body2" color="textSecondary">Patients waiting for vitals</Typography>
-            </CardContent>
-          </Card>
+        <Grid item xs={6} md={3}>
+          <TextField 
+            fullWidth label="Duration" type="number" 
+            value={vitals.duration_value} onChange={(e) => setVitals({...vitals, duration_value: e.target.value})}
+          />
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <Select 
+            fullWidth value={vitals.duration_unit} 
+            onChange={(e) => setVitals({...vitals, duration_unit: e.target.value})}
+            sx={{ height: 56 }}
+          >
+            <MenuItem value="days">Days</MenuItem>
+            <MenuItem value="weeks">Weeks</MenuItem>
+            <MenuItem value="months">Months</MenuItem>
+          </Select>
         </Grid>
       </Grid>
+    </Stack>
+  );
+
+  // --- STATION 1: ANTHROPOMETRY ---
+  const renderStation1 = () => (
+    <Stack spacing={4}>
+      <Typography variant="h5" fontWeight="900" color="primary">PHYSICAL STATION 1: BODY MEASURES</Typography>
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <TextField 
+            fullWidth label="Weight (kg)" type="number" 
+            value={vitals.weight || ''} onChange={(e) => setVitals({...vitals, weight: parseFloat(e.target.value)})} 
+            InputProps={{ sx: { height: 90, fontSize: '2rem', borderRadius: 4 }}} 
+          />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField 
+            fullWidth label="Height (cm)" type="number" 
+            value={vitals.height || ''} onChange={(e) => setVitals({...vitals, height: parseFloat(e.target.value)})} 
+            InputProps={{ sx: { height: 90, fontSize: '2rem', borderRadius: 4 }}} 
+          />
+        </Grid>
+      </Grid>
+
+      {selectedPatient?.gender?.toLowerCase() === 'female' && (
+        <Paper variant="outlined" sx={{ p: 4, borderRadius: 4, bgcolor: '#fff1f2', borderColor: '#fecdd3' }}>
+          <Typography variant="h6" fontWeight="bold" color="#be123c">Pregnancy Screening</Typography>
+          <RadioGroup row value={vitals.is_pregnant} onChange={(e) => setVitals({...vitals, is_pregnant: e.target.value})}>
+            <FormControlLabel value="yes" control={<Radio color="error" />} label={<Typography fontWeight="bold">Pregnant</Typography>} />
+            <FormControlLabel value="no" control={<Radio />} label="Not Pregnant" />
+          </RadioGroup>
+          {vitals.is_pregnant === 'yes' && (
+            <TextField 
+              label="Gestation Period (Months)" type="number" fullWidth sx={{ mt: 2, bgcolor: 'white' }} 
+              value={vitals.pregnancy_months} onChange={(e) => setVitals({...vitals, pregnancy_months: e.target.value})} 
+            />
+          )}
+        </Paper>
+      )}
+    </Stack>
+  );
+
+  // --- STATION 2: CARDIOVASCULAR ---
+  const renderStation2 = () => {
+    const bpStatus = getVitalStatus('bp', vitals.systolic, vitals.diastolic);
+    const hrStatus = getVitalStatus('hr', vitals.heartRate);
+    const o2Status = getVitalStatus('o2', vitals.oxygenSaturation);
+
+    return (
+      <Stack spacing={4}>
+        <Typography variant="h5" fontWeight="900" color="primary">PHYSICAL STATION 2: CARDIOVASCULAR</Typography>
+        
+        {/* Large Blood Pressure Block */}
+        <Box sx={{ p: 4, borderRadius: 5, border: `6px solid ${bpStatus.color}`, textAlign: 'center', transition: 'all 0.3s' }}>
+          <Typography variant="caption" fontWeight="900" color={bpStatus.color} sx={{ letterSpacing: 2 }}>{bpStatus.label}</Typography>
+          <Stack direction="row" spacing={3} justifyContent="center" alignItems="center">
+            <TextField 
+              label="Systolic" type="number" value={vitals.systolic} 
+              onChange={(e) => setVitals({...vitals, systolic: parseInt(e.target.value)})} 
+              InputProps={{ sx: { fontSize: '3rem', textAlign: 'center', fontWeight: 'bold' }}} 
+            />
+            <Typography variant="h1" color="text.secondary">/</Typography>
+            <TextField 
+              label="Diastolic" type="number" value={vitals.diastolic} 
+              onChange={(e) => setVitals({...vitals, diastolic: parseInt(e.target.value)})} 
+              InputProps={{ sx: { fontSize: '3rem', textAlign: 'center', fontWeight: 'bold' }}} 
+            />
+          </Stack>
+        </Box>
+
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <TextField 
+              fullWidth label="Heart Rate (bpm)" type="number" value={vitals.heartRate} 
+              onChange={(e) => setVitals({...vitals, heartRate: parseInt(e.target.value)})}
+              InputProps={{ 
+                startAdornment: <HeartIcon sx={{ mr: 1 }} color={hrStatus.color === '#ef4444' ? 'error' : 'primary'} />,
+                sx: { height: 90, fontSize: '1.8rem', border: `2px solid ${hrStatus.color}`, borderRadius: 4 }
+              }}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <TextField 
+              fullWidth label="SpO2 (%)" type="number" value={vitals.oxygenSaturation} 
+              onChange={(e) => setVitals({...vitals, oxygenSaturation: parseInt(e.target.value)})}
+              InputProps={{ 
+                sx: { height: 90, fontSize: '1.8rem', border: `2px solid ${o2Status.color}`, borderRadius: 4 }
+              }}
+            />
+          </Grid>
+        </Grid>
+      </Stack>
     );
   };
 
-  const renderVitalsForm = () => (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h5" fontWeight="900" color="info.main" sx={{ textTransform: 'uppercase', fontSize: isMobile ? '1.25rem' : '1.5rem' }}>
-          Record Vitals & Triage
-        </Typography>
-        <Button variant="outlined" color="inherit" onClick={handleCancel} size={isMobile ? "small" : "medium"}>Cancel</Button>
-      </Box>
-
-      <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-        {steps.map((label) => (
-          <Step key={label}>
-            <StepLabel>{label}</StepLabel>
-          </Step>
-        ))}
-      </Stepper>
-
-      <Grid container spacing={isMobile ? 2 : 3} justifyContent="center">
-        <Grid size={{ xs: 12, md: 8, lg: 6 }}>
-          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', mb: 3 }}>
-            <CardContent sx={{ p: isMobile ? 2 : 3 }}>
-              {activeStep === 0 ? (
-                <>
-                  <Typography variant="h6" fontWeight="800" gutterBottom color="info.main">VITAL SIGNS</Typography>
-                  <Grid container spacing={2}>
-                    <Grid size={{ xs: 6, sm: 4 }}>
-                      <TextField fullWidth label="Systolic" type="number" value={vitals.systolic} onChange={(e) => setVitals({ ...vitals, systolic: parseInt(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">mmHg</InputAdornment> }} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
-                    </Grid>
-                    <Grid size={{ xs: 6, sm: 4 }}>
-                      <TextField fullWidth label="Diastolic" type="number" value={vitals.diastolic} onChange={(e) => setVitals({ ...vitals, diastolic: parseInt(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">mmHg</InputAdornment> }} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
-                    </Grid>
-                    <Grid size={{ xs: 6, sm: 4 }}>
-                      <TextField fullWidth label="Heart Rate" type="number" value={vitals.heartRate} onChange={(e) => setVitals({ ...vitals, heartRate: parseInt(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">bpm</InputAdornment> }} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
-                    </Grid>
-                    <Grid size={{ xs: 6, sm: 4 }}>
-                      <TextField fullWidth label="Temp" type="number" value={vitals.temperature} onChange={(e) => setVitals({ ...vitals, temperature: parseFloat(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">°C</InputAdornment> }} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
-                    </Grid>
-                    <Grid size={{ xs: 6, sm: 4 }}>
-                      <TextField fullWidth label="Weight" type="number" value={vitals.weight} onChange={(e) => setVitals({ ...vitals, weight: parseFloat(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">kg</InputAdornment> }} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
-                    </Grid>
-                    <Grid size={{ xs: 6, sm: 4 }}>
-                      <TextField fullWidth label="Height" type="number" value={vitals.height} onChange={(e) => setVitals({ ...vitals, height: parseFloat(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">cm</InputAdornment> }} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
-                    </Grid>
-                    <Grid size={{ xs: 6, sm: 4 }}>
-                      <TextField fullWidth label="BMI" type="number" disabled value={vitals.bmi} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
-                    </Grid>
-                    <Grid size={{ xs: 6, sm: 4 }}>
-                      <TextField fullWidth label="SpO2" type="number" value={vitals.oxygenSaturation} onChange={(e) => setVitals({ ...vitals, oxygenSaturation: parseInt(e.target.value) })} InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }} slotProps={{ htmlInput: { style: { minHeight: '44px' } } }} />
-                    </Grid>
-                  </Grid>
-                </>
-              ) : (
-                <>
-                  <Typography variant="h6" fontWeight="800" gutterBottom color="info.main">TRIAGE ASSESSMENT</Typography>
-                  
-                  {triageResult?.isCritical && (
-                    <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
-                      <Typography variant="subtitle2" fontWeight="bold">CRITICAL VITALS</Typography>
-                      Immediate attention required.
-                    </Alert>
-                  )}
-
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="caption" color="textSecondary" sx={{ textTransform: 'uppercase', fontWeight: 'bold' }}>Suggested Level</Typography>
-                    <Typography variant="h4" sx={{ 
-                      color: triageResult?.triage_level === 'emergency' ? 'error.main' : 
-                             triageResult?.triage_level === 'urgent' ? 'warning.main' : 'success.main',
-                      fontWeight: '900',
-                      textTransform: 'uppercase',
-                      fontSize: isMobile ? '2rem' : '2.5rem'
-                    }}>
-                      {triageResult?.triage_level || 'STANDARD'}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">{triageResult?.triage_reason}</Typography>
-                  </Box>
-
-                  <FormControl fullWidth sx={{ mb: 3 }}>
-                    <InputLabel>Manual Override</InputLabel>
-                    <Select 
-                      value={manualTriageLevel || ''} 
-                      label="Manual Override" 
-                      onChange={(e) => setManualTriageLevel(e.target.value as TriageLevel)}
-                      sx={{ minHeight: '44px' }}
-                    >
-                      <MenuItem value=""><em>Use Suggested</em></MenuItem>
-                      <MenuItem value="emergency">Emergency</MenuItem>
-                      <MenuItem value="urgent">Urgent</MenuItem>
-                      <MenuItem value="standard">Standard</MenuItem>
-                      <MenuItem value="low">Low</MenuItem>
-                    </Select>
-                  </FormControl>
-                </>
-              )}
-
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-                <Button
-                  disabled={activeStep === 0}
-                  onClick={handleBack}
-                  sx={{ minHeight: '44px', minWidth: '100px' }}
-                >
-                  Back
-                </Button>
-                <Button
-                  variant="contained"
-                  color="info"
-                  onClick={handleNext}
-                  sx={{ minHeight: '44px', minWidth: '100px', fontWeight: 'bold' }}
-                >
-                  {activeStep === steps.length - 1 ? 'Save & Send' : 'Next'}
-                </Button>
-              </Box>
-            </CardContent>
-          </Card>
+  // --- STATION 3: LABS, RISK & OVERRIDE ---
+  const renderStation3 = () => (
+    <Stack spacing={3}>
+      <Typography variant="h5" fontWeight="900" color="primary">STATION 3: LABS, RISK & FINAL TRIAGE</Typography>
+      
+      <Grid container spacing={2}>
+        <Grid item xs={12} md={6}>
+          <TextField fullWidth label="Glucose / Blood Sugar" value={vitals.blood_sugar} onChange={(e) => setVitals({...vitals, blood_sugar: e.target.value})} placeholder="e.g. 110 mg/dL" />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField fullWidth label="Hemoglobin" value={vitals.hemoglobin} onChange={(e) => setVitals({...vitals, hemoglobin: e.target.value})} placeholder="e.g. 13.5 g/dL" />
         </Grid>
       </Grid>
-    </Box>
+
+      <Autocomplete
+        multiple options={['Diabetes', 'Hypertension', 'Asthma', 'COPD', 'Heart Disease', 'Thyroid', 'Gastric', 'Anemia']}
+        value={vitals.chronic_conditions} onChange={(_, val) => setVitals({...vitals, chronic_conditions: val})}
+        renderInput={(params) => <TextField {...params} label="Chronic Conditions" placeholder="Select existing diseases" />}
+      />
+
+      <Grid container spacing={2}>
+        <Grid item xs={12} md={6}>
+          <FormControl fullWidth>
+            <InputLabel>Tobacco / Substance Use</InputLabel>
+            <Select value={vitals.tobacco_use} label="Tobacco / Substance Use" onChange={(e) => setVitals({...vitals, tobacco_use: e.target.value})}>
+              <MenuItem value="none">None</MenuItem>
+              <MenuItem value="smoking">Smoking (Cigarettes/Bidi)</MenuItem>
+              <MenuItem value="chewing">Chewing (Gutkha / Pan Masala)</MenuItem>
+              <MenuItem value="both">Both Smoking & Chewing</MenuItem>
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <FormControl fullWidth>
+            <InputLabel>Alcohol Consumption</InputLabel>
+            <Select value={vitals.alcohol_consumption} label="Alcohol Consumption" onChange={(e) => setVitals({...vitals, alcohol_consumption: e.target.value})}>
+              <MenuItem value="none">None</MenuItem>
+              <MenuItem value="occasional">Occasional</MenuItem>
+              <MenuItem value="regular">Regular / Heavy</MenuItem>
+            </Select>
+          </FormControl>
+        </Grid>
+      </Grid>
+
+      <TextField fullWidth multiline rows={2} label="Known Allergies" placeholder="Food or Medication allergies..." value={vitals.allergies} onChange={(e) => setVitals({...vitals, allergies: e.target.value})} />
+
+      <Divider sx={{ my: 2 }}>Nurse Triage Decision</Divider>
+      
+      <Card variant="outlined" sx={{ p: 3, borderRadius: 4, bgcolor: '#f0f9ff', borderColor: '#bae6fd' }}>
+        <Typography variant="subtitle2" color="primary" gutterBottom>SYSTEM SUGGESTION: <strong>{systemTriage.triage_level.toUpperCase()}</strong></Typography>
+        <Typography variant="body2" sx={{ mb: 2 }}>{systemTriage.triage_reason}</Typography>
+        
+        <FormControl fullWidth>
+          <InputLabel sx={{ fontWeight: 'bold' }}>NURSE OVERRIDE (Select Final Priority)</InputLabel>
+          <Select 
+            value={vitals.nurse_priority} label="NURSE OVERRIDE (Select Final Priority)"
+            onChange={(e) => setVitals({...vitals, nurse_priority: e.target.value})}
+            sx={{ height: 80, borderRadius: 4, fontWeight: 'bold', fontSize: '1.2rem', bgcolor: 'white' }}
+          >
+            <MenuItem value=""><em>Follow System Suggestion</em></MenuItem>
+            <MenuItem value="emergency" sx={{ color: '#ef4444', fontWeight: 'bold' }}>EMERGENCY (Critical - Red)</MenuItem>
+            <MenuItem value="urgent" sx={{ color: '#f59e0b', fontWeight: 'bold' }}>URGENT (Delayed - Yellow)</MenuItem>
+            <MenuItem value="standard" sx={{ color: '#10b981', fontWeight: 'bold' }}>STANDARD (Routine - Green)</MenuItem>
+          </Select>
+        </FormControl>
+      </Card>
+    </Stack>
   );
 
   return (
-    <StationLayout
-      title="Vitals & Triage"
-      stationName="Vitals"
-      showPatientContext={!!selectedPatient}
-    >
+    <StationLayout title="Triage Station" stationName="Vitals" showPatientContext={!!selectedPatient}>
       {!selectedPatient ? (
-        <Box>
-          <Box sx={{ mb: isMobile ? 2 : 4 }}>
-            <Typography variant="subtitle1" color="text.secondary">
-              Select a patient from the queue to record vitals.
-            </Typography>
-          </Box>
-          {renderWaitingList()}
-        </Box>
+        <TableContainer component={Paper} sx={{ borderRadius: 5, border: '1px solid #e2e8f0', boxShadow: 'none' }}>
+          <Table>
+            <TableHead sx={{ bgcolor: '#f8fafc' }}><TableRow><TableCell sx={{ fontWeight: 800 }}>Patient Name</TableCell><TableCell align="right">Action</TableCell></TableRow></TableHead>
+            <TableBody>
+              {waitingList.map(item => (
+                <TableRow key={item.id} hover>
+                  <TableCell fontWeight="bold" sx={{ py: 3 }}>{item.patient_name}</TableCell>
+                  <TableCell align="right">
+                    <Button variant="contained" size="large" onClick={() => handleSelectPatient(item)} sx={{ borderRadius: 2 }}>Start Triage</Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {waitingList.length === 0 && <TableRow><TableCell colSpan={2} align="center" sx={{ py: 10 }}>No patients waiting in queue.</TableCell></TableRow>}
+            </TableBody>
+          </Table>
+        </TableContainer>
       ) : (
-        renderVitalsForm()
+        <Box sx={{ maxWidth: 850, mx: 'auto' }}>
+          <Stepper activeStep={activeStep} sx={{ mb: 6 }} alternativeLabel>
+            {steps.map((label) => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}
+          </Stepper>
+
+          <Paper elevation={0} sx={{ p: 5, borderRadius: 6, border: '1px solid #cbd5e1', bgcolor: 'white' }}>
+            {activeStep === 0 && renderIntakeStep()}
+            {activeStep === 1 && renderStation1()}
+            {activeStep === 2 && renderStation2()}
+            {activeStep === 3 && renderStation3()}
+
+            <Stack direction="row" spacing={3} sx={{ mt: 6 }}>
+              <Button 
+                fullWidth size="large" variant="outlined" 
+                sx={{ height: 80, borderRadius: 4, fontWeight: 800, fontSize: '1.2rem' }} 
+                onClick={activeStep === 0 ? () => setSelectedPatient(null) : () => setActiveStep(s => s - 1)}
+              >
+                {activeStep === 0 ? "Cancel" : "Back"}
+              </Button>
+              <Button 
+                fullWidth size="large" variant="contained" 
+                sx={{ height: 80, borderRadius: 4, fontWeight: 900, fontSize: '1.4rem' }} 
+                onClick={activeStep === 3 ? handleSaveVitals : () => setActiveStep(s => s + 1)}
+              >
+                {activeStep === 3 ? (isSaving ? 'Finishing...' : 'FINISH & SEND') : 'Next Station'}
+              </Button>
+            </Stack>
+          </Paper>
+        </Box>
       )}
     </StationLayout>
   );
