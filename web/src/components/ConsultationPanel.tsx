@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Box, Typography, TextField, Chip, Divider, Button, 
   Autocomplete, Stack, CircularProgress, Alert, Paper 
-} from '@mui/material'; // Added Paper here
+} from '@mui/material'; // <--- MUST INCLUDE Paper HERE
 import PrescriptionBuilder from './PrescriptionBuilder';
 import ClinicalAssessmentPanel, { ClinicalAssessmentData, initialClinicalAssessment } from './ClinicalAssessmentPanel';
 import { Prescription } from '../types';
