@@ -6,8 +6,8 @@ import { onSchedule, ScheduledEvent } from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import * as crypto from "crypto";
-import * as ExcelJS from 'exceljs';
 
+// Initialize Admin SDK once
 if (!admin.apps.length) {
   admin.initializeApp();
 }
@@ -21,7 +21,7 @@ const SUPER_ADMIN_EMAILS = [
   'ruhul_abid@haefa.org'
 ];
 
-const REQUISITION_THRESHOLD = 500; // Low stock alert level for Dhaka
+const REQUISITION_THRESHOLD = 500;
 
 /**
  * Helper to verify if the caller is a Global Admin
@@ -31,18 +31,6 @@ const checkIsGlobalAdmin = (auth: any) => {
   const email = auth.token.email?.toLowerCase();
   const role = auth.token.role;
   return SUPER_ADMIN_EMAILS.includes(email) || role === 'global_admin';
-};
-
-// ==========================================
-// UTILITY FUNCTIONS
-// ==========================================
-
-const generateId = () => {
-  try {
-    return crypto.randomUUID();
-  } catch (e) {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-  }
 };
 
 const sanitizeData = (data: any) => {
@@ -121,10 +109,6 @@ export const deleteUser = onCall(
   }
 );
 
-/**
- * RECURSIVE TEST DATA WIPER
- * Restored: Handles massive deletions by chunking in batches of 500.
- */
 export const wipeTestData = onCall(
   { region: "us-central1", timeoutSeconds: 540, memory: "1GiB" }, 
   async (request: any) => {
@@ -138,9 +122,7 @@ export const wipeTestData = onCall(
     for (const colName of collections) {
       let hasMore = true;
       while (hasMore) {
-        const querySnapshot = await db.collection(colName)
-          .limit(500)
-          .get();
+        const querySnapshot = await db.collection(colName).limit(500).get();
 
         if (querySnapshot.empty) {
           hasMore = false;
@@ -152,17 +134,13 @@ export const wipeTestData = onCall(
         await batch.commit();
         totalDeleted += querySnapshot.size;
         
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
     }
     return { success: true, deletedCount: totalDeleted };
   }
 );
 
-/**
- * DEMO DATA WIPER
- * Restored: Quickly wipes active queues and demo patient records.
- */
 export const wipeDemoData = onCall(
   { region: "us-central1" },
   async (request: any) => {
@@ -236,8 +214,8 @@ export const registerPatient = onCall(
       throw new HttpsError("invalid-argument", "Missing registration data");
     }
     try {
-      const patientId = generateId();
-      const encounterId = generateId();
+      const patientId = crypto.randomUUID();
+      const encounterId = crypto.randomUUID();
       let photoUrl = "";
       
       if (photoBase64 && photoBase64.includes(",")) {
@@ -249,24 +227,26 @@ export const registerPatient = onCall(
         photoUrl = signedUrls[0];
       }
       
-      await db.collection("patients").doc(patientId).set({ 
+      const batch = db.batch();
+      batch.set(db.collection("patients").doc(patientId), { 
         ...sanitizeData(patientData), 
         photo_url: photoUrl, 
         created_at: new Date() 
       });
       
-      await db.collection("encounters").doc(encounterId).set({ 
+      batch.set(db.collection("encounters").doc(encounterId), { 
         patient_id: patientId, clinic_id: clinicId, country_code: countryCode, 
         status: 'WAITING_FOR_VITALS', created_at: new Date() 
       });
       
       const fullName = `${patientData.given_name || ''} ${patientData.family_name || ''}`.trim();
-      await db.collection("queues_active").add({ 
+      batch.set(db.collection("queues_active").doc(), { 
         encounter_id: encounterId, patient_id: patientId, patient_name: fullName, 
         station: 'vitals', status: 'WAITING_FOR_VITALS', clinic_id: clinicId, 
         country_code: countryCode, created_at: new Date(), updated_at: new Date() 
       });
       
+      await batch.commit();
       return { patientId, encounterId };
     } catch (error: any) {
       throw new HttpsError("internal", error.message);
@@ -274,18 +254,15 @@ export const registerPatient = onCall(
   }
 );
 
-/**
- * SAVE CONSULTATION (Doctor Station)
- * Handles Atomic Transaction: saves encounter data AND flags non-inventory meds for requisition.
- */
 export const saveConsultation = onCall(
   { region: "us-central1" },
   async (request: any) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
     const { encounterId, patientId, clinicId, prescriptions, diagnosis, notes } = request.data;
     
+    const qSnap = await db.collection("queues_active").where("encounter_id", "==", encounterId).get();
+
     return await db.runTransaction(async (transaction) => {
-      // 1. Update Encounter
       const encounterRef = db.collection("encounters").doc(encounterId);
       transaction.update(encounterRef, {
         status: 'WAITING_FOR_PHARMACY',
@@ -293,32 +270,25 @@ export const saveConsultation = onCall(
         last_updated: admin.firestore.FieldValue.serverTimestamp()
       });
 
-      // 2. Save Prescription Document
       const presRef = db.collection("prescriptions").doc();
       transaction.set(presRef, {
         encounter_id: encounterId, patient_id: patientId, clinic_id: clinicId,
         prescriptions, created_at: admin.firestore.FieldValue.serverTimestamp()
       });
 
-      // 3. TRIGGER REQUISITION for items flagged by doctor as non-stock
       for (const med of prescriptions) {
         if (med.isRequisition) {
           const reqRef = db.collection("requisitions").doc();
           transaction.set(reqRef, {
-            clinic_id: clinicId, 
-            medication_name: med.medicationName,
-            dosage: `${med.dosageValue}${med.dosageUnit}`, 
-            requested_qty: med.quantity,
-            type: 'DOCTOR_ORDER_NON_STOCK', 
-            status: 'PENDING',
+            clinic_id: clinicId, medication_name: med.medicationName,
+            dosage: `${med.dosageValue}${med.dosageUnit}`, requested_qty: med.quantity,
+            type: 'DOCTOR_ORDER_NON_STOCK', status: 'PENDING',
             created_at: admin.firestore.FieldValue.serverTimestamp()
           });
         }
       }
 
-      // 4. Update Queue Station
-      const queueSnap = await db.collection("queues_active").where("encounter_id", "==", encounterId).get();
-      queueSnap.forEach(doc => transaction.update(doc.ref, { 
+      qSnap.forEach(doc => transaction.update(doc.ref, { 
         station: 'pharmacy', status: 'WAITING_FOR_PHARMACY', 
         updated_at: admin.firestore.FieldValue.serverTimestamp() 
       }));
@@ -339,7 +309,7 @@ export const dispenseMedication = onCall(
     const { clinicId, medications, encounterId, patientId } = request.data;
 
     return await db.runTransaction(async (transaction) => {
-      const results: any[] = [];
+      const summary: any[] = [];
 
       for (const med of medications) {
         const { medication_name, mode, qty, substitution, return_on } = med;
@@ -364,21 +334,16 @@ export const dispenseMedication = onCall(
             actualDeducted += toTake;
             remaining -= toTake;
 
-            // AUTO-REQUISITION: Low Stock Alert Trigger
             if (newQty < REQUISITION_THRESHOLD) {
               transaction.set(db.collection("requisitions").doc(), {
-                clinic_id: clinicId, 
-                medication_name: targetMedName,
-                current_stock: newQty, 
-                type: 'LOW_STOCK_ALERT', 
-                status: 'PENDING',
+                clinic_id: clinicId, medication_name: targetMedName,
+                current_stock: newQty, type: 'LOW_STOCK_ALERT', status: 'PENDING',
                 created_at: admin.firestore.FieldValue.serverTimestamp()
               });
             }
           }
         }
 
-        // Handle Patient Shortfalls (Scenario B & C)
         if (mode === 'PARTIAL' || mode === 'OUT_OF_STOCK') {
           transaction.set(db.collection("requisitions").doc(), {
             clinic_id: clinicId, patient_id: patientId, medication_name: medication_name,
@@ -387,13 +352,13 @@ export const dispenseMedication = onCall(
             created_at: admin.firestore.FieldValue.serverTimestamp()
           });
         }
-        results.push({ medication: medication_name, dispensed: actualDeducted });
+        summary.push({ medication: medication_name, dispensed: actualDeducted });
       }
 
       transaction.update(db.collection("encounters").doc(encounterId), { 
         status: 'COMPLETED', last_updated: admin.firestore.FieldValue.serverTimestamp() 
       });
-      return { success: true, summary: results };
+      return { success: true, summary };
     });
   }
 );
@@ -402,8 +367,10 @@ export const bulkUpload = onCall(
   { region: "us-central1" },
   async (request: any) => {
     const { clinicId, fileBase64 } = request.data;
+    // Lazy Load ExcelJS to fix initialization timeout
+    const ExcelJS = await import('exceljs');
     const workbook = new ExcelJS.Workbook();
-    await (workbook as any).xlsx.load(Buffer.from(fileBase64, 'base64'));
+    await workbook.xlsx.load(Buffer.from(fileBase64, 'base64'));
     const worksheet = workbook.getWorksheet(1);
     const batch = db.batch();
     
@@ -431,6 +398,8 @@ export const bulkUpload = onCall(
 export const getInventoryTemplate = onCall(
   { region: "us-central1" },
   async (request: any) => {
+    // Lazy Load ExcelJS to fix initialization timeout
+    const ExcelJS = await import('exceljs');
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Inventory Template');
     sheet.columns = [
@@ -442,8 +411,8 @@ export const getInventoryTemplate = onCall(
       { header: 'package_unit', key: 'pkg', width: 12 },
       { header: 'dosage', key: 'dosage', width: 15 }
     ];
-    const buffer = await (workbook as any).xlsx.writeBuffer();
-    return { fileBase64: Buffer.from(buffer).toString('base64') };
+    const buffer = await workbook.xlsx.writeBuffer();
+    return { fileBase64: Buffer.from(buffer as Buffer).toString('base64') };
   }
 );
 
