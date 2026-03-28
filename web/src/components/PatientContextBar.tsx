@@ -10,6 +10,7 @@ import SmokingRoomsIcon from '@mui/icons-material/SmokingRooms';
 import WineBarIcon from '@mui/icons-material/WineBar';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import PregnantWomanIcon from '@mui/icons-material/PregnantWoman';
+import SpeedIcon from '@mui/icons-material/Speed';
 
 const PatientContextBar: React.FC = () => {
   const { selectedPatient } = useAppStore();
@@ -22,19 +23,19 @@ const PatientContextBar: React.FC = () => {
     ? selectedPatient.age_years 
     : (selectedPatient.date_of_birth 
         ? new Date().getFullYear() - new Date(selectedPatient.date_of_birth).getFullYear() 
-        : 'Unknown');
+        : '??');
 
-  // 2. Triage Color System (Global Standard)
+  // 2. Triage Color System (Global Clinical Standard)
   const getTriageStyle = (level: string) => {
     switch (level?.toLowerCase()) {
       case 'emergency': 
-        return { bg: '#ef4444', text: '#fff', border: '2px solid #b91c1c', label: 'EMERGENCY' }; // Deep Red
+        return { bg: '#ef4444', text: '#fff', border: '2px solid #b91c1c', label: 'EMERGENCY' }; 
       case 'urgent': 
-        return { bg: '#f59e0b', text: '#fff', border: '2px solid #d97706', label: 'URGENT' };    // Amber
+        return { bg: '#f59e0b', text: '#fff', border: '2px solid #d97706', label: 'URGENT' };
       case 'standard': 
-        return { bg: '#10b981', text: '#fff', border: '2px solid #059669', label: 'STANDARD' };  // Green
+        return { bg: '#10b981', text: '#fff', border: '2px solid #059669', label: 'STANDARD' };
       default: 
-        return { bg: '#94a3b8', text: '#fff', border: '1px solid #64748b', label: 'NOT TRIAGED' };
+        return { bg: '#94a3b8', text: '#fff', border: '1px solid #64748b', label: 'PENDING' };
     }
   };
 
@@ -43,10 +44,10 @@ const PatientContextBar: React.FC = () => {
 
   return (
     <Paper 
-      elevation={3} 
+      elevation={4} 
       sx={{ 
         p: 1.5, 
-        mb: 0, // Pinned to the top of workspaces
+        mb: 0, 
         borderBottom: '1px solid rgba(0,0,0,0.12)', 
         borderRadius: 0,
         bgcolor: 'white',
@@ -57,15 +58,15 @@ const PatientContextBar: React.FC = () => {
         position: 'sticky',
         top: 0,
         zIndex: 1100,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+        boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
       }}
     >
       {/* SECTION: Patient Identity */}
       <Avatar 
         src={selectedPatient.photo_url} 
         sx={{ 
-          width: 56, 
-          height: 56, 
+          width: 52, 
+          height: 52, 
           border: '2px solid white', 
           boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
           bgcolor: 'primary.main'
@@ -74,113 +75,99 @@ const PatientContextBar: React.FC = () => {
         {selectedPatient.given_name?.[0]}{selectedPatient.family_name?.[0]}
       </Avatar>
       
-      <Box sx={{ minWidth: '180px' }}>
-        <Typography variant="h6" noWrap sx={{ lineHeight: 1.1, fontWeight: 900, fontSize: isMobile ? '1rem' : '1.2rem', color: '#1e293b' }}>
+      <Box sx={{ minWidth: '160px' }}>
+        <Typography variant="h6" noWrap sx={{ lineHeight: 1.1, fontWeight: 900, fontSize: isMobile ? '0.95rem' : '1.1rem', color: '#1e293b' }}>
           {selectedPatient.given_name} {selectedPatient.family_name}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
           <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', textTransform: 'uppercase', bgcolor: '#f1f5f9', px: 1, borderRadius: 1 }}>
             {selectedPatient.gender} • {age} YRS
           </Typography>
-          <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.disabled', fontSize: '0.7rem' }}>
-            ID: {selectedPatient.id?.substring(0, 8)}
-          </Typography>
         </Box>
       </Box>
 
-      <Divider orientation="vertical" flexItem sx={{ mx: 1, height: 40, alignSelf: 'center' }} />
+      <Divider orientation="vertical" flexItem sx={{ mx: 1, height: 35, alignSelf: 'center' }} />
 
-      {/* SECTION: The Risk Sentinel (The "Safety Network") */}
-      <Stack direction="row" spacing={1.5} alignItems="center">
-        
-        {/* 1. Triage Badge */}
-        <Tooltip title="Patient Priority Level">
-          <Chip 
-            label={triage.label} 
-            sx={{ 
-              bgcolor: triage.bg, 
-              color: triage.text, 
-              fontWeight: 900, 
-              borderRadius: 1.5,
-              height: 32,
-              border: triage.border,
-              px: 1,
-              '& .MuiChip-label': { px: 1 }
-            }} 
-          />
-        </Tooltip>
+      {/* SECTION: Vitals Sparkline (Critical for Quick Review) */}
+      {!isMobile && (
+        <>
+          <Stack direction="row" spacing={3} sx={{ px: 1 }}>
+            <Box>
+              <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 900, display: 'block', lineHeight: 1 }}>BP</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 900, color: '#0f172a' }}>
+                {vitals.systolic || '--'}/{vitals.diastolic || '--'}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 900, display: 'block', lineHeight: 1 }}>SpO2</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 900, color: (vitals.oxygenSaturation < 94) ? '#ef4444' : '#0f172a' }}>
+                {vitals.oxygenSaturation ? `${vitals.oxygenSaturation}%` : '--'}
+              </Typography>
+            </Box>
+          </Stack>
+          <Divider orientation="vertical" flexItem sx={{ mx: 1, height: 35, alignSelf: 'center' }} />
+        </>
+      )}
 
-        {/* 2. Pregnancy Alert (Critical Red) */}
+      {/* SECTION: The Risk Sentinel (Alert Network) */}
+      <Stack direction="row" spacing={1} alignItems="center">
+        {/* Triage Badge */}
+        <Chip 
+          label={triage.label} 
+          sx={{ 
+            bgcolor: triage.bg, color: triage.text, fontWeight: 900, 
+            borderRadius: 1.5, height: 28, border: triage.border, fontSize: '0.7rem'
+          }} 
+        />
+
+        {/* Pregnancy Alert */}
         {vitals.is_pregnant === 'yes' && (
-          <Tooltip title={`Pregnant: ${vitals.pregnancy_months || '?'} months`}>
+          <Tooltip title={`Pregnancy: ${vitals.pregnancy_months || '?'} months`}>
             <Chip 
-              icon={<PregnantWomanIcon style={{ color: 'white' }} />}
+              icon={<PregnantWomanIcon style={{ color: 'white', fontSize: 18 }} />}
               label="PREGNANT"
-              sx={{ bgcolor: '#be123c', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 32 }}
+              sx={{ bgcolor: '#be123c', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
             />
           </Tooltip>
         )}
 
-        {/* 3. Allergy Alert (Bright Red) */}
+        {/* Allergy Alert */}
         {vitals.allergies && vitals.allergies.toLowerCase() !== 'none' && (
-          <Tooltip title={`Allergies: ${vitals.allergies}`}>
+          <Tooltip title={`Allergy: ${vitals.allergies}`}>
             <Chip 
-              icon={<WarningIcon style={{ color: 'white' }} />}
+              icon={<WarningIcon style={{ color: 'white', fontSize: 16 }} />}
               label="ALLERGIES"
-              sx={{ bgcolor: '#e11d48', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 32 }}
+              sx={{ bgcolor: '#e11d48', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
             />
           </Tooltip>
         )}
 
-        {/* 4. Substance Use Alert (Dhaka Clinic Standard: Gutkha/Pan Masala) */}
+        {/* Substance Use (Dhaka Standard) */}
         {vitals.tobacco_use && vitals.tobacco_use !== 'none' && (
-          <Tooltip title={`Tobacco History: ${vitals.tobacco_use}`}>
-            <Chip 
-              icon={<SmokingRoomsIcon style={{ color: 'white' }} />}
-              label={vitals.tobacco_use === 'chewing' || vitals.tobacco_use === 'both' ? "GUTKHA/PAN" : "TOBACCO"}
-              sx={{ 
-                bgcolor: (vitals.tobacco_use === 'chewing' || vitals.tobacco_use === 'both') ? '#991b1b' : '#f59e0b', 
-                color: 'white', 
-                fontWeight: 900, 
-                borderRadius: 1.5,
-                height: 32 
-              }}
-            />
-          </Tooltip>
-        )}
-
-        {/* 5. Alcohol Alert */}
-        {vitals.alcohol_consumption && vitals.alcohol_consumption !== 'none' && (
-          <Tooltip title={`Alcohol Intake: ${vitals.alcohol_consumption}`}>
-            <Chip 
-              icon={<WineBarIcon style={{ color: 'white' }} />}
-              label="ALCOHOL"
-              sx={{ 
-                bgcolor: vitals.alcohol_consumption === 'regular' ? '#ef4444' : '#fbbf24', 
-                color: 'white', 
-                fontWeight: 900, 
-                borderRadius: 1.5,
-                height: 32 
-              }}
-            />
-          </Tooltip>
+          <Chip 
+            icon={<SmokingRoomsIcon style={{ color: 'white', fontSize: 16 }} />}
+            label={vitals.tobacco_use === 'chewing' || vitals.tobacco_use === 'both' ? "GUTKHA" : "TOBACCO"}
+            sx={{ 
+              bgcolor: (vitals.tobacco_use === 'chewing') ? '#991b1b' : '#f59e0b', 
+              color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' 
+            }}
+          />
         )}
       </Stack>
 
       <Box sx={{ flexGrow: 1 }} />
 
-      {/* SECTION: Context Meta */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', pr: 2 }}>
-        <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem' }}>
+      {/* SECTION: Meta Information */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', pr: 1 }}>
+        <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.6rem' }}>
           Finalized Station
         </Typography>
-        <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 800 }}>
-          {vitals.created_by ? `Nurse STN: ${vitals.created_by.substring(0, 4)}` : 'Awaiting Triage'}
+        <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 900, fontSize: '0.75rem' }}>
+          {vitals.created_by ? `STN: ${vitals.created_by.substring(0, 5)}` : 'AWAITING TRIAGE'}
         </Typography>
       </Box>
 
-      {/* Station Icon Indicator */}
-      <LocalHospitalIcon sx={{ color: triage.bg, opacity: 0.8, fontSize: 28, ml: 1 }} />
+      <LocalHospitalIcon sx={{ color: triage.bg, opacity: 0.9, fontSize: 24 }} />
     </Paper>
   );
 };

@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import WarningIcon from '@mui/icons-material/Warning';
 import ErrorIcon from '@mui/icons-material/Error';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { subscribeToQueue, updateQueueStatus } from '../services/queueService';
@@ -21,6 +22,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
   const [patientVitals, setPatientVitals] = useState<any>(null);
   const [checklist, setChecklist] = useState<Record<string, boolean>>({});
+  const [isFinalizing, setIsFinalizing] = useState(false);
 
   useEffect(() => {
     if (!selectedClinic) return;
@@ -45,23 +47,35 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       const meds = medsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setSelectedPatient({ ...patient, currentVitals: vitals, triage_level: item.triage_level });
       setPrescriptions(meds);
+      
       const initialChecks: Record<string, boolean> = {};
       meds.forEach(m => initialChecks[m.id!] = false);
       setChecklist(initialChecks);
-    } catch (e) { notify("Error loading dispense data", "error"); }
+    } catch (e) { 
+      notify("Error loading dispensing data", "error"); 
+    }
   };
 
   const handleFinalize = async () => {
     if (!Object.values(checklist).every(v => v === true)) {
-      return notify("Please verify all medications.", "warning");
+      return notify("Please verify all medications before finalizing dispensing.", "warning");
     }
+    setIsFinalizing(true);
     try {
       await Promise.all(prescriptions.map(m => updateDoc(doc(db, "prescriptions", m.id!), { status: 'DISPENSED' })));
       await updateQueueStatus(selectedItem.id, 'COMPLETED' as any);
+      notify("Patient visit finalized. Medications dispensed.", "success");
       setSelectedItem(null);
       setSelectedPatient(null);
-      notify("Dispensing complete", "success");
-    } catch (e) { notify("Error finalizing", "error"); }
+    } catch (e) { 
+      notify("Error finalizing dispensing session", "error"); 
+    } finally {
+      setIsFinalizing(false);
+    }
+  };
+
+  const toggleCheck = (id: string) => {
+    setChecklist(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   return (
@@ -69,15 +83,30 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       {!selectedItem ? (
         <TableContainer component={Paper} elevation={0} sx={{ p: 2, borderRadius: 4, border: '1px solid #e2e8f0' }}>
           <Table>
-            <TableHead sx={{ bgcolor: '#f8fafc' }}><TableRow><TableCell>Wait Time</TableCell><TableCell>Patient Name</TableCell><TableCell align="right">Action</TableCell></TableRow></TableHead>
+            <TableHead sx={{ bgcolor: '#f8fafc' }}>
+              <TableRow>
+                <TableCell>Wait Time</TableCell>
+                <TableCell>Patient Name</TableCell>
+                <TableCell align="right">Action</TableCell>
+              </TableRow>
+            </TableHead>
             <TableBody>
               {waitingList.map(item => (
                 <TableRow key={item.id} hover>
                   <TableCell>{formatWaitTime(item.created_at)}</TableCell>
                   <TableCell fontWeight="bold">{item.patient_name}</TableCell>
-                  <TableCell align="right"><Button variant="contained" onClick={() => handleSelectPatient(item)}>Dispense Meds</Button></TableCell>
+                  <TableCell align="right">
+                    <Button variant="contained" onClick={() => handleSelectPatient(item)}>Dispense Meds</Button>
+                  </TableCell>
                 </TableRow>
               ))}
+              {waitingList.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={3} align="center" sx={{ py: 8 }}>
+                    <Typography color="text.secondary">No prescriptions pending in queue.</Typography>
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </TableContainer>
@@ -86,24 +115,38 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
           <PatientContextBar />
           <Container maxWidth="lg" sx={{ py: 3 }}>
             <Stack spacing={2} sx={{ mb: 4 }}>
-                {patientVitals?.allergies && <Alert severity="error" variant="filled" icon={<WarningIcon />}><strong>ALLERGY ALERT:</strong> {patientVitals.allergies}</Alert>}
-                {patientVitals?.is_pregnant === 'yes' && <Alert severity="warning" variant="filled" icon={<ErrorIcon />}><strong>PREGNANCY ALERT:</strong> Patient is {patientVitals.pregnancy_months} months pregnant.</Alert>}
-                {patientVitals?.tobacco_use !== 'none' && <Alert severity="info" variant="outlined"><strong>Substance History:</strong> {patientVitals.tobacco_use.toUpperCase()}</Alert>}
+                {patientVitals?.allergies && patientVitals.allergies.toLowerCase() !== 'none' && (
+                  <Alert severity="error" variant="filled" icon={<WarningIcon />}>
+                    <strong>CRITICAL ALLERGY ALERT:</strong> {patientVitals.allergies}
+                  </Alert>
+                )}
+                {patientVitals?.is_pregnant === 'yes' && (
+                  <Alert severity="warning" variant="filled" icon={<ErrorIcon />}>
+                    <strong>PREGNANCY ALERT:</strong> Patient is {patientVitals.pregnancy_months} months pregnant. Check drug safety.
+                  </Alert>
+                )}
+                {patientVitals?.tobacco_use && patientVitals.tobacco_use !== 'none' && (
+                  <Alert severity="info" variant="outlined">
+                    <strong>Lifestyle Alert:</strong> Tobacco history noted ({patientVitals.tobacco_use}).
+                  </Alert>
+                )}
             </Stack>
 
             <Paper sx={{ p: 4, borderRadius: 5 }}>
-              <Typography variant="h5" fontWeight="900" mb={3}>Dispensing Verification</Typography>
+              <Typography variant="h5" fontWeight="900" mb={3}>Dispensary Verification Checklist</Typography>
               <Stack spacing={2}>
                 {prescriptions.map((med, idx) => (
-                  <Card key={idx} variant="outlined" sx={{ borderRadius: 4, border: checklist[med.id] ? '2px solid #10b981' : '1px solid #e2e8f0' }}>
+                  <Card key={idx} variant="outlined" sx={{ borderRadius: 4, border: checklist[med.id] ? '2px solid #10b981' : '1px solid #e2e8f0', bgcolor: checklist[med.id] ? '#f0fdf4' : 'white' }}>
                     <CardContent>
                       <Grid container spacing={2} alignItems="center">
                         <Grid item xs={8}>
-                          <Typography variant="h6" color="primary" fontWeight="bold">{med.medicationName}</Typography>
-                          <Typography variant="body1">{med.dosageValue}{med.dosageUnit} x {med.quantity} Total</Typography>
+                          <Typography variant="h6" color="primary" fontWeight="900">{med.medicationName}</Typography>
+                          <Typography variant="body1" fontWeight="700">
+                            {med.dosageValue}{med.dosageUnit} x {med.quantity} Total
+                          </Typography>
                           {med.instructions && (
-                            <Box sx={{ mt: 1, p: 2, bgcolor: '#f0fdf4', borderRadius: 2, borderLeft: '4px solid #10b981' }}>
-                                <Typography variant="caption" fontWeight="900" color="#166534">NOTES:</Typography>
+                            <Box sx={{ mt: 1.5, p: 2, bgcolor: '#ecfdf5', borderRadius: 2, borderLeft: '4px solid #10b981' }}>
+                                <Typography variant="caption" fontWeight="900" color="#065f46" sx={{ textTransform: 'uppercase' }}>Doctor's Notes:</Typography>
                                 <Typography variant="body2">{med.instructions}</Typography>
                             </Box>
                           )}
@@ -112,9 +155,12 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                           <Button 
                             variant={checklist[med.id] ? "contained" : "outlined"} 
                             color="success" 
-                            onClick={() => setChecklist({...checklist, [med.id]: !checklist[med.id]})}
+                            size="large"
+                            startIcon={checklist[med.id] ? <CheckCircleIcon /> : null}
+                            onClick={() => toggleCheck(med.id)}
+                            sx={{ borderRadius: 2, minWidth: 150 }}
                           >
-                            {checklist[med.id] ? "VERIFIED" : "VERIFY"}
+                            {checklist[med.id] ? "VERIFIED" : "MARK READY"}
                           </Button>
                         </Grid>
                       </Grid>
@@ -123,7 +169,17 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                 ))}
               </Stack>
               <Divider sx={{ my: 4 }} />
-              <Button fullWidth size="large" variant="contained" color="success" sx={{ height: 75, fontWeight: 900, borderRadius: 4 }} onClick={handleFinalize}>COMPLETE & FINALIZE VISIT</Button>
+              <Button 
+                fullWidth 
+                size="large" 
+                variant="contained" 
+                color="success" 
+                sx={{ height: 80, fontWeight: 900, borderRadius: 4, fontSize: '1.2rem' }} 
+                disabled={isFinalizing}
+                onClick={handleFinalize}
+              >
+                {isFinalizing ? "FINALIZING..." : "FINALIZE & CLOSE VISIT"}
+              </Button>
             </Paper>
           </Container>
         </Box>
@@ -131,4 +187,5 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     </StationLayout>
   );
 };
+
 export default PharmacyStation;

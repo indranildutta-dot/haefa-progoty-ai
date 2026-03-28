@@ -1,36 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Typography, 
-  Box, 
-  Paper, 
-  Grid, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow, 
-  Button, 
-  Chip, 
-  TextField, 
-  InputAdornment, 
-  Alert, 
-  Divider, 
-  Card, 
-  CardContent, 
-  MenuItem, 
-  Select, 
-  FormControl, 
-  InputLabel, 
-  Stepper, 
-  Step, 
-  StepLabel, 
-  CircularProgress, 
-  Stack, 
-  RadioGroup, 
-  FormControlLabel, 
-  Radio, 
-  Autocomplete 
+  Typography, Box, Paper, Grid, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
+  Button, Chip, TextField, Divider, Card, CardContent, MenuItem, Select, FormControl, 
+  InputLabel, Stepper, Step, StepLabel, Stack, RadioGroup, FormControlLabel, Radio, Autocomplete 
 } from '@mui/material';
 import { 
   MonitorWeight as WeightIcon, 
@@ -104,6 +76,16 @@ const VitalsStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       setVitals((prev: any) => ({ ...prev, bmi: parseFloat(bmi) }));
     }
   }, [vitals.weight, vitals.height]);
+
+  // SAFETY SENTINEL SYNC: Ensures top bar updates as nurse types
+  useEffect(() => {
+    if (selectedPatient) {
+      setSelectedPatient({
+        ...selectedPatient,
+        currentVitals: { ...vitals, triage_level: evaluateTriage(vitals).triage_level }
+      });
+    }
+  }, [vitals.is_pregnant, vitals.tobacco_use, vitals.allergies]);
 
   // Smart Wait-Time Formatting: Shows hours if > 60 mins
   const formatWaitTime = (createdAt: any) => {

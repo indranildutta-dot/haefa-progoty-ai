@@ -1,9 +1,7 @@
+import React from 'react';
 import { 
   Box, 
   Container, 
-  CssBaseline, 
-  ThemeProvider, 
-  createTheme, 
   Typography,
   BottomNavigation,
   BottomNavigationAction,
@@ -13,7 +11,8 @@ import {
   PersonAdd as PersonAddIcon,
   LocalHospital as LocalHospitalIcon,
   Medication as MedicationIcon,
-  Dashboard as DashboardIcon
+  Dashboard as DashboardIcon,
+  Assignment as AssignmentIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import TopNavigation from './TopNavigation';
@@ -39,27 +38,30 @@ const StationLayout: React.FC<StationLayoutProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Navigation Items including the Queue overview
   const navItems = [
     { label: 'Reg', to: '/', icon: <PersonAddIcon /> },
+    { label: 'Queue', to: '/queue', icon: <DashboardIcon /> },
     { label: 'Vitals', to: '/vitals', icon: <LocalHospitalIcon /> },
-    { label: 'Doctor', to: '/doctor', icon: <MedicationIcon /> },
+    { label: 'Doctor', to: '/doctor', icon: <AssignmentIcon /> },
     { label: 'Pharmacy', to: '/pharmacy', icon: <MedicationIcon /> },
   ];
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f8fafc' }}>
       <TopNavigation />
       
+      {/* Sticky Patient Alert Bar */}
       {showPatientContext && <PatientContextBar />}
       
-      <Box component="main" sx={{ flexGrow: 1, pb: (isMobile || isTablet) ? 12 : 10 }}>
-        <Container maxWidth="xl" sx={{ mt: isMobile ? 2 : 3 }}>
+      <Box component="main" sx={{ flexGrow: 1, pb: (isMobile || isTablet) ? 14 : 10 }}>
+        <Container maxWidth="xl" sx={{ mt: isMobile ? 2 : 4 }}>
           {(title || stationName) && (
             <Box sx={{ 
-              mb: isMobile ? 2 : 4, 
+              mb: isMobile ? 3 : 5, 
               display: 'flex', 
               justifyContent: 'space-between', 
-              alignItems: 'flex-start',
+              alignItems: 'center',
               flexDirection: isMobile && actions ? 'column' : 'row',
               gap: 2
             }}>
@@ -68,11 +70,11 @@ const StationLayout: React.FC<StationLayoutProps> = ({
                   <Typography 
                     variant="overline" 
                     sx={{ 
-                      fontWeight: 800, 
-                      color: 'info.main', 
-                      letterSpacing: 1.5,
+                      fontWeight: 900, 
+                      color: 'primary.main', 
+                      letterSpacing: 2,
                       display: 'block',
-                      mb: 0.5
+                      mb: 0
                     }}
                   >
                     {stationName} STATION
@@ -83,10 +85,10 @@ const StationLayout: React.FC<StationLayoutProps> = ({
                     variant="h4" 
                     sx={{ 
                       fontWeight: 900, 
-                      color: 'primary.main',
-                      fontSize: isMobile ? '1.75rem' : '2.25rem',
+                      color: '#0f172a',
+                      fontSize: isMobile ? '1.5rem' : '2rem',
                       textTransform: 'uppercase',
-                      lineHeight: 1.1
+                      letterSpacing: '-0.02em'
                     }}
                   >
                     {title}
@@ -94,25 +96,33 @@ const StationLayout: React.FC<StationLayoutProps> = ({
                 )}
               </Box>
               {actions && (
-                <Box sx={{ display: 'flex', gap: 1, width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  gap: 1.5, 
+                  width: isMobile ? '100%' : 'auto', 
+                  justifyContent: isMobile ? 'flex-start' : 'flex-end' 
+                }}>
                   {actions}
                 </Box>
               )}
             </Box>
           )}
+          
+          {/* Dashboard/Workspace Content */}
           {children}
         </Container>
       </Box>
 
+      {/* Mobile/Tablet Persistent Footer Navigation */}
       {(isMobile || isTablet) && (
-        <Paper sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1100 }} elevation={3}>
+        <Paper sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1200, borderTop: '1px solid #e2e8f0' }} elevation={10}>
           <BottomNavigation
             showLabels
             value={location.pathname}
             onChange={(event, newValue) => {
               navigate(newValue);
             }}
-            sx={{ height: 72 }}
+            sx={{ height: 80, bgcolor: 'white' }}
           >
             {navItems.map((item) => (
               <BottomNavigationAction 
@@ -121,10 +131,12 @@ const StationLayout: React.FC<StationLayoutProps> = ({
                 value={item.to} 
                 icon={item.icon} 
                 sx={{
+                  color: '#64748b',
                   '&.Mui-selected': {
                     color: 'primary.main',
                     '& .MuiBottomNavigationAction-label': {
-                      fontWeight: 800
+                      fontWeight: 900,
+                      fontSize: '0.75rem'
                     }
                   }
                 }}
