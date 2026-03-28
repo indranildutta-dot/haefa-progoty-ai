@@ -21,7 +21,7 @@ const SUPER_ADMIN_EMAILS = [
   'ruhul_abid@haefa.org'
 ];
 
-const REQUISITION_THRESHOLD = 500;
+const REQUISITION_THRESHOLD = 500; // Low stock alert level for Dhaka
 
 /**
  * Helper to verify if the caller is a Global Admin
@@ -31,6 +31,18 @@ const checkIsGlobalAdmin = (auth: any) => {
   const email = auth.token.email?.toLowerCase();
   const role = auth.token.role;
   return SUPER_ADMIN_EMAILS.includes(email) || role === 'global_admin';
+};
+
+// ==========================================
+// UTILITY FUNCTIONS
+// ==========================================
+
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  }
 };
 
 const sanitizeData = (data: any) => {
@@ -214,8 +226,8 @@ export const registerPatient = onCall(
       throw new HttpsError("invalid-argument", "Missing registration data");
     }
     try {
-      const patientId = crypto.randomUUID();
-      const encounterId = crypto.randomUUID();
+      const patientId = generateId();
+      const encounterId = generateId();
       let photoUrl = "";
       
       if (photoBase64 && photoBase64.includes(",")) {
@@ -254,6 +266,9 @@ export const registerPatient = onCall(
   }
 );
 
+/**
+ * Handles Doctor Consultation and Automatic Requisition triggers
+ */
 export const saveConsultation = onCall(
   { region: "us-central1" },
   async (request: any) => {
@@ -363,14 +378,17 @@ export const dispenseMedication = onCall(
   }
 );
 
+/**
+ * BULK UPLOAD: Uses Lazy Loading to fix deployment timeouts
+ */
 export const bulkUpload = onCall(
   { region: "us-central1" },
   async (request: any) => {
     const { clinicId, fileBase64 } = request.data;
-    // Lazy Load ExcelJS to fix initialization timeout
+    // CRITICAL: Loading inside function body to bypass CLI timeout
     const ExcelJS = await import('exceljs');
     const workbook = new ExcelJS.Workbook();
-    // FIXED: Added 'as any' to bypass the Buffer mismatch in TypeScript
+    // Type-cast to any to fix Buffer error from image_1e363e.png
     await workbook.xlsx.load(Buffer.from(fileBase64, 'base64') as any);
     const worksheet = workbook.getWorksheet(1);
     const batch = db.batch();
@@ -399,7 +417,6 @@ export const bulkUpload = onCall(
 export const getInventoryTemplate = onCall(
   { region: "us-central1" },
   async (request: any) => {
-    // Lazy Load ExcelJS to fix initialization timeout
     const ExcelJS = await import('exceljs');
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Inventory Template');
@@ -413,7 +430,7 @@ export const getInventoryTemplate = onCall(
       { header: 'dosage', key: 'dosage', width: 15 }
     ];
     const buffer = await workbook.xlsx.writeBuffer();
-    // FIXED: Cast to any to ensure toString('base64') works correctly
+    // Type-cast to any to fix Buffer error from image_1e363e.png
     return { fileBase64: (buffer as any).toString('base64') };
   }
 );
