@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, Typography, TextField, Chip, Divider, Button, 
   Autocomplete, Stack, CircularProgress, Alert, Paper 
-} from '@mui/material'; // <--- MUST INCLUDE Paper HERE
+} from '@mui/material';
 import PrescriptionBuilder from './PrescriptionBuilder';
 import ClinicalAssessmentPanel, { ClinicalAssessmentData, initialClinicalAssessment } from './ClinicalAssessmentPanel';
 import { Prescription } from '../types';
@@ -44,15 +44,24 @@ const ConsultationPanel: React.FC<ConsultationPanelProps> = ({
 }) => {
   const { notify } = useAppStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Local state buffer to ensure smooth typing and selection
+  const [localData, setLocalData] = useState<ConsultationData>(data);
 
-  const handleSymptomClick = (symptom: string) => {
-    const newNotes = data.notes ? `${data.notes}, ${symptom}` : symptom;
-    onChange({ ...data, notes: newNotes });
+  // Sync with parent when encounter changes
+  useEffect(() => {
+    setLocalData(data);
+  }, [encounterId]);
+
+  const handleLocalChange = (updates: Partial<ConsultationData>) => {
+    const updated = { ...localData, ...updates };
+    setLocalData(updated);
+    onChange(updated); // Sync back to the parent app state
   };
 
-  const handleFinalizeConsultation = async () => {
-    if (!data.diagnosis) {
-      notify("Provisional Diagnosis is required before finalizing.", "error");
+  const handleFinalize = async () => {
+    if (!localData.diagnosis) {
+      notify("Provisional Diagnosis is required.", "error");
       return;
     }
 
@@ -62,216 +71,140 @@ const ConsultationPanel: React.FC<ConsultationPanelProps> = ({
         {
           encounter_id: encounterId,
           patient_id: patientId,
-          diagnosis: data.diagnosis,
-          notes: data.notes,
-          treatment_notes: data.treatmentNotes,
-          lab_investigations: data.labInvestigations,
-          referrals: data.referrals,
-          assessment: data.clinicalAssessment
+          diagnosis: localData.diagnosis,
+          notes: localData.notes,
+          treatment_notes: localData.treatmentNotes,
+          lab_investigations: localData.labInvestigations,
+          referrals: localData.referrals,
+          assessment: localData.clinicalAssessment
         },
         {
           encounter_id: encounterId,
           patient_id: patientId,
-          prescriptions: data.prescriptions
+          prescriptions: localData.prescriptions
         }
       );
 
-      notify("Consultation finalized. Patient moved to Pharmacy queue.", "success");
-      
+      notify("Consultation finalized successfully.", "success");
       if (onComplete) onComplete();
       
     } catch (error: any) {
-      console.error("Finalization Error:", error);
-      notify("Failed to finalize consultation. Please try again.", "error");
+      console.error("Save Error:", error);
+      notify("Failed to finalize consultation.", "error");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const hasRequisitions = data.prescriptions.some(p => p.isRequisition);
+  const hasRequisitions = localData.prescriptions.some(p => p.isRequisition);
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, pb: 10 }}>
-      {/* Section 1: Clinical Assessment */}
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, pb: 12 }}>
+      {/* Section 1: Assessment */}
       <Box>
-        <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', mb: 2 }}>
-          Section 1 — Clinical Assessment
-        </Typography>
+        <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>Section 1 — Clinical Assessment</Typography>
         <ClinicalAssessmentPanel 
-          data={data.clinicalAssessment || initialClinicalAssessment} 
-          onChange={(clinicalAssessment) => onChange({ ...data, clinicalAssessment })} 
+          data={localData.clinicalAssessment || initialClinicalAssessment} 
+          onChange={(val) => handleLocalChange({ clinicalAssessment: val })} 
         />
       </Box>
 
       <Divider />
 
-      {/* Section 2: Symptoms / Notes */}
+      {/* Section 2: Notes */}
       <Box>
-        <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', mb: 2 }}>
-          Section 2 — Symptoms / Notes
-        </Typography>
+        <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>Section 2 — Symptoms / Notes</Typography>
         <TextField 
-          fullWidth 
-          multiline 
-          rows={3} 
-          variant="outlined" 
-          placeholder="Enter patient symptoms and clinical notes..." 
-          value={data.notes} 
-          onChange={(e) => onChange({ ...data, notes: e.target.value })} 
+          fullWidth multiline rows={3} variant="outlined" 
+          value={localData.notes || ""} 
+          onChange={(e) => handleLocalChange({ notes: e.target.value })} 
+          placeholder="Enter symptoms..." 
           sx={{ mb: 2, bgcolor: 'white', borderRadius: 2 }}
         />
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-          <Typography variant="caption" color="textSecondary" sx={{ mr: 1, fontWeight: 'bold' }}>Quick Add:</Typography>
-          {COMMON_SYMPTOMS.map((symptom) => (
-            <Chip 
-              key={symptom} 
-              label={symptom} 
-              onClick={() => handleSymptomClick(symptom)} 
-              size="small" 
-              variant="outlined" 
-              color="primary" 
-              sx={{ fontWeight: 600, borderRadius: 1 }}
-            />
+        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+          {COMMON_SYMPTOMS.map(s => (
+            <Chip key={s} label={s} onClick={() => handleLocalChange({ notes: localData.notes ? `${localData.notes}, ${s}` : s })} size="small" variant="outlined" color="primary" />
           ))}
-        </Box>
+        </Stack>
       </Box>
 
       <Divider />
 
-      {/* Section 3: Provisional Diagnosis */}
+      {/* Section 3: Diagnosis (Fixed typing) */}
       <Box>
-        <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', mb: 2 }}>
-          Section 3 — Provisional Diagnosis
-        </Typography>
+        <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>Section 3 — Provisional Diagnosis</Typography>
         <TextField 
-          fullWidth 
-          variant="outlined" 
-          placeholder="Enter provisional diagnosis (e.g., Upper respiratory infection)" 
-          value={data.diagnosis} 
-          onChange={(e) => onChange({ ...data, diagnosis: e.target.value })} 
+          fullWidth variant="outlined" 
+          value={localData.diagnosis || ""} 
+          onChange={(e) => handleLocalChange({ diagnosis: e.target.value })} 
+          placeholder="Enter diagnosis..." 
           sx={{ bgcolor: 'white', borderRadius: 2 }}
         />
       </Box>
 
       <Divider />
 
-      {/* Section 4: Prescribed Medicines */}
-      <Box>
-        <PrescriptionBuilder 
-          initialData={data.prescriptions} 
-          onPrescriptionChange={(prescriptions) => onChange({ ...data, prescriptions })} 
-        />
-      </Box>
+      {/* Section 4: Prescription Builder */}
+      <PrescriptionBuilder 
+        initialData={localData.prescriptions} 
+        onPrescriptionChange={(prescriptions) => handleLocalChange({ prescriptions })} 
+      />
 
       <Divider />
 
-      {/* Section 5: Lab Investigations */}
+      {/* Section 5: Lab Investigations (Fixed multiple selection) */}
       <Box>
-        <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', mb: 2 }}>
-          Section 5 — Lab Investigations
-        </Typography>
+        <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>Section 5 — Lab Investigations</Typography>
         <Autocomplete
-          multiple
-          freeSolo
-          options={COMMON_LABS}
-          value={data.labInvestigations || []}
-          onChange={(_, newValue) => onChange({ ...data, labInvestigations: newValue })}
-          renderTags={(value, getTagProps) =>
-            value.map((option, index) => {
-              const { key, ...tagProps } = getTagProps({ index });
-              return (
-                <Chip variant="outlined" label={option} key={key} {...tagProps} color="primary" sx={{ fontWeight: 600, borderRadius: 1 }} />
-              );
-            })
-          }
-          renderInput={(params) => (
-            <TextField {...params} variant="outlined" placeholder="Add lab tests..." sx={{ bgcolor: 'white', borderRadius: 2 }} />
-          )}
+          multiple options={COMMON_LABS} freeSolo
+          value={localData.labInvestigations || []}
+          onChange={(_, newValue) => handleLocalChange({ labInvestigations: newValue })}
+          renderTags={(value, getTagProps) => value.map((option, index) => <Chip label={option} {...getTagProps({ index })} color="primary" size="small" />)}
+          renderInput={(params) => <TextField {...params} variant="outlined" placeholder="Select Lab Tests..." sx={{ bgcolor: 'white' }} />}
         />
       </Box>
 
       <Divider />
 
-      {/* Section 6: Referral Section */}
+      {/* Section 6: Referrals (Fixed multiple selection) */}
       <Box>
-        <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', mb: 2 }}>
-          Section 6 — Referral Section
-        </Typography>
+        <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>Section 6 — Referral Section</Typography>
         <Autocomplete
-          multiple
-          freeSolo
-          options={COMMON_REFERRALS}
-          value={data.referrals || []}
-          onChange={(_, newValue) => onChange({ ...data, referrals: newValue })}
-          renderTags={(value, getTagProps) =>
-            value.map((option, index) => {
-              const { key, ...tagProps } = getTagProps({ index });
-              return (
-                <Chip variant="outlined" label={option} key={key} {...tagProps} color="secondary" sx={{ fontWeight: 600, borderRadius: 1 }} />
-              );
-            })
-          }
-          renderInput={(params) => (
-            <TextField {...params} variant="outlined" placeholder="Add referrals..." sx={{ bgcolor: 'white', borderRadius: 2 }} />
-          )}
+          multiple options={COMMON_REFERRALS} freeSolo
+          value={localData.referrals || []}
+          onChange={(_, newValue) => handleLocalChange({ referrals: newValue })}
+          renderTags={(value, getTagProps) => value.map((option, index) => <Chip label={option} {...getTagProps({ index })} color="secondary" size="small" />)}
+          renderInput={(params) => <TextField {...params} variant="outlined" placeholder="Add Referrals..." sx={{ bgcolor: 'white' }} />}
         />
       </Box>
 
       <Divider />
 
-      {/* Section 7: Treatment Notes */}
+      {/* Section 7: Treatment Notes (Fixed typing) */}
       <Box>
-        <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', mb: 2 }}>
-          Section 7 — Treatment Notes
-        </Typography>
+        <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>Section 7 — Treatment Notes</Typography>
         <TextField 
-          fullWidth 
-          multiline 
-          rows={2} 
-          variant="outlined" 
-          placeholder="General patient instructions (e.g., Increase fluids, Return if fever persists)" 
-          value={data.treatmentNotes} 
-          onChange={(e) => onChange({ ...data, treatmentNotes: e.target.value })} 
+          fullWidth multiline rows={2} variant="outlined" 
+          value={localData.treatmentNotes || ""} 
+          onChange={(e) => handleLocalChange({ treatmentNotes: e.target.value })} 
+          placeholder="Instructions for the patient..." 
           sx={{ bgcolor: 'white', borderRadius: 2 }}
         />
       </Box>
 
-      {/* --- FINALIZE FOOTER --- */}
-      <Paper 
-        elevation={10} 
-        sx={{ 
-          position: 'fixed', bottom: 0, left: 0, right: 0, 
-          p: 3, bgcolor: 'background.paper', borderTop: '1px solid #eee',
-          zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center'
-        }}
-      >
-        <Stack direction="row" spacing={3} alignItems="center" sx={{ width: '100%', maxWidth: 1200 }}>
-          <Box sx={{ flexGrow: 1 }}>
-            {hasRequisitions ? (
-              <Alert severity="warning" sx={{ borderRadius: 2 }}>
-                <strong>Requisition Detected:</strong> Some items are not in stock. Finalizing will create a procurement order.
-              </Alert>
-            ) : (
-              <Box sx={{ display: 'flex', alignItems: 'center', color: 'text.secondary' }}>
-                <InfoIcon sx={{ mr: 1, fontSize: 18 }} />
-                <Typography variant="body2">Ensure all clinical data is accurate before sending to Pharmacy.</Typography>
-              </Box>
-            )}
+      {/* Footer Button */}
+      <Paper elevation={10} sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, p: 3, zIndex: 1000 }}>
+        <Stack direction="row" spacing={3} alignItems="center" justifyContent="center">
+          <Box sx={{ flexGrow: 1, maxWidth: 600 }}>
+            {hasRequisitions && <Alert severity="warning">Note: Items out of stock will trigger procurement requisitions.</Alert>}
           </Box>
-          
           <Button
-            variant="contained"
-            size="large"
-            color="primary"
+            variant="contained" size="large" onClick={handleFinalize} 
+            disabled={isSubmitting || !localData.diagnosis}
             startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
-            onClick={handleFinalizeConsultation}
-            disabled={isSubmitting || !data.diagnosis}
-            sx={{ 
-              height: 56, px: 6, borderRadius: 3, fontWeight: 900, fontSize: '1.1rem',
-              boxShadow: '0 8px 24px rgba(25, 118, 210, 0.3)'
-            }}
+            sx={{ height: 56, px: 6, borderRadius: 3, fontWeight: 900 }}
           >
-            {isSubmitting ? "FINALIZING..." : "FINALIZE & SEND TO PHARMACY"}
+            {isSubmitting ? "SAVING..." : "FINALIZE & SEND TO PHARMACY"}
           </Button>
         </Stack>
       </Paper>
