@@ -10,7 +10,10 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Divider
+  Divider,
+  Stack,
+  Chip,
+  IconButton
 } from '@mui/material';
 import { 
   getPatientHistory,
@@ -23,6 +26,10 @@ import { getPatientById } from '../services/patientService';
 import { Encounter, VitalsRecord, DiagnosisRecord, PrescriptionRecord, TriageAssessment, Patient } from '../types';
 import PrescriptionPrintView from './PrescriptionPrintView';
 import LocalPrintshopIcon from '@mui/icons-material/LocalPrintshop';
+import WarningIcon from '@mui/icons-material/Warning';
+import ErrorIcon from '@mui/icons-material/Error';
+import SmokingRoomsIcon from '@mui/icons-material/SmokingRooms';
+import WineBarIcon from '@mui/icons-material/WineBar';
 import { useAppStore } from '../store/useAppStore';
 
 interface PatientHistoryTimelineProps {
@@ -56,8 +63,7 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
           getPatientById(patientId)
         ]);
         setPatient(patientData);
-        const completedEncounters = encounters
-          .filter(e => e.encounter_status === 'COMPLETED');
+        const completedEncounters = encounters.filter(e => e.encounter_status === 'COMPLETED');
         
         const items = await Promise.all(completedEncounters.slice(0, 5).map(async (encounter) => {
           const [vitals, diagnosis, prescription, triage] = await Promise.all([
@@ -82,14 +88,11 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
 
   const handleViewFullHistory = async () => {
     setOpenFullHistory(true);
-    if (fullHistoryItems.length > 0) return; // Already loaded
-
+    if (fullHistoryItems.length > 0) return; 
     setLoadingFull(true);
     try {
       const encounters = await getPatientHistory(patientId);
-      const completedEncounters = encounters
-        .filter(e => e.encounter_status === 'COMPLETED');
-      
+      const completedEncounters = encounters.filter(e => e.encounter_status === 'COMPLETED');
       const items = await Promise.all(completedEncounters.map(async (encounter) => {
         const [vitals, diagnosis, prescription, triage] = await Promise.all([
           getVitalsByEncounter(encounter.id!),
@@ -99,7 +102,6 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
         ]);
         return { encounter, vitals, diagnosis, prescription, triage };
       }));
-      
       setFullHistoryItems(items);
     } catch (err) {
       console.error("Error fetching full history:", err);
@@ -116,166 +118,125 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
     }, 100);
   };
 
-  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress size={24} /></Box>;
-
-  if (historyItems.length === 0) {
+  const renderRiskChips = (v: any) => {
+    if (!v) return null;
     return (
-      <Box p={2} textAlign="center">
-        <Typography color="textSecondary">No previous medical history found.</Typography>
-      </Box>
+      <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: 'wrap', gap: 1 }}>
+        {v.is_pregnant === 'yes' && (
+          <Chip size="small" icon={<ErrorIcon sx={{ fontSize: '14px !important' }}/>} label="PREGNANT" sx={{ bgcolor: '#be123c', color: 'white', fontWeight: 900 }} />
+        )}
+        {v.allergies && v.allergies.toLowerCase() !== 'none' && (
+          <Chip size="small" icon={<WarningIcon sx={{ fontSize: '14px !important' }}/>} label="ALLERGIES" sx={{ bgcolor: '#e11d48', color: 'white', fontWeight: 900 }} />
+        )}
+        {v.tobacco_use && v.tobacco_use !== 'none' && (
+          <Chip 
+            size="small" 
+            icon={<SmokingRoomsIcon sx={{ fontSize: '14px !important' }}/>} 
+            label={v.tobacco_use === 'chewing' || v.tobacco_use === 'both' ? "GUTKHA/PAN" : "TOBACCO"} 
+            sx={{ bgcolor: '#92400e', color: 'white', fontWeight: 900 }} 
+          />
+        )}
+        {v.alcohol_consumption && v.alcohol_consumption !== 'none' && (
+          <Chip size="small" icon={<WineBarIcon sx={{ fontSize: '14px !important' }}/>} label="ALCOHOL" sx={{ bgcolor: '#7c2d12', color: 'white', fontWeight: 900 }} />
+        )}
+      </Stack>
     );
-  }
+  };
+
+  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress size={24} /></Box>;
 
   return (
     <Box>
-      <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', mb: 2 }}>
-        Recent Encounters
+      <Typography variant="subtitle2" color="primary" fontWeight="900" sx={{ textTransform: 'uppercase', letterSpacing: '0.1em', mb: 2, display: 'flex', alignItems: 'center' }}>
+        <HistoryIcon sx={{ mr: 1, fontSize: 18 }} /> Clinical History
       </Typography>
-      {historyItems.map((item, index) => {
-        const dateStr = item.encounter.created_at?.toDate().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-        const isAbnormalTemp = item.vitals?.temperature && (item.vitals.temperature > 37.5 || item.vitals.temperature < 35.0);
-
-        return (
-          <Card key={item.encounter.id} sx={{ mb: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
-            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Typography variant="subtitle2" fontWeight="bold">
-                  {dateStr}
-                </Typography>
-                <Button 
-                  size="small" 
-                  variant="outlined" 
-                  startIcon={<LocalPrintshopIcon />}
-                  onClick={() => handlePrint(item)}
-                  sx={{ py: 0, px: 1, minWidth: 'auto' }}
-                >
-                  Print
-                </Button>
-              </Box>
-              <Typography variant="body2" sx={{ mb: 0.5 }}>
-                <strong>Diagnosis:</strong> {item.diagnosis?.diagnosis || 'N/A'}
+      
+      {historyItems.map((item) => (
+        <Card key={item.encounter.id} sx={{ mb: 2, borderRadius: 3, border: '1px solid #e2e8f0', transition: '0.2s', '&:hover': { borderColor: 'primary.main', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' } }}>
+          <CardContent sx={{ p: 2 }}>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
+              <Typography variant="subtitle2" fontWeight="900" color="text.secondary">
+                {item.encounter.created_at?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </Typography>
-              {item.vitals?.temperature && (
-                <Typography variant="body2" sx={{ mb: 0.5 }}>
-                  <strong>Temp:</strong> <span style={{ color: isAbnormalTemp ? '#ef4444' : 'inherit', fontWeight: isAbnormalTemp ? 'bold' : 'normal' }}>{item.vitals.temperature}°C</span>
-                </Typography>
-              )}
-              {item.prescription && item.prescription.prescriptions.length > 0 && (
-                <Typography variant="body2">
-                  <strong>Medications:</strong> {item.prescription.prescriptions.map(p => p.medicationName).join(', ')}
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
-      {historyItems.length > 0 && (
-        <Button variant="outlined" fullWidth onClick={handleViewFullHistory} sx={{ mt: 1, borderRadius: 2, fontWeight: 700 }}>
-          View Full History
-        </Button>
-      )}
+              <IconButton size="small" onClick={() => handlePrint(item)} sx={{ bgcolor: '#f1f5f9' }}>
+                <LocalPrintshopIcon fontSize="small" />
+              </IconButton>
+            </Box>
+            
+            <Typography variant="body2" sx={{ fontWeight: 800, color: '#1e293b', mb: 0.5 }}>
+              Diagnosis: {item.diagnosis?.diagnosis || 'General Consultation'}
+            </Typography>
+            
+            {renderRiskChips(item.vitals)}
+            
+            <Box sx={{ mt: 1.5, display: 'flex', gap: 2 }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                BP: <strong>{item.vitals?.systolic}/{item.vitals?.diastolic}</strong>
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                SpO2: <strong>{item.vitals?.oxygenSaturation}%</strong>
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
+      ))}
+
+      <Button variant="outlined" fullWidth onClick={handleViewFullHistory} sx={{ mt: 1, borderRadius: 2, fontWeight: 900, py: 1.2, borderWidth: 2, '&:hover': { borderWidth: 2 } }}>
+        View Full Medical Record
+      </Button>
 
       <Dialog open={openFullHistory} onClose={() => setOpenFullHistory(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Full Patient History</DialogTitle>
-        <DialogContent dividers>
+        <DialogTitle sx={{ fontWeight: 900, bgcolor: '#f8fafc' }}>COMPREHENSIVE PATIENT RECORD</DialogTitle>
+        <DialogContent dividers sx={{ bgcolor: '#fcfcfc' }}>
           {loadingFull ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress size={24} /></Box>
+            <Box display="flex" justifyContent="center" p={6}><CircularProgress /></Box>
           ) : (
-            fullHistoryItems.map((item, index) => {
-              const dateStr = item.encounter.created_at?.toDate().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-              return (
-                <Box key={item.encounter.id} sx={{ mb: 3 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="h6" fontWeight="bold" color="primary.main">{dateStr}</Typography>
-                    <Button 
-                      size="small" 
-                      variant="outlined" 
-                      startIcon={<LocalPrintshopIcon />}
-                      onClick={() => handlePrint(item)}
-                    >
-                      Print
-                    </Button>
-                  </Box>
-                  <Typography variant="body2" color="textSecondary" gutterBottom>Encounter ID: {item.encounter.id}</Typography>
-                  
-                  <Box sx={{ pl: 2, borderLeft: '2px solid', borderColor: 'primary.main', mb: 2 }}>
-                    <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 1 }}>Diagnosis</Typography>
-                    <Typography variant="body2">{item.diagnosis?.diagnosis || 'None recorded'}</Typography>
-                    {item.diagnosis?.notes && <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>{item.diagnosis.notes}</Typography>}
-
-                    <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 1 }}>Vitals</Typography>
-                    {item.vitals ? (
-                      <Typography variant="body2">
-                        BP: {item.vitals.systolic}/{item.vitals.diastolic} | HR: {item.vitals.heartRate} | Temp: {item.vitals.temperature}°C | SpO2: {item.vitals.oxygenSaturation}%
-                      </Typography>
-                    ) : (
-                      <Typography variant="body2" color="textSecondary">None recorded</Typography>
-                    )}
-
-                    <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 1 }}>Prescriptions</Typography>
-                    {item.prescription && item.prescription.prescriptions.length > 0 ? (
-                      <ul style={{ margin: 0, paddingLeft: '20px' }}>
-                        {item.prescription.prescriptions.map((p, i) => {
-                          const isDispensed = item.prescription?.status !== 'PENDING';
-                          const shortfall = p.shortfall_qty || 0;
-                          const dispensed = p.dispensed_qty || 0;
-                          const prescribed = p.quantity || 0;
-                          
-                          let statusLabel = '';
-                          let statusColor = 'text.secondary';
-                          
-                          if (isDispensed) {
-                            if (shortfall === 0) {
-                              statusLabel = ' (Fully Dispensed)';
-                              statusColor = 'success.main';
-                            } else if (dispensed > 0) {
-                              statusLabel = ` (Partial: ${dispensed}/${prescribed})`;
-                              statusColor = 'warning.main';
-                            } else {
-                              statusLabel = ' (Out of Stock)';
-                              statusColor = 'error.main';
-                            }
-                          }
-
-                          return (
-                            <li key={i}>
-                              <Typography variant="body2">
-                                {p.medicationName} - {p.dosage} ({p.frequency} for {p.duration})
-                                <Box component="span" sx={{ color: statusColor, fontWeight: 'bold', ml: 1 }}>
-                                  {statusLabel}
-                                </Box>
-                              </Typography>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    ) : (
-                      <Typography variant="body2" color="textSecondary">None recorded</Typography>
-                    )}
-                  </Box>
-                  {index < fullHistoryItems.length - 1 && <Divider />}
-                </Box>
-              );
-            })
+            fullHistoryItems.map((item, idx) => (
+              <Box key={idx} sx={{ mb: 5 }}>
+                <Typography variant="h6" fontWeight="900" color="primary" gutterBottom>
+                  Visit Date: {item.encounter.created_at?.toDate().toLocaleDateString()}
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="subtitle2" fontWeight="900">VITALS & RISK</Typography>
+                    <Box sx={{ mt: 1, p: 2, bgcolor: 'white', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+                      <Typography variant="body2">BP: {item.vitals?.systolic}/{item.vitals?.diastolic}</Typography>
+                      <Typography variant="body2">BMI: {item.vitals?.bmi}</Typography>
+                      <Typography variant="body2">Temp: {item.vitals?.temperature}°C</Typography>
+                      {renderRiskChips(item.vitals)}
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} md={8}>
+                    <Typography variant="subtitle2" fontWeight="900">CLINICAL FINDINGS</Typography>
+                    <Typography variant="body2" sx={{ mt: 1 }}><strong>Diagnosis:</strong> {item.diagnosis?.diagnosis}</Typography>
+                    <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic', color: 'text.secondary' }}>{item.diagnosis?.notes}</Typography>
+                    
+                    <Typography variant="subtitle2" fontWeight="900" sx={{ mt: 2 }}>PRESCRIPTIONS</Typography>
+                    <Stack spacing={1} sx={{ mt: 1 }}>
+                      {item.prescription?.prescriptions.map((p, pIdx) => (
+                        <Typography key={pIdx} variant="body2" sx={{ p: 1, bgcolor: '#f1f5f9', borderRadius: 1 }}>
+                          • {p.medicationName} ({p.dosageValue}{p.dosageUnit}) - {p.frequencyValue} {p.frequencyUnit}
+                        </Typography>
+                      ))}
+                    </Stack>
+                  </Grid>
+                </Grid>
+                {idx < fullHistoryItems.length - 1 && <Divider sx={{ mt: 4, mb: 2, borderWidth: 1, borderStyle: 'dashed' }} />}
+              </Box>
+            ))
           )}
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenFullHistory(false)} variant="contained" sx={{ borderRadius: 2, fontWeight: 700 }}>Close</Button>
+        <DialogActions sx={{ p: 2, bgcolor: '#f8fafc' }}>
+          <Button onClick={() => setOpenFullHistory(false)} variant="contained" sx={{ borderRadius: 2, fontWeight: 900, px: 4 }}>Close History</Button>
         </DialogActions>
       </Dialog>
 
-      {/* Hidden Print View */}
       {printItem && patient && (
         <Box sx={{ display: 'none', '@media print': { display: 'block' } }}>
           <PrescriptionPrintView 
-            patient={patient}
-            encounter={printItem.encounter}
-            vitals={printItem.vitals}
-            diagnosis={printItem.diagnosis}
-            prescription={printItem.prescription}
-            triage={printItem.triage}
-            countryCode={selectedCountry?.id || 'BD'}
-            clinicName={selectedClinic?.name}
+            patient={patient} encounter={printItem.encounter} vitals={printItem.vitals}
+            diagnosis={printItem.diagnosis} prescription={printItem.prescription} triage={printItem.triage}
+            countryCode={selectedCountry?.id || 'BD'} clinicName={selectedClinic?.name}
           />
         </Box>
       )}

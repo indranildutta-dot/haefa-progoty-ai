@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Typography, Box, IconButton } from '@mui/material';
+import { Typography, Box, IconButton, Grid, Paper } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import TimerIcon from '@mui/icons-material/Timer';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db, handleFirestoreError } from '../firebase';
 import { QueuePatient, Patient, QueueItem, OperationType } from '../types';
@@ -26,25 +27,31 @@ const QueueBoard: React.FC<{ countryId: string }> = ({ countryId }) => {
 
   useEffect(() => {
     if (!selectedCountry || !selectedClinic || !userProfile?.isApproved) return;
-    const q = query(collection(db, "queues_active"), where("country_code", "==", selectedCountry.id), where("clinic_id", "==", selectedClinic.id), where("status", "!=", "COMPLETED"));
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
+    const q = query(collection(db, "queues_active"), 
+              where("country_code", "==", selectedCountry.id), 
+              where("clinic_id", "==", selectedClinic.id), 
+              where("status", "!=", "COMPLETED"));
+
+    return onSnapshot(q, async (snapshot) => {
       try {
         const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as QueueItem[];
         items.sort((a, b) => (a.created_at?.toMillis() || 0) - (b.created_at?.toMillis() || 0));
+
         const missingIds = items.map(i => i.patient_id).filter(id => !patientsCache[id]);
         if (missingIds.length > 0) {
           const newPatients = { ...patientsCache };
-          await Promise.all(missingIds.map(async id => { const p = await getPatientById(id); if (p) newPatients[id] = p; }));
+          await Promise.all(missingIds.map(async id => { 
+            const p = await getPatientById(id); if (p) newPatients[id] = p; 
+          }));
           setPatientsCache(newPatients);
         }
+
         setQueuePatients(items.map(item => {
           const p = patientsCache[item.patient_id];
           return {
             encounterId: item.encounter_id, queueId: item.id, patientId: item.patient_id,
             patientName: p ? `${p.given_name} ${p.family_name}` : 'Loading...',
-            age: p ? (p.age_years ?? (p.date_of_birth ? new Date().getFullYear() - new Date(p.date_of_birth).getFullYear() : 0)) : 0,
-            gender: p ? p.gender : '?',
-            triageLevel: item.triage_level,
+            triageLevel: item.triage_level as any,
             encounterStatus: item.status,
             createdAt: item.created_at,
             waitTimeDisplay: formatWaitTime(item.created_at)
@@ -52,8 +59,10 @@ const QueueBoard: React.FC<{ countryId: string }> = ({ countryId }) => {
         }));
         setLoading(false);
       } catch (e) { setLoading(false); }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, "queues_active");
+      setLoading(false);
     });
-    return () => unsubscribe();
   }, [selectedCountry, selectedClinic, patientsCache]);
 
   const grouped = useMemo(() => {
@@ -67,12 +76,20 @@ const QueueBoard: React.FC<{ countryId: string }> = ({ countryId }) => {
   }, [queuePatients]);
 
   return (
-    <StationLayout title="Clinic Flow" stationName="Queue" showPatientContext={false}>
-      <Box sx={{ display: 'flex', gap: 3, overflowX: 'auto', minHeight: 'calc(100vh - 250px)' }}>
-        <Box sx={{ minWidth: 350, flex: 1 }}><QueueColumn title="Vitals" headerColor="#f3e5f5" patients={grouped.VITALS} onPatientClick={setSelectedPatient} loading={loading} /></Box>
-        <Box sx={{ minWidth: 350, flex: 1 }}><QueueColumn title="Doctor" headerColor="#e8f5e9" patients={grouped.DOCTOR} onPatientClick={setSelectedPatient} loading={loading} /></Box>
-        <Box sx={{ minWidth: 350, flex: 1 }}><QueueColumn title="Pharmacy" headerColor="#fff3e0" patients={grouped.PHARMACY} onPatientClick={setSelectedPatient} loading={loading} /></Box>
-      </Box>
+    <StationLayout title="Clinic Flow Board" stationName="Queue" showPatientContext={false}
+      actions={<IconButton onClick={() => window.location.reload()} color="primary"><RefreshIcon /></IconButton>}
+    >
+      <Grid container spacing={3} sx={{ flexGrow: 1, minHeight: 'calc(100vh - 200px)' }}>
+        <Grid item xs={12} md={4}>
+          <QueueColumn title="VITALS STATION" headerColor="#f3e5f5" patients={grouped.VITALS} onPatientClick={setSelectedPatient} loading={loading} />
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <QueueColumn title="DOCTOR CONSULTATION" headerColor="#e8f5e9" patients={grouped.DOCTOR} onPatientClick={setSelectedPatient} loading={loading} />
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <QueueColumn title="PHARMACY DISPENSING" headerColor="#fff3e0" patients={grouped.PHARMACY} onPatientClick={setSelectedPatient} loading={loading} />
+        </Grid>
+      </Grid>
       <QueuePatientDetailDrawer patient={selectedPatient} onClose={() => setSelectedPatient(null)} />
     </StationLayout>
   );

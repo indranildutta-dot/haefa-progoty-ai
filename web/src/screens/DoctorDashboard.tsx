@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Box, Grid, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button, Chip, Paper, Stack } from '@mui/material';
+import { 
+  Typography, Box, Grid, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
+  Button, Chip, Paper, Stack, Divider, CircularProgress 
+} from '@mui/material';
 import TimerIcon from '@mui/icons-material/Timer';
 import { auth } from "../firebase";
 import { subscribeToQueue, updateQueueStatus } from '../services/queueService';
-import { saveConsultation, getVitalsByEncounter, updateEncounterStatus, getEncounterById, getPatientHistory } from '../services/encounterService';
-import { getTriageAssessmentByEncounter } from '../services/triageService';
+import { saveConsultation, getVitalsByEncounter, updateEncounterStatus } from '../services/encounterService';
 import { getPatientById } from '../services/patientService';
 import { useAppStore } from '../store/useAppStore';
 import StationLayout from '../components/StationLayout';
@@ -33,31 +35,35 @@ const DoctorDashboard: React.FC<{ countryId: string }> = ({ countryId }) => {
   };
 
   const handleOpenConsult = async (item: any) => {
-    setSelectedItem(item);
-    const [patient, vitals] = await Promise.all([getPatientById(item.patient_id), getVitalsByEncounter(item.encounter_id)]);
-    setCurrentVitals(vitals);
-    setSelectedPatient({ ...patient, currentVitals: vitals, triage_level: item.triage_level });
+    try {
+      setSelectedItem(item);
+      const [patient, vitals] = await Promise.all([getPatientById(item.patient_id), getVitalsByEncounter(item.encounter_id)]);
+      setCurrentVitals(vitals);
+      setSelectedPatient({ ...patient, currentVitals: vitals, triage_level: item.triage_level });
+    } catch (e) { notify("Error loading workspace", "error"); }
   };
 
   const handleFinalize = async (status: string) => {
     try {
       await saveConsultation({ ...consultData, encounter_id: selectedItem.encounter_id, patient_id: selectedItem.patient_id, created_by: auth.currentUser?.uid });
       await updateQueueStatus(selectedItem.id!, status as any);
-      notify("Finalized", "success");
+      notify("Sent to Pharmacy", "success");
       setSelectedItem(null);
-    } catch (e) { notify("Error", "error"); }
+      setSelectedPatient(null);
+    } catch (e) { notify("Error finalizing", "error"); }
   };
 
   return (
-    <StationLayout title="Doctor Dashboard" stationName="Doctor" showPatientContext={!!selectedItem}>
+    <StationLayout title="Doctor Consultation" stationName="Doctor" showPatientContext={!!selectedItem}>
       {!selectedItem ? (
         <TableContainer component={Paper} elevation={0} sx={{ p: 2, borderRadius: 4, border: '1px solid #e2e8f0' }}>
           <Table>
-            <TableHead sx={{ bgcolor: '#f8fafc' }}><TableRow><TableCell>Wait Time</TableCell><TableCell>Patient Name</TableCell><TableCell align="right">Action</TableCell></TableRow></TableHead>
+            <TableHead sx={{ bgcolor: '#f8fafc' }}><TableRow><TableCell>Wait Time</TableCell><TableCell>Priority</TableCell><TableCell>Patient Name</TableCell><TableCell align="right">Action</TableCell></TableRow></TableHead>
             <TableBody>
               {waitingList.map(item => (
                 <TableRow key={item.id} hover>
-                  <TableCell><Stack direction="row" spacing={1}><TimerIcon sx={{ fontSize: 16 }}/> <Typography variant="body2">{formatWaitTime(item.created_at)}</Typography></Stack></TableCell>
+                  <TableCell><Stack direction="row" spacing={1} alignItems="center"><TimerIcon sx={{ fontSize: 16 }}/> {formatWaitTime(item.created_at)}</Stack></TableCell>
+                  <TableCell><Chip label={item.triage_level?.toUpperCase()} size="small" sx={{ bgcolor: item.triage_level === 'emergency' ? '#ef4444' : '#10b981', color: 'white', fontWeight: 900 }} /></TableCell>
                   <TableCell fontWeight="bold">{item.patient_name}</TableCell>
                   <TableCell align="right"><Button variant="contained" onClick={() => handleOpenConsult(item)}>Start</Button></TableCell>
                 </TableRow>
@@ -73,7 +79,8 @@ const DoctorDashboard: React.FC<{ countryId: string }> = ({ countryId }) => {
             <Grid item xs={12} lg={6}>
               <Paper sx={{ p: 4, borderRadius: 4 }}>
                 <ConsultationPanel data={consultData} onChange={setConsultData} />
-                <Button fullWidth variant="contained" color="secondary" sx={{ mt: 4 }} onClick={() => handleFinalize('WAITING_FOR_PHARMACY')}>Send to Pharmacy</Button>
+                <Divider sx={{ my: 4 }} />
+                <Button fullWidth variant="contained" color="secondary" sx={{ height: 65, fontWeight: 900 }} onClick={() => handleFinalize('WAITING_FOR_PHARMACY')}>FINALIZE & SEND TO PHARMACY</Button>
               </Paper>
             </Grid>
             <Grid item xs={12} lg={3}><PatientHistoryTimeline patientId={selectedItem.patient_id} /></Grid>
