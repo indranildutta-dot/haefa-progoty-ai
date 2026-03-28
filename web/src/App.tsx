@@ -7,7 +7,7 @@ import { getUserProfile, subscribeToAuthChanges } from './services/authService';
 import LandingPage from './screens/LandingPage';
 import LoginPage from './screens/LoginPage';
 import ClinicSelection from './screens/ClinicSelection';
-import Dashboard from './screens/Dashboard';
+import ClinicOperationDashboard from './screens/ClinicOperationDashboard'; // Fixed from "Dashboard"
 import RegistrationStation from './screens/RegistrationStation';
 import VitalsStation from './screens/VitalsStation';
 import DoctorDashboard from './screens/DoctorDashboard';
@@ -109,7 +109,7 @@ const App: React.FC = () => {
 
         {/* STEP 4: PROTECTED CLINICAL STATIONS (Requires Authorized Profile + Active Clinic Session) */}
         <Route path="/dashboard" element={
-          isAuthorized() && selectedClinic ? <Dashboard /> : <Navigate to="/clinic-selection" />
+          isAuthorized() && selectedClinic ? <ClinicOperationDashboard /> : <Navigate to="/clinic-selection" />
         } />
 
         <Route path="/registration" element={
