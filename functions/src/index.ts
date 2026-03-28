@@ -309,7 +309,7 @@ export const dispenseMedication = onCall(
     const { clinicId, medications, encounterId, patientId } = request.data;
 
     return await db.runTransaction(async (transaction) => {
-      const summary: any[] = [];
+      const results: any[] = [];
 
       for (const med of medications) {
         const { medication_name, mode, qty, substitution, return_on } = med;
@@ -352,13 +352,13 @@ export const dispenseMedication = onCall(
             created_at: admin.firestore.FieldValue.serverTimestamp()
           });
         }
-        summary.push({ medication: medication_name, dispensed: actualDeducted });
+        results.push({ medication: medication_name, dispensed: actualDeducted });
       }
 
       transaction.update(db.collection("encounters").doc(encounterId), { 
         status: 'COMPLETED', last_updated: admin.firestore.FieldValue.serverTimestamp() 
       });
-      return { success: true, summary };
+      return { success: true, summary: results };
     });
   }
 );
@@ -370,7 +370,8 @@ export const bulkUpload = onCall(
     // Lazy Load ExcelJS to fix initialization timeout
     const ExcelJS = await import('exceljs');
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(Buffer.from(fileBase64, 'base64'));
+    // FIXED: Added 'as any' to bypass the Buffer mismatch in TypeScript
+    await workbook.xlsx.load(Buffer.from(fileBase64, 'base64') as any);
     const worksheet = workbook.getWorksheet(1);
     const batch = db.batch();
     
@@ -412,7 +413,8 @@ export const getInventoryTemplate = onCall(
       { header: 'dosage', key: 'dosage', width: 15 }
     ];
     const buffer = await workbook.xlsx.writeBuffer();
-    return { fileBase64: Buffer.from(buffer as Buffer).toString('base64') };
+    // FIXED: Cast to any to ensure toString('base64') works correctly
+    return { fileBase64: (buffer as any).toString('base64') };
   }
 );
 
