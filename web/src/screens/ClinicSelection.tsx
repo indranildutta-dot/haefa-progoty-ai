@@ -1,28 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { 
-  Container, 
-  Typography, 
-  Grid, 
-  Card, 
-  CardContent, 
-  CardActionArea, 
-  Box,
-  Paper,
-  Chip,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  CircularProgress,
-  Alert,
-  AlertTitle
+  Container, Typography, Grid, Card, CardActionArea, 
+  Box, Paper, Chip, Button, Alert, AlertTitle 
 } from '@mui/material';
-import { ArrowBack, DeleteOutline, LockClock, CheckCircle } from '@mui/icons-material';
+import { ArrowBack, CheckCircle, LockClock, Business } from '@mui/icons-material';
 import { CountryConfig, ClinicConfig } from '../config/countries';
-import { clearBangladeshData } from '../services/adminService';
 import { useAppStore } from '../store/useAppStore';
+import { useNavigate } from 'react-router-dom';
 
 interface ClinicSelectionProps {
   selectedCountry: CountryConfig;
@@ -32,42 +16,36 @@ interface ClinicSelectionProps {
 
 const ClinicSelection: React.FC<ClinicSelectionProps> = ({ selectedCountry, onSelectClinic, onBack }) => {
   const { userProfile } = useAppStore();
-  const [openClearDialog, setOpenClearDialog] = useState(false);
-  const [isClearing, setIsClearing] = useState(false);
+  const navigate = useNavigate();
 
-  // RBAC Filter Logic based on Firestore "assignedClinics" and "role"
+  // FILTER LOGIC: Uses 'assignedClinics' array from your Firestore data
   const authorizedClinics = useMemo(() => {
     if (!userProfile) return [];
     
-    // Global Admins see all clinics
+    // Global Admins see everything
     if (userProfile.role === 'global_admin') return selectedCountry.clinics;
 
-    // Others see only what is in their assignedClinics array
+    // Others see only clinics listed in their 'assignedClinics' array
     return selectedCountry.clinics.filter(clinic => 
       userProfile.assignedClinics?.includes(clinic.id)
     );
   }, [selectedCountry, userProfile]);
 
-  const handleClearData = async () => {
-    setIsClearing(true);
-    try {
-      await clearBangladeshData();
-    } finally {
-      setIsClearing(false);
-      setOpenClearDialog(false);
-    }
+  const handleSelect = (clinic: ClinicConfig) => {
+    onSelectClinic(clinic);
+    navigate('/dashboard'); // Direct entry to dashboard upon selection
   };
 
-  // 1. Check for staged (non-approved) status
+  // Approval Check for Staged Users
   if (userProfile && !userProfile.isApproved && userProfile.role !== 'global_admin') {
     return (
       <Container maxWidth="sm" sx={{ py: 10 }}>
         <Alert severity="warning" variant="filled" icon={<LockClock sx={{ fontSize: 40 }} />} sx={{ borderRadius: 4, p: 3 }}>
-          <AlertTitle sx={{ fontWeight: 900, fontSize: '1.2rem' }}>ACCOUNT STAGED</AlertTitle>
-          Your account is currently in the <strong>Staged</strong> phase. You cannot access patient data or start clinical work until a Global Admin approves your profile.
-          <Box sx={{ mt: 2 }}>
+          <AlertTitle sx={{ fontWeight: 900, fontSize: '1.2rem' }}>STATION PENDING APPROVAL</AlertTitle>
+          Your account is currently <strong>Staged</strong>. Please contact a Global Admin (like Indranil) to set your profile to <strong>isApproved: true</strong>.
+          <Box sx={{ mt: 3 }}>
             <Button variant="contained" color="inherit" onClick={onBack} sx={{ color: 'black', fontWeight: 900 }}>
-              Return to Country Selection
+              Return to Countries
             </Button>
           </Box>
         </Alert>
@@ -76,92 +54,55 @@ const ClinicSelection: React.FC<ClinicSelectionProps> = ({ selectedCountry, onSe
   }
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Button onClick={onBack} startIcon={<ArrowBack />} variant="outlined" color="inherit" sx={{ borderRadius: 2 }}>
-            Back
-          </Button>
-          <Box>
-            <Typography variant="h4" fontWeight={900} color="primary">
-              Select Clinic
-            </Typography>
-            <Typography variant="subtitle1" color="text.secondary" fontWeight={700}>
-              {selectedCountry.name} {selectedCountry.flag}
-            </Typography>
-          </Box>
+    <Container maxWidth="md" sx={{ py: 6 }}>
+      <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Button onClick={onBack} startIcon={<ArrowBack />} variant="outlined" sx={{ borderRadius: 2, fontWeight: 700 }}>
+          Back
+        </Button>
+        <Box>
+          <Typography variant="h4" fontWeight={900} color="primary">Select Clinic</Typography>
+          <Typography variant="subtitle1" color="text.secondary" fontWeight={700}>
+            {selectedCountry.name} {selectedCountry.flag}
+          </Typography>
         </Box>
-        
-        {selectedCountry.id === 'BD' && userProfile?.role === 'global_admin' && (
-          <Button 
-            variant="outlined" 
-            color="error" 
-            startIcon={<DeleteOutline />}
-            onClick={() => setOpenClearDialog(true)}
-            size="small"
-          >
-            Clear BD Data
-          </Button>
-        )}
       </Box>
 
       {authorizedClinics.length === 0 ? (
         <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 4, border: '2px dashed #cbd5e1' }}>
-          <Typography variant="h6" fontWeight={800} color="text.secondary">
-            No Clinics Assigned
-          </Typography>
+          <Typography variant="h6" fontWeight={800} color="text.secondary">No Access Found</Typography>
           <Typography variant="body2" color="text.disabled">
-            You do not have any clinics assigned in this country. Please contact support.
+            You do not have any clinics assigned for {selectedCountry.name} in your Firestore profile.
           </Typography>
         </Paper>
       ) : (
-        <Grid container spacing={2}>
+        <Grid container spacing={3}>
           {authorizedClinics.map((clinic) => (
-            <Grid item xs={12} sm={6} md={4} key={clinic.id}>
+            <Grid item xs={12} sm={6} key={clinic.id}>
               <Card 
                 sx={{ 
                   borderRadius: 4, 
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  transition: 'all 0.2s ease',
+                  border: '2px solid transparent',
+                  transition: '0.2s',
                   '&:hover': {
                     borderColor: 'primary.main',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
-                    transform: 'translateY(-2px)'
+                    boxShadow: '0 12px 24px rgba(0,0,0,0.1)',
+                    transform: 'translateY(-4px)'
                   }
                 }}
               >
-                <CardActionArea onClick={() => onSelectClinic(clinic)} sx={{ p: 3 }}>
-                  <Typography variant="subtitle1" fontWeight={900} gutterBottom>{clinic.name}</Typography>
-                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>ID: {clinic.id}</Typography>
-                  <Chip 
-                    label="Authorized" 
-                    size="small" 
-                    color="success" 
-                    icon={<CheckCircle sx={{ fontSize: '14px !important' }} />}
-                    sx={{ borderRadius: 1.5, fontWeight: 900, height: 24 }} 
-                  />
+                <CardActionArea onClick={() => handleSelect(clinic)} sx={{ p: 4 }}>
+                  <Business color="primary" sx={{ fontSize: 40, mb: 2 }} />
+                  <Typography variant="h5" fontWeight={900}>{clinic.name}</Typography>
+                  <Typography variant="caption" color="text.disabled" sx={{ letterSpacing: 1 }}>ID: {clinic.id}</Typography>
+                  <Box sx={{ mt: 2 }}>
+                    <Chip label="AUTHORIZED" color="success" size="small" icon={<CheckCircle sx={{ fontSize: 14 }} />} sx={{ fontWeight: 900, borderRadius: 1.5 }} />
+                  </Box>
                 </CardActionArea>
               </Card>
             </Grid>
           ))}
         </Grid>
       )}
-
-      <Dialog open={openClearDialog} onClose={() => !isClearing && setOpenClearDialog(false)}>
-        <DialogTitle sx={{ fontWeight: 900 }}>Clear Bangladesh Data</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete all clinical records for Bangladesh? This action is permanent.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setOpenClearDialog(false)} disabled={isClearing}>Cancel</Button>
-          <Button onClick={handleClearData} color="error" variant="contained" disabled={isClearing}>
-            {isClearing ? <CircularProgress size={24} color="inherit" /> : 'Confirm Delete'}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Container>
   );
 };

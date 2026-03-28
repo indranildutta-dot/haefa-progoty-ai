@@ -5,7 +5,8 @@ import {
   signOut,
   User
 } from "firebase/auth";
-import { auth } from "../firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../firebase";
 import { UserProfile } from "../types";
 
 const provider = new GoogleAuthProvider();
@@ -25,14 +26,21 @@ export const logout = async () => {
   return signOut(auth);
 };
 
-// Mock function for now
-export const getUserProfile = async (uid: string): Promise<UserProfile> => {
-  return {
-    uid,
-    email: "test@haefa.org",
-    role: "admin",
-    name: "Test User",
-    countryCode: "BD",
-    isApproved: true
-  };
+/**
+ * Fetches the real RBAC profile from Firestore.
+ * Matches your screenshots: assignedClinics, isApproved, role.
+ */
+export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
+  try {
+    const docRef = doc(db, "users", uid);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      return { uid, ...docSnap.data() } as UserProfile;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error fetching Firestore profile:", error);
+    return null;
+  }
 };

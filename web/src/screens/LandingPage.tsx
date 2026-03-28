@@ -4,22 +4,28 @@ import {
   Grid, 
   Card, 
   CardActionArea, 
-  Box,
-  Stack,
-  useTheme,
-  alpha
+  Box, 
+  Stack, 
+  useTheme, 
+  alpha 
 } from '@mui/material';
 import { motion } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
 import { countries, CountryConfig } from '../config/countries';
+import { useAppStore } from '../store/useAppStore';
 import PublicIcon from '@mui/icons-material/Public';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
-interface LandingPageProps {
-  onSelectCountry: (country: CountryConfig) => void;
-}
-
-const LandingPage: React.FC<LandingPageProps> = ({ onSelectCountry }) => {
+const LandingPage: React.FC = () => {
   const theme = useTheme();
+  const navigate = useNavigate();
+  const { setSelectedCountry } = useAppStore();
+
+  const handleSelect = (country: CountryConfig) => {
+    // Logic: Initialize session state and move to login
+    setSelectedCountry(country);
+    navigate('/login');
+  };
 
   return (
     <Box sx={{ 
@@ -29,7 +35,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectCountry }) => {
       bgcolor: 'background.default',
       overflow: 'hidden'
     }}>
-      {/* Left Side: Branding & Hero */}
+      {/* LEFT SIDE: Branding & Hero */}
       <Box sx={{ 
         flex: { xs: 'none', md: 1 }, 
         background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`, 
@@ -63,7 +69,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectCountry }) => {
             sx={{ 
               fontWeight: 900, 
               letterSpacing: 6, 
-              color: '#4fd1c5', // Vibrant teal/cyan
+              color: '#4fd1c5', 
               mb: 1,
               display: 'block',
               fontSize: '1rem'
@@ -112,7 +118,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectCountry }) => {
         </motion.div>
       </Box>
 
-      {/* Right Side: Country Selection */}
+      {/* RIGHT SIDE: Country Selection */}
       <Box sx={{ 
         flex: { xs: 'none', md: 1.2 }, 
         p: { xs: 4, md: 8, lg: 10 },
@@ -150,7 +156,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectCountry }) => {
 
           <Grid container spacing={3}>
             {countries.map((country, index) => (
-              <Grid size={{ xs: 12, sm: 6 }} key={country.id}>
+              <Grid item xs={12} sm={6} key={country.id}>
                 <motion.div
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -181,7 +187,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectCountry }) => {
                     }}
                   >
                     <CardActionArea 
-                      onClick={() => onSelectCountry(country)} 
+                      onClick={() => handleSelect(country)} 
                       sx={{ p: 4 }}
                     >
                       <Stack direction="row" alignItems="center" justifyContent="space-between">

@@ -1,116 +1,139 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from './firebase';
 import { useAppStore } from './store/useAppStore';
+import { getUserProfile, subscribeToAuthChanges } from './services/authService';
 
-// Screens
-import Login from './screens/Login';
-import CountrySelection from './screens/CountrySelection';
+// FULL SCREEN IMPORTS - Verified from Explorer
+import LandingPage from './screens/LandingPage';
+import LoginPage from './screens/LoginPage';
 import ClinicSelection from './screens/ClinicSelection';
 import Dashboard from './screens/Dashboard';
+import RegistrationStation from './screens/RegistrationStation';
 import VitalsStation from './screens/VitalsStation';
 import DoctorDashboard from './screens/DoctorDashboard';
 import PharmacyStation from './screens/PharmacyStation';
 import QueueBoard from './screens/QueueBoard';
-import { CircularProgress, Box, Typography } from '@mui/material';
+
+import { CircularProgress, Box, Typography, Container, Paper } from '@mui/material';
 
 const App: React.FC = () => {
-  const { 
-    user, 
-    userProfile, 
-    setUser, 
-    selectedCountry, 
-    selectedClinic, 
-    setSession,
-    clearCountry 
-  } = useAppStore();
-  
+  const { user, userProfile, setUser, selectedCountry, selectedClinic, clearCountry, setSession } = useAppStore();
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
+  /**
+   * CORE AUTHENTICATION BRIDGE
+   * Listens to Firebase Auth changes and immediately fetches the 
+   * Firestore RBAC profile (assignedClinics, role, isApproved).
+   */
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          const docRef = doc(db, "users", firebaseUser.uid);
-          const docSnap = await getDoc(docRef);
-          
-          if (docSnap.exists()) {
-            setUser(firebaseUser, docSnap.data() as any);
-          } else {
-            setUser(firebaseUser, null);
-          }
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
-          setUser(firebaseUser, null);
+    const unsubscribe = subscribeToAuthChanges(async (firebaseUser) => {
+      try {
+        if (firebaseUser) {
+          const profile = await getUserProfile(firebaseUser.uid);
+          // profile may be null if user exists in Auth but not in Firestore 'users'
+          setUser(firebaseUser, profile);
+        } else {
+          setUser(null, null);
         }
-      } else {
-        setUser(null, null);
+        setAuthError(null);
+      } catch (err) {
+        console.error("Critical Auth/Profile Fetch Error:", err);
+        setAuthError("Failed to synchronize your medical profile. Please refresh.");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
   }, [setUser]);
 
-  if (loading) {
-    return (
-      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100vh">
-        <CircularProgress size={40} />
-        <Typography sx={{ mt: 2, fontWeight: 900, color: 'primary.main' }}>VERIFYING CREDENTIALS...</Typography>
-      </Box>
-    );
-  }
+  // Loading State - Branded UI
+  if (loading) return (
+    <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100vh" bgcolor="#f8fafc">
+      <CircularProgress size={50} thickness={4} />
+      <Typography sx={{ mt: 3, fontWeight: 900, color: 'primary.main', letterSpacing: '0.1em' }}>
+        VERIFYING CLINICAL SESSION...
+      </Typography>
+    </Box>
+  );
 
-  // Helper for Route Guarding
-  const IsAuthorized = () => {
-    if (!user) return false;
-    if (userProfile?.role === 'global_admin') return true;
-    return userProfile?.isApproved === true;
+  // Error State - If profile fetch fails
+  if (authError) return (
+    <Container maxWidth="sm" sx={{ py: 10 }}>
+      <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 4, border: '2px solid #ef4444' }}>
+        <Typography variant="h6" color="error" fontWeight="900" gutterBottom>CONNECTION ERROR</Typography>
+        <Typography variant="body2" color="text.secondary">{authError}</Typography>
+        <Box sx={{ mt: 3 }}>
+          <button onClick={() => window.location.reload()} style={{ padding: '10px 20px', fontWeight: 900, borderRadius: '8px', cursor: 'pointer' }}>
+            RETRY CONNECTION
+          </button>
+        </Box>
+      </Paper>
+    </Container>
+  );
+
+  /**
+   * AUTHORIZATION GUARD
+   * Logic: Global Admins (Indranil) bypass approval. Others (Nurses) must be isApproved: true.
+   */
+  const isAuthorized = () => {
+    if (!user || !userProfile) return false;
+    if (userProfile.role === 'global_admin') return true;
+    return userProfile.isApproved === true;
   };
 
   return (
     <Router>
       <Routes>
-        <Route path="/login" element={!user ? <Login /> : <Navigate to="/country-selection" />} />
+        {/* STEP 1: GLOBAL LANDING & COUNTRY SELECTION */}
+        <Route path="/" element={<LandingPage />} />
 
-        <Route path="/country-selection" element={
-          user ? <CountrySelection /> : <Navigate to="/login" />
+        {/* STEP 2: LOGIN - Guarded by Country Selection */}
+        <Route path="/login" element={
+          selectedCountry ? (
+            !user ? <LoginPage selectedCountry={selectedCountry} onBack={() => clearCountry()} /> : <Navigate to="/clinic-selection" />
+          ) : <Navigate to="/" />
         } />
 
+        {/* STEP 3: CLINIC SELECTION - Guarded by Auth & Country */}
         <Route path="/clinic-selection" element={
           user && selectedCountry ? (
             <ClinicSelection 
-              selectedCountry={selectedCountry}
-              onSelectClinic={(clinic) => setSession(selectedCountry, clinic)}
-              onBack={() => clearCountry()}
+              selectedCountry={selectedCountry} 
+              onSelectClinic={(clinic) => setSession(selectedCountry, clinic)} 
+              onBack={() => clearCountry()} 
             />
-          ) : <Navigate to="/country-selection" />
+          ) : <Navigate to="/login" />
         } />
 
-        {/* CLINICAL ROUTES - Require Login, Approved Profile, and Selected Clinic */}
+        {/* STEP 4: PROTECTED CLINICAL STATIONS (Requires Authorized Profile + Active Clinic Session) */}
         <Route path="/dashboard" element={
-          IsAuthorized() && selectedClinic ? <Dashboard /> : <Navigate to="/clinic-selection" />
+          isAuthorized() && selectedClinic ? <Dashboard /> : <Navigate to="/clinic-selection" />
+        } />
+
+        <Route path="/registration" element={
+          isAuthorized() && selectedClinic ? <RegistrationStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
         } />
 
         <Route path="/vitals" element={
-          IsAuthorized() && selectedClinic ? <VitalsStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+          isAuthorized() && selectedClinic ? <VitalsStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
         } />
 
         <Route path="/doctor" element={
-          IsAuthorized() && selectedClinic ? <DoctorDashboard countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+          isAuthorized() && selectedClinic ? <DoctorDashboard countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
         } />
 
         <Route path="/pharmacy" element={
-          IsAuthorized() && selectedClinic ? <PharmacyStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+          isAuthorized() && selectedClinic ? <PharmacyStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
         } />
 
         <Route path="/queue" element={
-          IsAuthorized() && selectedClinic ? <QueueBoard countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+          isAuthorized() && selectedClinic ? <QueueBoard countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
         } />
 
-        <Route path="/" element={<Navigate to="/dashboard" />} />
+        {/* CATCH-ALL REDIRECT */}
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
   );

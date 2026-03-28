@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User } from 'firebase/auth';
 import { CountryConfig, ClinicConfig } from '../config/countries';
-import { UserProfile, ClinicConfigDocument, Patient } from '../types';
+import { UserProfile, Patient } from '../types';
 
 interface Notification {
   message: string;
@@ -11,26 +11,22 @@ interface Notification {
 }
 
 interface AppState {
-  // Auth
   user: User | null;
   userProfile: UserProfile | null;
   setUser: (user: User | null, profile?: UserProfile | null) => void;
   
-  // Session
   selectedCountry: CountryConfig | null;
   selectedClinic: ClinicConfig | null;
-  clinicConfig: ClinicConfigDocument | null;
   selectedPatient: Patient | null;
+  
+  setSelectedCountry: (country: CountryConfig | null) => void;
   setSession: (country: CountryConfig | null, clinic: ClinicConfig | null) => void;
   clearCountry: () => void;
   clearClinic: () => void;
-  setClinicConfig: (config: ClinicConfigDocument | null) => void;
   setSelectedPatient: (patient: Patient | null) => void;
   
-  // Notifications
   notifications: Notification[];
   notify: (message: string, type?: Notification['type']) => void;
-  removeNotification: (id: string) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -42,15 +38,26 @@ export const useAppStore = create<AppState>()(
       
       selectedCountry: null,
       selectedClinic: null,
-      clinicConfig: null,
       selectedPatient: null,
+
+      setSelectedCountry: (country) => set({ selectedCountry: country }),
+      
       setSession: (country, clinic) => set({ 
         selectedCountry: country, 
         selectedClinic: clinic 
       }),
-      clearCountry: () => set({ selectedCountry: null, selectedClinic: null, selectedPatient: null }),
-      clearClinic: () => set({ selectedClinic: null, selectedPatient: null }),
-      setClinicConfig: (config) => set({ clinicConfig: config }),
+
+      clearCountry: () => set({ 
+        selectedCountry: null, 
+        selectedClinic: null, 
+        selectedPatient: null 
+      }),
+
+      clearClinic: () => set({ 
+        selectedClinic: null, 
+        selectedPatient: null 
+      }),
+
       setSelectedPatient: (patient) => set({ selectedPatient: patient }),
       
       notifications: [],
@@ -59,20 +66,10 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           notifications: [...state.notifications, { id, message, type }]
         }));
-        // Auto-remove after 5 seconds
-        setTimeout(() => {
-          set((state) => ({
-            notifications: state.notifications.filter((n) => n.id !== id)
-          }));
-        }, 5000);
       },
-      removeNotification: (id) => set((state) => ({
-        notifications: state.notifications.filter((n) => n.id !== id)
-      })),
     }),
     {
-      name: 'haefa-progoty-storage',
-      // Ensure session and profile metadata are persisted across refreshes
+      name: 'haefa-progoty-session-v3',
       partialize: (state) => ({ 
         selectedCountry: state.selectedCountry, 
         selectedClinic: state.selectedClinic,
