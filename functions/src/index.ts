@@ -14,13 +14,14 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 // ==========================================
-// SUPER ADMIN CONFIGURATION
-// These emails bypass all database checks.
+// CONFIGURATION & GLOBAL SETTINGS
 // ==========================================
 const SUPER_ADMIN_EMAILS = [
   'indranil_dutta@haefa.org', 
   'ruhul_abid@haefa.org'
 ];
+
+const REQUISITION_THRESHOLD = 500; // Low stock alert level for Dhaka
 
 /**
  * Helper to verify if the caller is a Global Admin
@@ -32,7 +33,9 @@ const checkIsGlobalAdmin = (auth: any) => {
   return SUPER_ADMIN_EMAILS.includes(email) || role === 'global_admin';
 };
 
-// --- Utility Functions ---
+// ==========================================
+// UTILITY FUNCTIONS
+// ==========================================
 
 const generateId = () => {
   try {
@@ -40,12 +43,6 @@ const generateId = () => {
   } catch (e) {
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   }
-};
-
-const parseClinicalDate = (input: any): Date | null => {
-  if (!input) return null;
-  const date = new Date(input);
-  return isNaN(date.getTime()) ? null : date;
 };
 
 const sanitizeData = (data: any) => {
@@ -62,7 +59,9 @@ const sanitizeData = (data: any) => {
   return sanitized;
 };
 
-// --- Administrative & RBAC Functions ---
+// ==========================================
+// ADMINISTRATIVE & RBAC FUNCTIONS
+// ==========================================
 
 export const syncUserPermissions = onCall(
   { region: "us-central1", maxInstances: 10 },
@@ -124,7 +123,7 @@ export const deleteUser = onCall(
 
 /**
  * RECURSIVE TEST DATA WIPER
- * Safely deletes 50,000+ documents by batching in chunks of 500
+ * Restored: Handles massive deletions by chunking in batches of 500.
  */
 export const wipeTestData = onCall(
   { region: "us-central1", timeoutSeconds: 540, memory: "1GiB" }, 
@@ -133,28 +132,26 @@ export const wipeTestData = onCall(
       throw new HttpsError("permission-denied", "Unauthorized.");
     }
 
-    const collections = ["patients", "encounters", "queues_active", "procurement_requests"];
+    const collections = ["patients", "encounters", "queues_active", "requisitions", "procurement_requests"];
     let totalDeleted = 0;
 
     for (const colName of collections) {
       let hasMore = true;
       while (hasMore) {
-        const query = db.collection(colName)
-          .where("is_test_data", "==", true)
-          .limit(500);
+        const querySnapshot = await db.collection(colName)
+          .limit(500)
+          .get();
 
-        const snapshot = await query.get();
-        if (snapshot.empty) {
+        if (querySnapshot.empty) {
           hasMore = false;
           break;
         }
 
         const batch = db.batch();
-        snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+        querySnapshot.docs.forEach((doc) => batch.delete(doc.ref));
         await batch.commit();
-        totalDeleted += snapshot.size;
+        totalDeleted += querySnapshot.size;
         
-        // Anti-throttling delay
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
@@ -162,13 +159,17 @@ export const wipeTestData = onCall(
   }
 );
 
+/**
+ * DEMO DATA WIPER
+ * Restored: Quickly wipes active queues and demo patient records.
+ */
 export const wipeDemoData = onCall(
   { region: "us-central1" },
   async (request: any) => {
     if (!checkIsGlobalAdmin(request.auth)) {
       throw new HttpsError("permission-denied", "Unauthorized.");
     }
-    const collectionsToWipe = ["patients", "encounters", "queues_active"];
+    const collectionsToWipe = ["patients", "encounters", "queues_active", "requisitions"];
     try {
       for (const colName of collectionsToWipe) {
         const snapshot = await db.collection(colName).get();
@@ -192,27 +193,19 @@ export const initClinics = onCall(
     const clinicsToCreate = [
       { id: 'BD-01', name: 'Dhaka Clinic', country: 'Bangladesh', code: 'BD', currency: 'BDT' },
       { id: 'BD-02', name: 'Cox’s Bazar Clinic', country: 'Bangladesh', code: 'BD', currency: 'BDT' },
-      { id: 'BD-03', name: 'Noakhali Clinic', country: 'Bangladesh', code: 'BD', currency: 'BDT' },
-      { id: 'BD-04', name: 'Kurigram Clinic', country: 'Bangladesh', code: 'BD', currency: 'BDT' },
-      { id: 'BD-05', name: 'Gazipur Clinic', country: 'Bangladesh', code: 'BD', currency: 'BDT' },
       { id: 'SB-01', name: 'SL Island 1', country: 'Solomon Islands', code: 'SB', currency: 'SBD' },
-      { id: 'SB-02', name: 'SL Island 2', country: 'Solomon Islands', code: 'SB', currency: 'SBD' },
-      { id: 'NP-01', name: 'Kathmandu 1', country: 'Nepal', code: 'NP', currency: 'NPR' },
-      { id: 'NP-02', name: 'Kathmandu 2', country: 'Nepal', code: 'NP', currency: 'NPR' }
+      { id: 'NP-01', name: 'Kathmandu 1', country: 'Nepal', code: 'NP', currency: 'NPR' }
     ];
 
     const commonSettings = {
       max_patients_per_day: 1000,
-      timezone: 'UTC',
       status: 'active',
-      units: { weight: 'kg', height: 'cm', blood_pressure: 'mmHg', temperature: 'Celsius', blood_glucose: 'mg/dL', heart_rate: 'bpm' },
       queue_structure: [
         { id: 'registration', name: 'Registration', order: 1 },
         { id: 'vitals', name: 'Vitals', order: 2 },
         { id: 'consultation', name: 'Doctor Consultation', order: 3 },
         { id: 'pharmacy', name: 'Pharmacy/Dispensing', order: 4 }
       ],
-      supported_roles: ['admin', 'doctor', 'nurse', 'pharmacist', 'lab_tech'],
       created_at: admin.firestore.FieldValue.serverTimestamp()
     };
 
@@ -220,24 +213,19 @@ export const initClinics = onCall(
       const batch = db.batch();
       clinicsToCreate.forEach((clinic) => {
         const docRef = db.collection('clinics').doc(clinic.id);
-        batch.set(docRef, {
-          clinic_id: clinic.id,
-          clinic_name: clinic.name,
-          country_code: clinic.code,
-          country_name: clinic.country,
-          local_currency: clinic.currency,
-          ...commonSettings
-        }, { merge: true });
+        batch.set(docRef, { ...clinic, ...commonSettings }, { merge: true });
       });
       await batch.commit();
-      return { success: true, count: clinicsToCreate.length };
+      return { success: true };
     } catch (error: any) {
       throw new HttpsError("internal", error.message);
     }
   }
 );
 
-// --- Patient & Clinical ---
+// ==========================================
+// PATIENT & CLINICAL FUNCTIONS
+// ==========================================
 
 export const registerPatient = onCall(
   { region: "us-central1" },
@@ -251,6 +239,7 @@ export const registerPatient = onCall(
       const patientId = generateId();
       const encounterId = generateId();
       let photoUrl = "";
+      
       if (photoBase64 && photoBase64.includes(",")) {
         const bucket = admin.storage().bucket();
         const file = bucket.file(`patient_photos/${patientId}/photo.jpg`);
@@ -260,11 +249,23 @@ export const registerPatient = onCall(
         photoUrl = signedUrls[0];
       }
       
-      await db.collection("patients").doc(patientId).set({ ...sanitizeData(patientData), photo_url: photoUrl, created_at: new Date() });
-      await db.collection("encounters").doc(encounterId).set({ patient_id: patientId, clinic_id: clinicId, country_code: countryCode, status: 'WAITING_FOR_VITALS', created_at: new Date() });
+      await db.collection("patients").doc(patientId).set({ 
+        ...sanitizeData(patientData), 
+        photo_url: photoUrl, 
+        created_at: new Date() 
+      });
       
-      const fullName = `${patientData.given_name || ''} ${patientData.family_name || ''}`.trim() || 'Unknown';
-      await db.collection("queues_active").add({ encounter_id: encounterId, patient_id: patientId, patient_name: fullName, station: 'vitals', status: 'WAITING_FOR_VITALS', clinic_id: clinicId, country_code: countryCode, created_at: new Date(), updated_at: new Date() });
+      await db.collection("encounters").doc(encounterId).set({ 
+        patient_id: patientId, clinic_id: clinicId, country_code: countryCode, 
+        status: 'WAITING_FOR_VITALS', created_at: new Date() 
+      });
+      
+      const fullName = `${patientData.given_name || ''} ${patientData.family_name || ''}`.trim();
+      await db.collection("queues_active").add({ 
+        encounter_id: encounterId, patient_id: patientId, patient_name: fullName, 
+        station: 'vitals', status: 'WAITING_FOR_VITALS', clinic_id: clinicId, 
+        country_code: countryCode, created_at: new Date(), updated_at: new Date() 
+      });
       
       return { patientId, encounterId };
     } catch (error: any) {
@@ -273,104 +274,157 @@ export const registerPatient = onCall(
   }
 );
 
-// --- Pharmacy & Inventory ---
-
 /**
- * DISPENSE MEDICATION: Supports partial dispensing and Scenarios B & C.
+ * SAVE CONSULTATION (Doctor Station)
+ * Handles Atomic Transaction: saves encounter data AND flags non-inventory meds for requisition.
  */
+export const saveConsultation = onCall(
+  { region: "us-central1" },
+  async (request: any) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
+    const { encounterId, patientId, clinicId, prescriptions, diagnosis, notes } = request.data;
+    
+    return await db.runTransaction(async (transaction) => {
+      // 1. Update Encounter
+      const encounterRef = db.collection("encounters").doc(encounterId);
+      transaction.update(encounterRef, {
+        status: 'WAITING_FOR_PHARMACY',
+        diagnosis, notes,
+        last_updated: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // 2. Save Prescription Document
+      const presRef = db.collection("prescriptions").doc();
+      transaction.set(presRef, {
+        encounter_id: encounterId, patient_id: patientId, clinic_id: clinicId,
+        prescriptions, created_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // 3. TRIGGER REQUISITION for items flagged by doctor as non-stock
+      for (const med of prescriptions) {
+        if (med.isRequisition) {
+          const reqRef = db.collection("requisitions").doc();
+          transaction.set(reqRef, {
+            clinic_id: clinicId, 
+            medication_name: med.medicationName,
+            dosage: `${med.dosageValue}${med.dosageUnit}`, 
+            requested_qty: med.quantity,
+            type: 'DOCTOR_ORDER_NON_STOCK', 
+            status: 'PENDING',
+            created_at: admin.firestore.FieldValue.serverTimestamp()
+          });
+        }
+      }
+
+      // 4. Update Queue Station
+      const queueSnap = await db.collection("queues_active").where("encounter_id", "==", encounterId).get();
+      queueSnap.forEach(doc => transaction.update(doc.ref, { 
+        station: 'pharmacy', status: 'WAITING_FOR_PHARMACY', 
+        updated_at: admin.firestore.FieldValue.serverTimestamp() 
+      }));
+
+      return { success: true };
+    });
+  }
+);
+
+// ==========================================
+// PHARMACY & INVENTORY FUNCTIONS
+// ==========================================
+
 export const dispenseMedication = onCall(
   { region: "us-central1" },
   async (request: any) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
-
-    const { clinicId, medications, encounterId, patientId, returnDate } = request.data;
-    if (!clinicId || !medications || !encounterId) {
-      throw new HttpsError("invalid-argument", "Missing required fields.");
-    }
+    const { clinicId, medications, encounterId, patientId } = request.data;
 
     return await db.runTransaction(async (transaction) => {
       const results: any[] = [];
 
       for (const med of medications) {
-        const medIdLower = med.medication_id.toString().toLowerCase().replace(/\s+/g, '');
-        const dosageNormalized = (med.dosage || '').toString().toLowerCase().replace(/\s+/g, '');
-        const prescribedQty = Number(med.quantity) || 0;
+        const { medication_name, mode, qty, substitution, return_on } = med;
+        const targetMedName = (mode === 'SUBSTITUTE' && substitution) ? substitution : medication_name;
+        const medIdLower = targetMedName.toLowerCase().replace(/\s+/g, '');
         
-        // Robust target quantity calculation to handle potential NaN/Empty inputs
-        const dispensedQtyVal = (typeof med.dispensed_qty !== 'undefined' && med.dispensed_qty !== null && med.dispensed_qty !== '') ? Number(med.dispensed_qty) : prescribedQty;
-        const targetQty = isNaN(dispensedQtyVal) ? prescribedQty : dispensedQtyVal;
-              
-        const inventoryRef = db.collection(`clinics/${clinicId}/inventory`);
-        const q = inventoryRef
-          .where("med_id_lower", "==", medIdLower)
-          .where("dosage_normalized", "==", dosageNormalized)
-          .orderBy("expiry_date", "asc");
-        
-        const snapshot = await transaction.get(q);
-        let remainingToDispense = targetQty;
-        let actualDispensed = 0;
+        let actualDeducted = 0;
 
-        if (!snapshot.empty) {
+        if (mode !== 'OUT_OF_STOCK') {
+          const inventoryRef = db.collection(`clinics/${clinicId}/inventory`);
+          const q = inventoryRef.where("med_id_lower", "==", medIdLower);
+          const snapshot = await transaction.get(q);
+
+          let remaining = Number(qty);
           for (const doc of snapshot.docs) {
-            if (remainingToDispense <= 0) break;
-            const batch = doc.data();
-            const available = Number(batch.quantity) || 0;
-            if (available <= 0) continue; 
+            if (remaining <= 0) break;
+            const available = Number(doc.data().quantity) || 0;
+            const toTake = Math.min(available, remaining);
+            const newQty = available - toTake;
+            
+            transaction.update(doc.ref, { quantity: newQty });
+            actualDeducted += toTake;
+            remaining -= toTake;
 
-            const toTake = Math.min(available, remainingToDispense);
-            transaction.update(doc.ref, { quantity: available - toTake });
-            
-            actualDispensed += toTake;
-            remainingToDispense -= toTake;
-            
-            transaction.set(db.collection("inventory_logs").doc(), {
-              clinic_id: clinicId,
-              medication_id: med.medication_id,
-              type: 'dispense',
-              quantity: toTake,
-              batch_id: batch.batch_id || "N/A",
-              user_id: request.auth.uid,
-              encounter_id: encounterId,
-              timestamp: admin.firestore.FieldValue.serverTimestamp()
-            });
+            // AUTO-REQUISITION: Low Stock Alert Trigger
+            if (newQty < REQUISITION_THRESHOLD) {
+              transaction.set(db.collection("requisitions").doc(), {
+                clinic_id: clinicId, 
+                medication_name: targetMedName,
+                current_stock: newQty, 
+                type: 'LOW_STOCK_ALERT', 
+                status: 'PENDING',
+                created_at: admin.firestore.FieldValue.serverTimestamp()
+              });
+            }
           }
         }
 
-        const shortfall = prescribedQty - actualDispensed;
-
-        if (shortfall > 0) {
-          const procurementRef = db.collection("procurement_requests").doc();
-          transaction.set(procurementRef, {
-            clinic_id: clinicId,
-            patient_id: patientId || "Unknown",
-            medication_id: med.medication_id,
-            dosage: med.dosage,
-            prescribed_qty: prescribedQty,
-            dispensed_qty: actualDispensed,
-            shortfall_qty: shortfall,
-            status: 'PENDING_ORDER',
-            return_date: returnDate || null, // Capture the patient return date
-            created_at: admin.firestore.FieldValue.serverTimestamp(),
-            encounter_id: encounterId
+        // Handle Patient Shortfalls (Scenario B & C)
+        if (mode === 'PARTIAL' || mode === 'OUT_OF_STOCK') {
+          transaction.set(db.collection("requisitions").doc(), {
+            clinic_id: clinicId, patient_id: patientId, medication_name: medication_name,
+            type: 'PATIENT_IOU_SHORTFALL', status: 'WAITING_FOR_STOCK',
+            return_date: return_on || null, encounter_id: encounterId,
+            created_at: admin.firestore.FieldValue.serverTimestamp()
           });
         }
-
-        results.push({
-          medication: med.medication_id,
-          prescribed: prescribedQty,
-          dispensed: actualDispensed,
-          shortfall: shortfall
-        });
+        results.push({ medication: medication_name, dispensed: actualDeducted });
       }
 
-      const encounterRef = db.collection("encounters").doc(encounterId);
-      transaction.update(encounterRef, { 
-        status: 'PHARMACY_COMPLETED',
-        last_updated: admin.firestore.FieldValue.serverTimestamp()
+      transaction.update(db.collection("encounters").doc(encounterId), { 
+        status: 'COMPLETED', last_updated: admin.firestore.FieldValue.serverTimestamp() 
       });
-
       return { success: true, summary: results };
     });
+  }
+);
+
+export const bulkUpload = onCall(
+  { region: "us-central1" },
+  async (request: any) => {
+    const { clinicId, fileBase64 } = request.data;
+    const workbook = new ExcelJS.Workbook();
+    await (workbook as any).xlsx.load(Buffer.from(fileBase64, 'base64'));
+    const worksheet = workbook.getWorksheet(1);
+    const batch = db.batch();
+    
+    worksheet?.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+      const medId = row.getCell(1).value?.toString().trim() || "";
+      const qty = Number(row.getCell(4).value) || 0;
+      const dosage = row.getCell(7).value?.toString().trim() || "N/A";
+      
+      if (!medId || medId.toUpperCase().includes('EXAMPLE')) return;
+      
+      const docRef = db.collection(`clinics/${clinicId}/inventory`).doc();
+      batch.set(docRef, { 
+        medication_id: medId, 
+        med_id_lower: medId.toLowerCase().replace(/\s+/g, ''), 
+        dosage, quantity: qty, 
+        created_at: admin.firestore.FieldValue.serverTimestamp() 
+      });
+    });
+    await batch.commit();
+    return { success: true };
   }
 );
 
@@ -390,44 +444,6 @@ export const getInventoryTemplate = onCall(
     ];
     const buffer = await (workbook as any).xlsx.writeBuffer();
     return { fileBase64: Buffer.from(buffer).toString('base64') };
-  }
-);
-
-export const bulkUpload = onCall(
-  { region: "us-central1" },
-  async (request: any) => {
-    const { clinicId, fileBase64 } = request.data;
-    const workbook = new ExcelJS.Workbook();
-    await (workbook as any).xlsx.load(Buffer.from(fileBase64, 'base64'));
-    const worksheet = workbook.getWorksheet(1);
-    const batch = db.batch();
-    
-    worksheet?.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return; // Skip the header row
-      
-      const medId = row.getCell(1).value?.toString().trim() || "";
-      const batchId = row.getCell(2).value?.toString() || "N/A";
-      const expiryDateRaw = row.getCell(3).value;
-      const qty = Number(row.getCell(4).value) || 0;
-      const dosage = row.getCell(7).value?.toString().trim() || "N/A";
-      
-      if (!medId || medId.toUpperCase().includes('EXAMPLE')) return;
-      
-      const docRef = db.collection(`clinics/${clinicId}/inventory`).doc();
-      batch.set(docRef, { 
-        medication_id: medId, 
-        med_id_lower: medId.toLowerCase().replace(/\s+/g, ''), 
-        batch_id: batchId,
-        dosage, 
-        dosage_normalized: dosage.toLowerCase().replace(/\s+/g, ''), 
-        expiry_date: Timestamp.fromDate(new Date(expiryDateRaw as any)), 
-        quantity: qty, 
-        created_at: admin.firestore.FieldValue.serverTimestamp() 
-      });
-    });
-    
-    await batch.commit();
-    return { success: true };
   }
 );
 

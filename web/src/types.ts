@@ -48,7 +48,8 @@ export type EncounterStatus =
   | 'READY_FOR_DOCTOR' 
   | 'IN_CONSULTATION' 
   | 'WAITING_FOR_PHARMACY' 
-  | 'COMPLETED';
+  | 'COMPLETED'
+  | 'PHARMACY_COMPLETED';
 
 export interface Patient {
   id?: string;
@@ -120,14 +121,22 @@ export interface Vitals {
   hemoglobin?: string;
 }
 
+/**
+ * UPDATED: Prescription Interface
+ * Includes split fields for clinical precision and the Requisition flag.
+ */
 export interface Prescription {
   medicationId: string;
   medicationName: string;
-  dosage: string;
-  frequency: string;
-  duration: string;
+  dosageValue: string;
+  dosageUnit: string;
+  frequencyValue: number;
+  frequencyUnit: string;
+  durationValue: number;
+  durationUnit: string;
   instructions: string;
-  quantity?: number;
+  quantity: number;
+  isRequisition?: boolean;
   dispensed_qty?: number;
   shortfall_qty?: number;
 }
@@ -145,13 +154,19 @@ export interface VitalsRecord extends Vitals {
   device_id?: string;
 }
 
+/**
+ * UPDATED: DiagnosisRecord Interface
+ * Aligned with the new saveConsultation Cloud Function payload.
+ */
 export interface DiagnosisRecord {
   id?: string;
   encounter_id: string;
   patient_id: string;
-  chief_complaint: string;
+  chief_complaint?: string;
   diagnosis: string;
   notes: string;
+  treatment_notes?: string;
+  assessment?: any;
   clinicalAssessment?: any;
   labInvestigations?: string[];
   referrals?: string[];

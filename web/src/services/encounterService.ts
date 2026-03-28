@@ -12,7 +12,8 @@ import {
   limit,
   increment
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "../firebase";
 import { 
   Encounter, 
   Vitals, 
@@ -25,7 +26,6 @@ import {
 import { getSession } from "../utils/session";
 import { logAction } from "./auditService";
 import { updateQueueMetric } from "./queueMetricsService";
-
 import { handleFirestoreError, OperationType } from "../utils/firestoreError";
 
 const ENCOUNTERS_COLLECTION = "encounters";
@@ -34,6 +34,9 @@ const VITALS_COLLECTION = "vitals";
 const DIAGNOSES_COLLECTION = "diagnoses";
 const PRESCRIPTIONS_COLLECTION = "prescriptions";
 
+/**
+ * Creates a new encounter and updates patient visit metrics.
+ */
 export const createEncounter = async (patient_id: string) => {
   const { selectedCountry, selectedClinic } = getSession();
   if (!selectedClinic) throw new Error("Clinic not selected");
@@ -62,13 +65,12 @@ export const createEncounter = async (patient_id: string) => {
       created_at: serverTimestamp(),
       updated_at: serverTimestamp()
     };
-    console.log("Encounter data to add:", encounterData);
     docRef = await addDoc(collection(db, ENCOUNTERS_COLLECTION), encounterData);
     console.log(`Encounter document created with ID: ${docRef.id}`);
   } catch (e) {
     console.error("Error creating encounter document:", e);
     handleFirestoreError(e, OperationType.WRITE, ENCOUNTERS_COLLECTION);
-    throw e; // Re-throw so caller knows it failed
+    throw e;
   }
 
   try {
@@ -87,6 +89,44 @@ export const createEncounter = async (patient_id: string) => {
   }
 
   return docRef.id;
+};
+
+/**
+ * UPDATED: Saves consultation data via Cloud Function to ensure Atomic Transactions
+ * and trigger automated Requisitions for non-inventory items.
+ */
+export const saveConsultation = async (
+  diagnosisData: Omit<DiagnosisRecord, 'id' | 'created_at' | 'country_code' | 'clinic_id'>,
+  prescriptionData?: Omit<PrescriptionRecord, 'id' | 'created_at' | 'status' | 'country_code' | 'clinic_id'>
+) => {
+  const { selectedClinic } = getSession();
+  if (!selectedClinic) throw new Error("Clinic not selected");
+
+  // Call the 'saveConsultation' Cloud Function we added to index.ts
+  const saveConsultationFunction = httpsCallable(functions, 'saveConsultation');
+  
+  try {
+    const result = await saveConsultationFunction({
+      encounterId: diagnosisData.encounter_id,
+      patientId: diagnosisData.patient_id,
+      clinicId: selectedClinic.id,
+      prescriptions: prescriptionData?.prescriptions || [],
+      diagnosis: diagnosisData.diagnosis,
+      notes: diagnosisData.notes || ""
+    });
+
+    // Logging the successful hand-off for audit purposes
+    await logAction({
+      action: 'CONSULTATION_SAVED_VIA_CLOUD_FUNCTION',
+      encounter_id: diagnosisData.encounter_id,
+      patient_id: diagnosisData.patient_id
+    });
+
+    return result.data;
+  } catch (error) {
+    console.error("Failed to save consultation via Cloud Function:", error);
+    throw error;
+  }
 };
 
 export const getPatientHistory = async (patientId: string): Promise<Encounter[]> => {
@@ -189,83 +229,6 @@ export const saveVitals = async (vitalsData: Omit<VitalsRecord, 'id' | 'created_
     encounter_id: vitalsData.encounter_id,
     patient_id: vitalsData.patient_id
   });
-
-  await logAction({
-    action: 'ENCOUNTER_STATUS_CHANGED',
-    encounter_id: vitalsData.encounter_id,
-    patient_id: vitalsData.patient_id
-  });
-};
-
-export const saveConsultation = async (
-  diagnosisData: Omit<DiagnosisRecord, 'id' | 'created_at' | 'country_code' | 'clinic_id'>,
-  prescriptionData?: Omit<PrescriptionRecord, 'id' | 'created_at' | 'status' | 'country_code' | 'clinic_id'>
-) => {
-  const { selectedCountry, selectedClinic } = getSession();
-  if (!selectedClinic) throw new Error("Clinic not selected");
-
-  await addDoc(collection(db, DIAGNOSES_COLLECTION), {
-    ...diagnosisData,
-    country_code: selectedCountry.id,
-    country_id: selectedCountry.id,
-    clinic_id: selectedClinic.id,
-    created_at: serverTimestamp(),
-    updated_at: serverTimestamp()
-  });
-
-  if (prescriptionData && prescriptionData.prescriptions.length > 0) {
-    await addDoc(collection(db, PRESCRIPTIONS_COLLECTION), {
-      ...prescriptionData,
-      status: 'PENDING',
-      country_code: selectedCountry.id,
-      country_id: selectedCountry.id,
-      clinic_id: selectedClinic.id,
-      created_at: serverTimestamp(),
-      updated_at: serverTimestamp()
-    });
-  }
-
-  const encounterRef = doc(db, ENCOUNTERS_COLLECTION, diagnosisData.encounter_id);
-  const encounterSnap = await getDoc(encounterRef);
-  const clinicId = encounterSnap.exists() ? encounterSnap.data().clinic_id : undefined;
-
-  const newStatus = prescriptionData ? 'WAITING_FOR_PHARMACY' : 'COMPLETED';
-  
-  if (clinicId) {
-    const metrics: any = { in_consultation: -1 };
-    if (newStatus === 'WAITING_FOR_PHARMACY') {
-      metrics.waiting_for_pharmacy = 1;
-    } else {
-      metrics.completed_today = 1;
-    }
-    await updateQueueMetric(clinicId, metrics);
-  }
-
-  await updateDoc(encounterRef, {
-    encounter_status: newStatus,
-    current_station: 'doctor',
-    updated_at: serverTimestamp()
-  });
-
-  await logAction({
-    action: 'DIAGNOSIS_CREATED',
-    encounter_id: diagnosisData.encounter_id,
-    patient_id: diagnosisData.patient_id
-  });
-
-  if (prescriptionData) {
-    await logAction({
-      action: 'PRESCRIPTION_ISSUED',
-      encounter_id: diagnosisData.encounter_id,
-      patient_id: diagnosisData.patient_id
-    });
-  }
-
-  await logAction({
-    action: 'ENCOUNTER_STATUS_CHANGED',
-    encounter_id: diagnosisData.encounter_id,
-    patient_id: diagnosisData.patient_id
-  });
 };
 
 export const getVitalsByEncounter = async (encounterId: string): Promise<VitalsRecord | null> => {
@@ -338,12 +301,6 @@ export const markPrescriptionDispensed = async (prescriptionId: string) => {
 
     await logAction({
       action: 'MEDICATION_DISPENSED',
-      encounter_id: data.encounter_id,
-      patient_id: data.patient_id
-    });
-
-    await logAction({
-      action: 'ENCOUNTER_STATUS_CHANGED',
       encounter_id: data.encounter_id,
       patient_id: data.patient_id
     });
