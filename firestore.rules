@@ -65,12 +65,14 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidPatient(data) {
-      return data.keys().hasAll(['given_name', 'family_name', 'gender', 'country_code', 'clinic_id']) &&
+      return data.keys().hasAll(['given_name', 'family_name', 'gender', 'country_id', 'clinic_id']) &&
              data.given_name is string && data.given_name.size() > 0 && data.given_name.size() < 100 &&
              data.family_name is string && data.family_name.size() > 0 && data.family_name.size() < 100 &&
              data.gender in ['male', 'female', 'other'] &&
-             data.country_code is string &&
-             data.clinic_id is string;
+             data.country_id is string &&
+             data.clinic_id is string &&
+             (!('date_of_birth' in data) || data.date_of_birth is string) &&
+             (!('age_years' in data) || data.age_years is string || data.age_years is number);
     }
 
     function isValidEncounter(data) {
@@ -101,6 +103,15 @@ service cloud.firestore {
              data.base_unit is string && data.package_unit is string;
     }
 
+    function isValidQueueItem(data) {
+      return data.keys().hasAll(['patient_id', 'encounter_id', 'clinic_id', 'status', 'station']) &&
+             data.patient_id is string &&
+             data.encounter_id is string &&
+             data.clinic_id is string &&
+             data.status is string &&
+             data.station is string;
+    }
+
     // ===============================================================
     // Collection Rules
     // ===============================================================
@@ -114,21 +125,21 @@ service cloud.firestore {
       
       allow create: if isApproved() && (
         isGlobalAdmin() ||
-        isCountryAdmin(request.resource.data.country_code) ||
+        isCountryAdmin(request.resource.data.country_id) ||
         isStaff(request.resource.data.clinic_id)
       ) && isValidPatient(request.resource.data);
 
       allow update: if isApproved() && (
         isGlobalAdmin() ||
-        isCountryAdmin(resource.data.country_code) ||
+        isCountryAdmin(resource.data.country_id) ||
         isStaff(resource.data.clinic_id)
       ) && (
-        // Ensure clinic_id and country_code don't change unless admin
+        // Ensure clinic_id and country_id don't change unless admin
         (isGlobalAdmin() || (
           request.resource.data.clinic_id == resource.data.clinic_id &&
-          request.resource.data.country_code == resource.data.country_code
+          request.resource.data.country_id == resource.data.country_id
         ))
-      );
+      ) && isValidPatient(request.resource.data);
 
       allow delete: if isGlobalAdmin();
     }
@@ -215,12 +226,12 @@ service cloud.firestore {
         isGlobalAdmin() ||
         isCountryAdmin(request.resource.data.country_code) ||
         isStaff(request.resource.data.clinic_id)
-      );
+      ) && isValidQueueItem(request.resource.data);
       allow update: if isApproved() && (
         isGlobalAdmin() ||
         isCountryAdmin(request.resource.data.country_code) ||
         isStaff(request.resource.data.clinic_id)
-      );
+      ) && isValidQueueItem(request.resource.data);
       allow delete: if isApproved() && (
         isGlobalAdmin() ||
         isCountryAdmin(resource.data.country_code) ||
@@ -273,8 +284,17 @@ service cloud.firestore {
     }
 
     match /badge_tokens/{tokenId} {
-      allow read: if isAuthenticated();
-      allow write: if isApproved();
+      allow read: if isApproved();
+      allow create: if isApproved() && (
+        isGlobalAdmin() ||
+        isCountryAdmin(request.resource.data.country_code) ||
+        isStaff(request.resource.data.clinic_id)
+      );
+      allow update: if isApproved() && (
+        isGlobalAdmin() ||
+        isCountryAdmin(resource.data.country_code) ||
+        isStaff(resource.data.clinic_id)
+      );
     }
     
     match /users/{userId} {

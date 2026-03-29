@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Container, 
   Typography,
   BottomNavigation,
   BottomNavigationAction,
-  Paper
+  Paper,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { 
   PersonAdd as PersonAddIcon,
@@ -18,6 +20,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import TopNavigation from './TopNavigation';
 import PatientContextBar from './PatientContextBar';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import { useAppStore } from '../store/useAppStore';
 
 interface StationLayoutProps {
   children: React.ReactNode;
@@ -37,10 +40,24 @@ const StationLayout: React.FC<StationLayoutProps> = ({
   const { isMobile, isTablet } = useResponsiveLayout();
   const navigate = useNavigate();
   const location = useLocation();
+  const { notifications } = useAppStore();
+  const [open, setOpen] = useState(false);
+  const [currentNotification, setCurrentNotification] = useState<any>(null);
+
+  useEffect(() => {
+    if (notifications.length > 0) {
+      setCurrentNotification(notifications[notifications.length - 1]);
+      setOpen(true);
+    }
+  }, [notifications]);
+
+  const handleClose = () => {
+    setOpen(false);
+  };
 
   // Navigation Items including the Queue overview
   const navItems = [
-    { label: 'Reg', to: '/', icon: <PersonAddIcon /> },
+    { label: 'Reg', to: '/registration', icon: <PersonAddIcon /> },
     { label: 'Queue', to: '/queue', icon: <DashboardIcon /> },
     { label: 'Vitals', to: '/vitals', icon: <LocalHospitalIcon /> },
     { label: 'Doctor', to: '/doctor', icon: <AssignmentIcon /> },
@@ -112,6 +129,13 @@ const StationLayout: React.FC<StationLayoutProps> = ({
           {children}
         </Container>
       </Box>
+
+      {/* Notification Snackbar */}
+      <Snackbar open={open} autoHideDuration={6000} onClose={handleClose}>
+        <Alert onClose={handleClose} severity={currentNotification?.type || 'info'} sx={{ width: '100%' }}>
+          {currentNotification?.message}
+        </Alert>
+      </Snackbar>
 
       {/* Mobile/Tablet Persistent Footer Navigation */}
       {(isMobile || isTablet) && (

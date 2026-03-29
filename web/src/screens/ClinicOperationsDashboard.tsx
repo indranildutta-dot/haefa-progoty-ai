@@ -398,12 +398,10 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
                   sx={{ fontSize: '0.875rem' }}
                 >
                   <MenuItem value="current_clinic">Current Clinic</MenuItem>
-                  {(userProfile?.role === 'global_admin' || userProfile?.role === 'country_admin' || userProfile?.role === 'admin') && (
-                    <>
-                      <MenuItem value="clinic">Select Clinic</MenuItem>
-                      <MenuItem value="country">Select Country</MenuItem>
-                    </>
-                  )}
+                  {(userProfile?.role === 'global_admin' || userProfile?.role === 'country_admin' || userProfile?.role === 'admin') && [
+                    <MenuItem key="clinic" value="clinic">Select Clinic</MenuItem>,
+                    <MenuItem key="country" value="country">Select Country</MenuItem>
+                  ]}
                   {userProfile?.role === 'global_admin' && (
                     <MenuItem value="global">Global View</MenuItem>
                   )}
@@ -622,7 +620,7 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
         <Divider sx={{ mb: 3 }} />
         <Grid container spacing={2}>
           <Grid size={{ xs: 6, sm: 6, md: 3 }}>
-            <Button fullWidth variant="outlined" component={Link} to="/" sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+            <Button fullWidth variant="outlined" component={Link} to="/registration" sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
               Registration
             </Button>
           </Grid>

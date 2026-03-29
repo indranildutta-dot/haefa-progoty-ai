@@ -50,7 +50,7 @@ const TopNavigation: React.FC = () => {
 
   const navItems = [
     { label: 'Operations', to: '/admin', icon: <DashboardIcon /> },
-    { label: 'Registration', to: '/', icon: <PersonAddIcon /> },
+    { label: 'Registration', to: '/registration', icon: <PersonAddIcon /> },
     { label: 'Vitals', to: '/vitals', icon: <LocalHospitalIcon /> },
     { label: 'Doctor', to: '/doctor', icon: <MedicationIcon /> },
     { label: 'Pharmacy', to: '/pharmacy', icon: <MedicationIcon /> },

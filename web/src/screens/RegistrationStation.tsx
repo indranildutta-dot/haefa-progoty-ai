@@ -815,10 +815,12 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
    */
   const handleRegisterOrUpdate = async () => {
     if (!selectedClinic || !selectedCountry) {
+      notify("Clinic or Country not selected. Please select them from the dashboard.", "error");
       return;
     }
 
     setLoading(true);
+    console.log("Starting registration/update for patient:", currentPatientId);
     
     try {
       const patientData: any = {
@@ -831,14 +833,17 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
 
       if (!editingPatientId) {
         patientData.created_at = serverTimestamp();
+        console.log("Attempting to create patient document:", currentPatientId, patientData);
         await setDoc(
           doc(db, 'patients', currentPatientId), 
           patientData
         );
+        console.log("Patient document created successfully.");
         
         const qrToken = `HAEFA-${currentPatientId.slice(0, 8)}`;
         const qrCodeDataUrl = await QRCode.toDataURL(qrToken);
         
+        console.log("Attempting to create badge token document:", qrToken);
         await setDoc(
           doc(db, 'badge_tokens', qrToken), 
           {
@@ -848,6 +853,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
             country_code: selectedCountry.id
           }
         );
+        console.log("Badge token document created successfully.");
 
         setBadgeData({
           patientId: currentPatientId,
@@ -859,14 +865,19 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
         
         setShowBadgeModal(true);
       } else {
+        console.log("Attempting to update patient document:", editingPatientId, patientData);
         await updatePatient(
           editingPatientId, 
           patientData
         );
+        console.log("Patient document updated successfully.");
       }
 
+      console.log("Attempting to create encounter for patient:", currentPatientId);
       const encounterId = await createEncounter(currentPatientId);
+      console.log("Encounter created successfully:", encounterId);
       
+      console.log("Attempting to add patient to queue:", currentPatientId);
       await addToQueue({
         patient_id: currentPatientId,
         patient_name: `${newPatient.given_name} ${newPatient.family_name}`,
@@ -874,6 +885,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
         status: 'WAITING_FOR_VITALS',
         station: 'vitals'
       });
+      console.log("Patient added to queue successfully.");
       
       setSuccessMsg(editingPatientId ? "Profile updated!" : "Registration complete!");
       
@@ -883,6 +895,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
       setCurrentPatientId(doc(collection(db, 'patients')).id);
       setActiveStep(0);
     } catch (error: any) {
+      console.error("Registration/Update Error:", error);
       notify(`Clinical Sync Error: ${error.message}`, "error");
     } finally {
       setLoading(false);
