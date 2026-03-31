@@ -74,7 +74,7 @@ const ConsultationPanel: React.FC<ConsultationPanelProps> = ({
           diagnosis: localData.diagnosis,
           notes: localData.notes,
           treatment_notes: localData.treatmentNotes,
-          lab_investigations: localData.labInvestigations,
+          labInvestigations: localData.labInvestigations,
           referrals: localData.referrals,
           assessment: localData.clinicalAssessment
         },

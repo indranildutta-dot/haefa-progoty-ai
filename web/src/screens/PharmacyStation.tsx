@@ -94,7 +94,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
               {waitingList.map(item => (
                 <TableRow key={item.id} hover>
                   <TableCell>{formatWaitTime(item.created_at)}</TableCell>
-                  <TableCell fontWeight="bold">{item.patient_name}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{item.patient_name}</TableCell>
                   <TableCell align="right">
                     <Button variant="contained" onClick={() => handleSelectPatient(item)}>Dispense Meds</Button>
                   </TableCell>
@@ -139,7 +139,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                   <Card key={idx} variant="outlined" sx={{ borderRadius: 4, border: checklist[med.id] ? '2px solid #10b981' : '1px solid #e2e8f0', bgcolor: checklist[med.id] ? '#f0fdf4' : 'white' }}>
                     <CardContent>
                       <Grid container spacing={2} alignItems="center">
-                        <Grid item xs={8}>
+                        <Grid size={{ xs: 8 }}>
                           <Typography variant="h6" color="primary" fontWeight="900">{med.medicationName}</Typography>
                           <Typography variant="body1" fontWeight="700">
                             {med.dosageValue}{med.dosageUnit} x {med.quantity} Total
@@ -151,7 +151,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                             </Box>
                           )}
                         </Grid>
-                        <Grid item xs={4} textAlign="right">
+                        <Grid size={{ xs: 4 }} textAlign="right">
                           <Button 
                             variant={checklist[med.id] ? "contained" : "outlined"} 
                             color="success" 

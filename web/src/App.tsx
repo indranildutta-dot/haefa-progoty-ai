@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAppStore } from './store/useAppStore';
 import { getUserProfile, subscribeToAuthChanges } from './services/authService';
 
@@ -85,66 +85,72 @@ const App: React.FC = () => {
   };
 
   return (
-    <Router>
-      <Routes>
-        {/* STEP 1: GLOBAL LANDING & COUNTRY SELECTION */}
-        <Route path="/" element={<LandingPage />} />
+    <Routes>
+      {/* STEP 1: GLOBAL LANDING & COUNTRY SELECTION */}
+      <Route path="/" element={<LandingPage />} />
 
-        {/* STEP 2: LOGIN - Guarded by Country Selection */}
-        <Route path="/login" element={
-          selectedCountry ? (
-            !user ? <LoginPage selectedCountry={selectedCountry} onBack={() => clearCountry()} /> : <Navigate to="/clinic-selection" />
-          ) : <Navigate to="/" />
-        } />
+      {/* STEP 2: LOGIN - Guarded by Country Selection */}
+      <Route path="/login" element={
+        selectedCountry ? (
+          !user ? <LoginPage selectedCountry={selectedCountry} onBack={() => clearCountry()} /> : <Navigate to="/clinic-selection" />
+        ) : <Navigate to="/" />
+      } />
 
-        {/* STEP 3: CLINIC SELECTION - Guarded by Auth & Country */}
-        <Route path="/clinic-selection" element={
-          user && selectedCountry ? (
-            <ClinicSelection 
-              selectedCountry={selectedCountry} 
-              onSelectClinic={(clinic) => setSession(selectedCountry, clinic)} 
-              onBack={() => clearCountry()} 
-            />
-          ) : <Navigate to="/login" />
-        } />
+      {/* STEP 3: CLINIC SELECTION - Guarded by Auth & Country */}
+      <Route path="/clinic-selection" element={
+        user && selectedCountry ? (
+          <ClinicSelection 
+            selectedCountry={selectedCountry} 
+            onSelectClinic={(clinic) => setSession(selectedCountry, clinic)} 
+            onBack={() => clearCountry()} 
+          />
+        ) : <Navigate to="/login" />
+      } />
 
-        {/* STEP 4: PROTECTED CLINICAL STATIONS (Requires Authorized Profile + Active Clinic Session) */}
-        <Route path="/dashboard" element={
-          isAuthorized() && selectedClinic ? <ClinicOperationsDashboard /> : <Navigate to="/clinic-selection" />
-        } />
+      {/* STEP 4: PROTECTED CLINICAL STATIONS (Requires Authorized Profile + Active Clinic Session) */}
+      <Route path="/dashboard" element={
+        isAuthorized() && selectedClinic ? <ClinicOperationsDashboard countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+      } />
 
-        <Route path="/registration" element={
-          isAuthorized() && selectedClinic ? <RegistrationStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
-        } />
+      <Route path="/registration" element={
+        isAuthorized() && selectedClinic ? <RegistrationStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+      } />
 
-        <Route path="/vitals" element={
-          isAuthorized() && selectedClinic ? <VitalsStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
-        } />
+      <Route path="/vitals-1" element={
+        isAuthorized() && selectedClinic ? <VitalsStation countryId={selectedCountry?.id || ''} mode={1} /> : <Navigate to="/clinic-selection" />
+      } />
 
-        <Route path="/doctor" element={
-          isAuthorized() && selectedClinic ? <DoctorDashboard countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
-        } />
+      <Route path="/vitals-2" element={
+        isAuthorized() && selectedClinic ? <VitalsStation countryId={selectedCountry?.id || ''} mode={2} /> : <Navigate to="/clinic-selection" />
+      } />
 
-        <Route path="/pharmacy" element={
-          isAuthorized() && selectedClinic ? <PharmacyStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
-        } />
+      <Route path="/labs-and-risk" element={
+        isAuthorized() && selectedClinic ? <VitalsStation countryId={selectedCountry?.id || ''} mode={3} /> : <Navigate to="/clinic-selection" />
+      } />
 
-        <Route path="/queue" element={
-          isAuthorized() && selectedClinic ? <QueueBoard countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
-        } />
+      <Route path="/doctor" element={
+        isAuthorized() && selectedClinic ? <DoctorDashboard countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+      } />
 
-        <Route path="/admin" element={
-          userProfile?.role === 'global_admin' ? <AdminDashboard /> : <Navigate to="/" />
-        } />
+      <Route path="/pharmacy" element={
+        isAuthorized() && selectedClinic ? <PharmacyStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+      } />
 
-        <Route path="/admin/users" element={
-          userProfile?.role === 'global_admin' ? <AdminUserManagement /> : <Navigate to="/" />
-        } />
+      <Route path="/queue" element={
+        isAuthorized() && selectedClinic ? <QueueBoard countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+      } />
 
-        {/* CATCH-ALL REDIRECT */}
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </Router>
+      <Route path="/admin" element={
+        userProfile?.role === 'global_admin' ? <AdminDashboard /> : <Navigate to="/" />
+      } />
+
+      <Route path="/admin/users" element={
+        userProfile?.role === 'global_admin' ? <AdminUserManagement /> : <Navigate to="/" />
+      } />
+
+      {/* CATCH-ALL REDIRECT */}
+      <Route path="*" element={<Navigate to="/" />} />
+    </Routes>
   );
 };
 

@@ -25,7 +25,7 @@ import { handleFirestoreError, OperationType } from "../utils/firestoreError";
 const QUEUE_ACTIVE_COLLECTION = "queues_active";
 const QUEUE_ARCHIVE_COLLECTION = "queues_archive";
 
-export const addToQueue = async (queueData: Omit<QueueItem, 'id' | 'created_at' | 'country_code' | 'clinic_id'>) => {
+export const addToQueue = async (queueData: Omit<QueueItem, 'id' | 'created_at' | 'country_id' | 'clinic_id'>) => {
   const { selectedCountry, selectedClinic } = getSession();
   if (!selectedClinic) throw new Error("Clinic not selected");
 
@@ -35,7 +35,6 @@ export const addToQueue = async (queueData: Omit<QueueItem, 'id' | 'created_at' 
   try {
     const data = {
       ...queueData,
-      country_code: selectedCountry.id,
       country_id: selectedCountry.id,
       clinic_id: selectedClinic.id,
       created_at: serverTimestamp(),
@@ -87,7 +86,7 @@ export const callNextPatient = async (queueId: string, doctorId: string) => {
       patient_id: data.patient_id
     });
 
-    await updateMetrics(data.clinic_id, data.country_code, {
+    await updateMetrics(data.clinic_id, data.country_id, {
       in_consultation: 1
     });
   }
@@ -132,18 +131,18 @@ export const updateQueueStatus = async (queueId: string, status: EncounterStatus
 
     if (status === 'COMPLETED') {
       const waitMinutes = data.created_at ? Math.floor((Date.now() - data.created_at.toMillis()) / 60000) : 0;
-      await updateMetrics(data.clinic_id, data.country_code, {
+      await updateMetrics(data.clinic_id, data.country_id, {
         active_queue: -1,
         completed_today: 1,
         wait_time_minutes: waitMinutes
       });
       if (data.status === 'IN_CONSULTATION') {
-        await updateMetrics(data.clinic_id, data.country_code, {
+        await updateMetrics(data.clinic_id, data.country_id, {
           in_consultation: -1
         });
       }
     } else if (data.status === 'IN_CONSULTATION' && status !== 'IN_CONSULTATION') {
-      await updateMetrics(data.clinic_id, data.country_code, {
+      await updateMetrics(data.clinic_id, data.country_id, {
         in_consultation: -1
       });
     }
@@ -165,10 +164,7 @@ export const getQueueByStatus = async (status: EncounterStatus) => {
   const q = query(
     collection(db, QUEUE_ACTIVE_COLLECTION),
     and(
-      or(
-        where("country_code", "==", selectedCountry.id),
-        where("country_id", "==", selectedCountry.id)
-      ),
+      where("country_id", "==", selectedCountry.id),
       where("clinic_id", "==", selectedClinic.id)
     )
   );
@@ -204,10 +200,7 @@ export const subscribeToQueue = (
   const q = query(
     collection(db, QUEUE_ACTIVE_COLLECTION),
     and(
-      or(
-        where("country_code", "==", selectedCountry.id),
-        where("country_id", "==", selectedCountry.id)
-      ),
+      where("country_id", "==", selectedCountry.id),
       where("clinic_id", "==", selectedClinic.id)
     )
   );

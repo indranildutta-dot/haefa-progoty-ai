@@ -40,7 +40,7 @@ const PatientAllergies: React.FC<PatientAllergiesProps> = ({ patientId }) => {
         medicationName: newAllergy.medicationName,
         severity: newAllergy.severity,
         notes: newAllergy.notes,
-        country_code: selectedCountry?.id || '',
+        country_id: selectedCountry?.id || '',
         clinic_id: selectedClinic?.id || ''
       });
       notify("Allergy added", "success");

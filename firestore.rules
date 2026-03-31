@@ -23,11 +23,11 @@ service cloud.firestore {
       );
     }
 
-    function isCountryAdmin(countryCode) {
+    function isCountryAdmin(countryId) {
       return isGlobalAdmin() || (
         isAuthenticated() && 
         getUserData().get('role', '') == 'country_admin' && 
-        countryCode in getUserData().get('assignedCountries', [])
+        countryId in getUserData().get('assignedCountries', [])
       );
     }
 
@@ -76,10 +76,10 @@ service cloud.firestore {
     }
 
     function isValidEncounter(data) {
-      return data.keys().hasAll(['patient_id', 'status', 'country_code', 'clinic_id']) &&
+      return data.keys().hasAll(['patient_id', 'status', 'country_id', 'clinic_id']) &&
              data.patient_id is string &&
              data.status is string &&
-             data.country_code is string &&
+             data.country_id is string &&
              data.clinic_id is string;
     }
 
@@ -119,7 +119,7 @@ service cloud.firestore {
     match /patients/{patientId} {
       allow read: if isApproved() && (
         isGlobalAdmin() ||
-        isCountryAdmin(resource.data.country_code) ||
+        isCountryAdmin(resource.data.country_id) ||
         isStaff(resource.data.clinic_id)
       );
       
@@ -148,12 +148,12 @@ service cloud.firestore {
       allow read: if isApproved();
       allow create: if isApproved() && (
         isGlobalAdmin() ||
-        isCountryAdmin(request.resource.data.country_code) ||
+        isCountryAdmin(request.resource.data.country_id) ||
         isStaff(request.resource.data.clinic_id)
       ) && isValidEncounter(request.resource.data);
       allow update: if isApproved() && (
         isGlobalAdmin() ||
-        isCountryAdmin(resource.data.country_code) ||
+        isCountryAdmin(resource.data.country_id) ||
         isStaff(request.resource.data.clinic_id)
       );
     }
@@ -219,22 +219,22 @@ service cloud.firestore {
     match /queues_active/{queueId} {
       allow read: if isAuthenticated() && (
         isGlobalAdmin() || 
-        isCountryAdmin(resource.data.country_code) ||
+        isCountryAdmin(resource.data.country_id) ||
         isStaff(resource.data.clinic_id)
       );
       allow create: if isApproved() && (
         isGlobalAdmin() ||
-        isCountryAdmin(request.resource.data.country_code) ||
+        isCountryAdmin(request.resource.data.country_id) ||
         isStaff(request.resource.data.clinic_id)
       ) && isValidQueueItem(request.resource.data);
       allow update: if isApproved() && (
         isGlobalAdmin() ||
-        isCountryAdmin(request.resource.data.country_code) ||
+        isCountryAdmin(request.resource.data.country_id) ||
         isStaff(request.resource.data.clinic_id)
       ) && isValidQueueItem(request.resource.data);
       allow delete: if isApproved() && (
         isGlobalAdmin() ||
-        isCountryAdmin(resource.data.country_code) ||
+        isCountryAdmin(resource.data.country_id) ||
         isStaff(request.resource.data.clinic_id)
       );
     }
@@ -247,7 +247,7 @@ service cloud.firestore {
     match /clinic_metrics/{clinicId} {
       allow read: if isAuthenticated() && (
         isGlobalAdmin() || 
-        isCountryAdmin(resource.data.country_code) ||
+        isCountryAdmin(resource.data.country_id) ||
         isStaff(resource.data.clinic_id) ||
         isStaff(clinicId) ||
         // Allow reading metrics for the specific clinic even if ID is clinicId_today
@@ -255,7 +255,7 @@ service cloud.firestore {
       );
       allow write: if isApproved() && (
         isGlobalAdmin() ||
-        isCountryAdmin(resource.data.country_code) ||
+        isCountryAdmin(resource.data.country_id) ||
         isStaff(resource.data.clinic_id) ||
         isStaff(clinicId) ||
         // Allow writing metrics for the specific clinic even if ID is clinicId_today
@@ -287,12 +287,12 @@ service cloud.firestore {
       allow read: if isApproved();
       allow create: if isApproved() && (
         isGlobalAdmin() ||
-        isCountryAdmin(request.resource.data.country_code) ||
+        isCountryAdmin(request.resource.data.country_id) ||
         isStaff(request.resource.data.clinic_id)
       );
       allow update: if isApproved() && (
         isGlobalAdmin() ||
-        isCountryAdmin(resource.data.country_code) ||
+        isCountryAdmin(resource.data.country_id) ||
         isStaff(resource.data.clinic_id)
       );
     }
@@ -301,12 +301,12 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (
         request.auth.uid == userId ||
         isGlobalAdmin() || 
-        (getUserData().get('role', '') == 'country_admin' && resource.data.countryCode in getUserData().get('assignedCountries', []))
+        (getUserData().get('role', '') == 'country_admin' && resource.data.country_id in getUserData().get('assignedCountries', []))
       );
       allow write: if isAuthenticated() && (
         request.auth.uid == userId ||
         isGlobalAdmin() || 
-        (getUserData().get('role', '') == 'country_admin' && request.resource.data.countryCode in getUserData().get('assignedCountries', []))
+        (getUserData().get('role', '') == 'country_admin' && request.resource.data.country_id in getUserData().get('assignedCountries', []))
       );
     }
 

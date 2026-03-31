@@ -27,9 +27,13 @@ const PrescriptionForm: React.FC<PrescriptionFormProps> = ({ prescriptions, onCh
   const [newMed, setNewMed] = useState<Prescription>({
     medicationId: '',
     medicationName: '',
-    dosage: '',
-    frequency: '',
-    duration: '',
+    dosageValue: '',
+    dosageUnit: 'mg',
+    frequencyValue: 1,
+    frequencyUnit: 'times daily',
+    durationValue: 7,
+    durationUnit: 'days',
+    quantity: 7,
     instructions: ''
   });
 
@@ -39,9 +43,13 @@ const PrescriptionForm: React.FC<PrescriptionFormProps> = ({ prescriptions, onCh
     setNewMed({
       medicationId: '',
       medicationName: '',
-      dosage: '',
-      frequency: '',
-      duration: '',
+      dosageValue: '',
+      dosageUnit: 'mg',
+      frequencyValue: 1,
+      frequencyUnit: 'times daily',
+      durationValue: 7,
+      durationUnit: 'days',
+      quantity: 7,
       instructions: ''
     });
   };
@@ -72,8 +80,8 @@ const PrescriptionForm: React.FC<PrescriptionFormProps> = ({ prescriptions, onCh
             fullWidth
             label="Dosage"
             size="small"
-            value={newMed.dosage}
-            onChange={(e) => setNewMed({ ...newMed, dosage: e.target.value })}
+            value={newMed.dosageValue}
+            onChange={(e) => setNewMed({ ...newMed, dosageValue: e.target.value })}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 3 }}>
@@ -81,8 +89,8 @@ const PrescriptionForm: React.FC<PrescriptionFormProps> = ({ prescriptions, onCh
             fullWidth
             label="Frequency"
             size="small"
-            value={newMed.frequency}
-            onChange={(e) => setNewMed({ ...newMed, frequency: e.target.value })}
+            value={newMed.frequencyValue}
+            onChange={(e) => setNewMed({ ...newMed, frequencyValue: Number(e.target.value) })}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 3 }}>
@@ -90,8 +98,8 @@ const PrescriptionForm: React.FC<PrescriptionFormProps> = ({ prescriptions, onCh
             fullWidth
             label="Duration"
             size="small"
-            value={newMed.duration}
-            onChange={(e) => setNewMed({ ...newMed, duration: e.target.value })}
+            value={newMed.durationValue}
+            onChange={(e) => setNewMed({ ...newMed, durationValue: Number(e.target.value) })}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 7 }}>
@@ -143,9 +151,9 @@ const PrescriptionForm: React.FC<PrescriptionFormProps> = ({ prescriptions, onCh
               prescriptions.map((p, index) => (
                 <TableRow key={index}>
                   <TableCell>{p.medicationName}</TableCell>
-                  <TableCell>{p.dosage}</TableCell>
-                  <TableCell>{p.frequency}</TableCell>
-                  <TableCell>{p.duration}</TableCell>
+                  <TableCell>{p.dosageValue} {p.dosageUnit}</TableCell>
+                  <TableCell>{p.frequencyValue} {p.frequencyUnit}</TableCell>
+                  <TableCell>{p.durationValue} {p.durationUnit}</TableCell>
                   <TableCell align="right">
                     <IconButton size="small" color="error" onClick={() => handleRemove(index)}>
                       <DeleteIcon fontSize="small" />

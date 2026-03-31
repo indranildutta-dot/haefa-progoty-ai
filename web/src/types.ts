@@ -7,65 +7,41 @@ export interface UserProfile {
   email: string;
   role: UserRole;
   name: string;
-  countryCode?: string;
+  country_id?: string;
   assignedCountries?: string[];
   assignedClinics?: string[];
   isApproved: boolean;
   lastUpdated?: Timestamp;
 }
 
-export enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-export interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  }
-}
-
 export type EncounterStatus = 
   | 'REGISTERED' 
   | 'WAITING_FOR_VITALS' 
+  | 'WAITING_FOR_VITALS_2' 
+  | 'WAITING_FOR_VITALS_3' 
   | 'READY_FOR_DOCTOR' 
   | 'IN_CONSULTATION' 
   | 'WAITING_FOR_PHARMACY' 
-  | 'COMPLETED'
-  | 'PHARMACY_COMPLETED';
+  | 'COMPLETED';
+
+export type TriageLevel = 'emergency' | 'urgent' | 'standard' | 'low';
 
 export interface Patient {
   id?: string;
   given_name: string;
   family_name: string;
   gender: 'male' | 'female' | 'other';
-  date_of_birth?: string;
+  date_of_birth: string;
   age_years?: number;
   age_months?: number;
   age_days?: number;
   phone?: string;
   marital_status?: 'single' | 'married' | 'divorced' | 'widowed' | 'separated';
-  patient_type?: string;
   national_id?: string;
   rohingya_number?: string;
   bhutanese_refugee_number?: string;
+  nepal_id?: string;
+  patient_type?: string;
   address_type?: 'home' | 'refugee camp';
   address_line?: string;
   village?: string;
@@ -76,38 +52,14 @@ export interface Patient {
   photo_url?: string;
   country_id: string;
   clinic_id: string;
-  latest_encounter_id?: string;
-  last_visit_date?: Timestamp;
-  encounter_count?: number;
   created_at: Timestamp;
   updated_at?: Timestamp;
-  sync_status?: 'synced' | 'pending' | 'error';
-  device_id?: string;
+  triage_level?: string;
+  currentVitals?: VitalsRecord;
+  chronic_diseases?: string[];
 }
 
-export type TriageLevel = 'emergency' | 'urgent' | 'standard' | 'low';
-
-export interface QueueItem {
-  id?: string;
-  encounter_id: string;
-  patient_id: string;
-  patient_name: string;
-  station: string;
-  status: string;
-  country_code: string;
-  clinic_id: string;
-  triage_level?: TriageLevel;
-  priority_score?: number;
-  triage_source?: 'automatic' | 'manual';
-  triage_reason?: string;
-  doctor_id?: string;
-  doctor_called_at?: Timestamp;
-  created_at: Timestamp;
-  updated_at?: Timestamp;
-  sync_status?: 'synced' | 'pending' | 'error';
-  device_id?: string;
-}
-
+// FIXED: Added missing properties requested by AI Studio
 export interface Vitals {
   systolic: number;
   diastolic: number;
@@ -119,12 +71,43 @@ export interface Vitals {
   oxygenSaturation?: number;
   blood_sugar?: string;
   hemoglobin?: string;
+  is_pregnant?: 'yes' | 'no';
+  pregnancy_months?: string;
+  allergies?: string;
+  tobacco_use?: string;
+  created_by?: string;
 }
 
-/**
- * UPDATED: Prescription Interface
- * Includes split fields for clinical precision and the Requisition flag.
- */
+export interface QueueItem {
+  id?: string;
+  encounter_id: string;
+  patient_id: string;
+  patient_name: string;
+  status: EncounterStatus;
+  station: string;
+  country_id: string;
+  clinic_id: string;
+  triage_level?: TriageLevel;
+  priority_score?: number;
+  doctor_id?: string;
+  doctor_called_at?: Timestamp;
+  created_at: Timestamp;
+  updated_at?: Timestamp;
+}
+
+export interface Encounter {
+  id?: string;
+  patient_id: string;
+  encounter_status: EncounterStatus;
+  status: EncounterStatus;
+  current_station: string;
+  country_id: string;
+  clinic_id: string;
+  triage_level?: TriageLevel;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
 export interface Prescription {
   medicationId: string;
   medicationName: string;
@@ -134,188 +117,180 @@ export interface Prescription {
   frequencyUnit: string;
   durationValue: number;
   durationUnit: string;
-  instructions: string;
   quantity: number;
+  instructions: string;
+  isCustom?: boolean;
   isRequisition?: boolean;
-  dispensed_qty?: number;
-  shortfall_qty?: number;
+  dosage?: string;
+  frequency?: string;
+  duration?: string;
 }
 
-export interface VitalsRecord extends Vitals {
+export interface VitalsRecord {
   id?: string;
-  encounter_id: string;
   patient_id: string;
-  country_code: string;
+  encounter_id: string;
   clinic_id: string;
+  country_id: string;
   created_at: Timestamp;
-  created_by: string;
-  updated_at?: Timestamp;
-  sync_status?: 'synced' | 'pending' | 'error';
-  device_id?: string;
+  updated_at: Timestamp;
+  systolic?: number;
+  diastolic?: number;
+  heartRate?: number;
+  temperature?: number;
+  weight?: number;
+  height?: number;
+  bmi?: number;
+  oxygenSaturation?: number;
+  blood_sugar?: number;
+  hemoglobin?: number;
+  is_pregnant?: boolean;
+  pregnancy_months?: number;
+  allergies?: string[];
+  tobacco_use?: string;
+  created_by?: string;
 }
 
-/**
- * UPDATED: DiagnosisRecord Interface
- * Aligned with the new saveConsultation Cloud Function payload.
- */
 export interface DiagnosisRecord {
   id?: string;
-  encounter_id: string;
   patient_id: string;
-  chief_complaint?: string;
+  encounter_id: string;
+  clinic_id: string;
+  country_id: string;
   diagnosis: string;
   notes: string;
   treatment_notes?: string;
-  assessment?: any;
-  clinicalAssessment?: any;
+  chief_complaint?: string;
   labInvestigations?: string[];
   referrals?: string[];
-  country_code: string;
-  clinic_id: string;
+  assessment?: any; // Using any to accommodate ClinicalAssessmentData without circular imports or complex nesting
   created_at: Timestamp;
-  created_by: string;
-  updated_at?: Timestamp;
-  sync_status?: 'synced' | 'pending' | 'error';
-  device_id?: string;
 }
 
 export interface PrescriptionRecord {
   id?: string;
-  encounter_id: string;
   patient_id: string;
-  prescriptions: Prescription[];
-  status: 'PENDING' | 'DISPENSED' | 'PARTIAL_DISPENSE' | 'OUT_OF_STOCK';
-  country_code: string;
+  encounter_id: string;
   clinic_id: string;
+  country_id: string;
+  prescriptions: Prescription[];
+  status: 'PENDING' | 'DISPENSED';
   created_at: Timestamp;
-  created_by: string;
-  updated_at?: Timestamp;
-  sync_status?: 'synced' | 'pending' | 'error';
-  device_id?: string;
 }
 
-export interface Encounter {
+export interface TriageAssessment {
   id?: string;
   patient_id: string;
-  encounter_status: EncounterStatus;
-  status: EncounterStatus;
-  current_station: string;
-  country_code: string;
+  encounter_id: string;
+  clinic_id: string;
+  country_id: string;
+  triage_level: TriageLevel;
+  notes: string;
+  chronic_diseases?: string[];
+  tobacco_use?: string;
+  alcohol_use?: string;
+  triage_notes?: string;
+  chief_complaint?: string;
+  created_at: Timestamp;
+}
+
+export interface QueuePatient {
+  encounterId: string;
+  queueId: string;
+  patientId: string;
+  patientName: string;
+  triageLevel: TriageLevel;
+  encounterStatus: EncounterStatus;
+  createdAt: Timestamp;
+  waitTimeDisplay: string;
+  triageColor: string;
+  photoUrl?: string;
+  age?: number;
+  gender?: string;
+  village?: string;
+}
+
+export interface AuditLog {
+  id?: string;
+  action: string;
+  encounter_id?: string;
+  patient_id?: string;
+  user_id: string;
+  country_id: string;
   clinic_id: string;
   created_at: Timestamp;
+}
+
+export interface ClinicConfigDocument {
+  id?: string;
+  name: string;
+  clinic_name?: string;
+  country_id: string;
+  country_name?: string;
+  timezone?: string;
+  system_name?: string;
+  queue_structure?: string[];
+  supported_roles?: string[];
+  language_settings?: string[];
+  measurement_units?: {
+    weight: string;
+    height: string;
+    temperature: string;
+  };
+  currency?: string;
+  feature_flags?: {
+    enable_pharmacy: boolean;
+    enable_lab: boolean;
+  };
+  system_limits?: {
+    max_patients_per_day: number;
+  };
+  created_at?: Timestamp;
   updated_at?: Timestamp;
-  sync_status?: 'synced' | 'pending' | 'error';
-  device_id?: string;
 }
 
 export interface Medication {
   id?: string;
   name: string;
-  maxDailyDose?: number; // e.g., in mg
+  generic_name: string;
+  form: string;
+  strength: string;
+  cold_chain_req: boolean;
+  base_unit: string;
+  package_unit: string;
+  package_size: number;
   unit?: string;
+  maxDailyDose?: number;
 }
 
 export interface DrugInteraction {
   id?: string;
-  medication1Name: string;
-  medication2Name: string;
-  severity: 'high' | 'moderate' | 'low';
+  medication_id_1: string;
+  medication_id_2: string;
+  medication1Name?: string;
+  medication2Name?: string;
+  severity: 'low' | 'moderate' | 'high';
   description: string;
+}
+
+export interface SafetyAlert {
+  id?: string;
+  medication_id?: string;
+  alert_type?: string;
+  description: string;
+  type?: string;
+  severity?: 'low' | 'moderate' | 'high';
+  medicationNames?: string[];
 }
 
 export interface PatientAllergy {
   id?: string;
   patient_id: string;
-  medicationName: string;
-  severity: 'high' | 'moderate' | 'low';
+  allergy: string;
+  severity: 'low' | 'moderate' | 'high';
+  country_id: string;
+  clinic_id: string;
+  created_at: Timestamp;
+  medicationName?: string;
   notes?: string;
-}
-
-export interface SafetyAlert {
-  type: 'allergy' | 'interaction' | 'dosage' | 'duplicate';
-  severity: 'high' | 'moderate' | 'low';
-  description: string;
-  medicationNames: string[];
-}
-
-export interface ClinicConfigDocument {
-  id?: string;
-  clinic_name: string;
-  country_code: string;
-  country_name: string;
-  timezone: string;
-  system_name: string;
-  queue_structure: string[];
-  supported_roles: string[];
-  language_settings: string[];
-  measurement_units: {
-    weight: string;
-    height: string;
-    temperature: string;
-  };
-  currency: string;
-  feature_flags: Record<string, boolean>;
-  system_limits: Record<string, number>;
-  created_at: Timestamp;
-  updated_at: Timestamp;
-}
-
-export interface AuditLog {
-  id?: string;
-  user_id: string;
-  role: UserRole | 'unknown';
-  action: 'PATIENT_CREATED' | 'VITALS_RECORDED' | 'DIAGNOSIS_CREATED' | 'PRESCRIPTION_ISSUED' | 'MEDICATION_DISPENSED' | 'ENCOUNTER_STATUS_CHANGED' | 'DOCTOR_CALLED_PATIENT';
-  patient_id?: string;
-  encounter_id?: string;
-  timestamp: Timestamp;
-  device_id: string;
-  country_code: string;
-  clinic_id: string;
-  created_at?: Timestamp;
-  updated_at?: Timestamp;
-  sync_status?: 'synced' | 'pending' | 'error';
-}
-
-export interface TriageAssessment {
-  id?: string;
-  encounter_id: string;
-  patient_id: string;
-  clinic_id: string;
-  country_code: string;
-  recorded_by: string;
-  created_at: Timestamp;
-  allergies: string[];
-  tobacco_use: 'none' | 'former' | 'current';
-  alcohol_use: 'none' | 'occasional' | 'regular';
-  chronic_diseases: ('diabetes' | 'hypertension' | 'asthma' | 'heart disease' | 'other')[];
-  family_medical_history: string;
-  pregnancy_status: 'yes' | 'no' | 'unknown';
-  triage_notes: string;
-  chief_complaint?: string;
-}
-
-export interface ClinicMetrics {
-  clinic_id: string;
-  patients_registered_today: number;
-  waiting_for_vitals: number;
-  ready_for_doctor: number;
-  in_consultation: number;
-  waiting_for_pharmacy: number;
-  completed_today: number;
-  avg_wait_time_minutes: number;
-  last_updated: Timestamp;
-}
-
-export interface QueuePatient {
-  encounterId: string;
-  queueId?: string;
-  patientId: string;
-  patientName: string;
-  age: number;
-  gender: string;
-  village?: string;
-  photoUrl?: string;
-  triageLevel?: TriageLevel;
-  encounterStatus: string;
-  createdAt: Timestamp;
 }

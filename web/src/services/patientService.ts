@@ -34,7 +34,6 @@ export const createPatient = async (patientData: Omit<Patient, 'id' | 'created_a
     last_name: patientData.family_name,
     // Standardize location (save both versions for compatibility)
     country_id: selectedCountry.id,
-    country_code: selectedCountry.id,
     clinic_id: selectedClinic.id,
     created_at: serverTimestamp(),
     updated_at: serverTimestamp()
@@ -88,10 +87,7 @@ export const searchPatients = async (searchParams: {
   const q = query(
     collection(db, PATIENTS_COLLECTION), 
     and(
-      or(
-        where("country_id", "in", countryIds),
-        where("country_code", "in", countryIds)
-      ),
+      where("country_id", "in", countryIds),
       where("clinic_id", "==", selectedClinic.id)
     )
   );
@@ -160,7 +156,7 @@ export const searchPatients = async (searchParams: {
     ...p,
     given_name: p.given_name || p.first_name || '',
     family_name: p.family_name || p.last_name || '',
-    country_id: p.country_id || p.country_code || selectedCountry.id
+    country_id: p.country_id || selectedCountry.id
   })) as Patient[];
 };
 

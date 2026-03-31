@@ -73,7 +73,7 @@ const PrescriptionPrintView: React.FC<PrescriptionPrintViewProps> = ({
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 2 }}>
         <Typography><strong>Name:</strong> {patient.given_name} {patient.family_name}</Typography>
         <Typography><strong>Age:</strong> {patient.age_years || 0}</Typography>
-        <Typography><strong>Gender:</strong> {patient.gender.toUpperCase()}</Typography>
+        <Typography><strong>Gender:</strong> {patient.gender?.toUpperCase() || 'N/A'}</Typography>
         <Typography><strong>Date:</strong> {dateStr}</Typography>
       </Box>
       <Divider sx={{ borderBottomWidth: 2, borderColor: 'black', mb: 2 }} />

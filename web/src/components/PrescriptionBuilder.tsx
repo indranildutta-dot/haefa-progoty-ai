@@ -119,7 +119,7 @@ const PrescriptionBuilder: React.FC<{ onPrescriptionChange?: (p: Prescription[])
 
               <Grid container spacing={2}>
                 {/* Medicine Search */}
-                <Grid item xs={12} md={5}>
+                <Grid size={{ xs: 12, md: 5 }}>
                   {med.isCustom ? (
                     <TextField fullWidth label="Custom Medicine Name" variant="filled" value={med.medicationName} onChange={(e) => updateMed(i, 'medicationName', e.target.value)} />
                   ) : (
@@ -133,7 +133,7 @@ const PrescriptionBuilder: React.FC<{ onPrescriptionChange?: (p: Prescription[])
                 </Grid>
 
                 {/* Yellow Box: Dosage */}
-                <Grid item xs={6} md={1.5}>
+                <Grid size={{ xs: 6, md: 1.5 }}>
                   <Box sx={{ bgcolor: '#fef3c7', p: 0.5, borderRadius: 2 }}>
                     {hasMultipleDosages && !med.isCustom ? (
                       <FormControl fullWidth variant="filled">
@@ -149,7 +149,7 @@ const PrescriptionBuilder: React.FC<{ onPrescriptionChange?: (p: Prescription[])
                 </Grid>
 
                 {/* Brown Box: Unit */}
-                <Grid item xs={6} md={2.5}>
+                <Grid size={{ xs: 6, md: 2.5 }}>
                   <Box sx={{ bgcolor: '#fafaf9', p: 0.5, borderRadius: 2, border: '1px solid #e7e5e4' }}>
                     <FormControl fullWidth variant="standard" sx={{ px: 1 }}>
                       <InputLabel>Unit</InputLabel>
@@ -161,7 +161,7 @@ const PrescriptionBuilder: React.FC<{ onPrescriptionChange?: (p: Prescription[])
                 </Grid>
 
                 {/* Blue Box: Total Qty (Moved to Right) */}
-                <Grid item xs={12} md={3} sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <Grid size={{ xs: 12, md: 3 }} sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                   <Box sx={{ bgcolor: '#e0f2fe', p: 1, borderRadius: 3, border: '1px solid #bae6fd', display: 'flex', alignItems: 'center', height: '100%' }}>
                     <CalculateIcon sx={{ mr: 2, color: '#0369a1' }} />
                     <Box>
@@ -172,7 +172,7 @@ const PrescriptionBuilder: React.FC<{ onPrescriptionChange?: (p: Prescription[])
                 </Grid>
 
                 {/* Schedule Row */}
-                <Grid item xs={12} md={9}>
+                <Grid size={{ xs: 12, md: 9 }}>
                    <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
                       <TextField label="Freq" type="number" sx={{ width: 80 }} value={med.frequencyValue} onChange={(e) => updateMed(i, 'frequencyValue', e.target.value)} />
                       <Select value={med.frequencyUnit} sx={{ flexGrow: 1 }} onChange={(e) => updateMed(i, 'frequencyUnit', e.target.value)}>
@@ -186,7 +186,7 @@ const PrescriptionBuilder: React.FC<{ onPrescriptionChange?: (p: Prescription[])
                 </Grid>
 
                 {/* Green Box: Pharmacist Instructions */}
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <Box sx={{ bgcolor: '#f0fdf4', p: 2, borderRadius: 3, border: '1px solid #dcfce7', mt: 1 }}>
                     <Typography variant="caption" sx={{ fontWeight: 900, color: '#166534', mb: 1, display: 'block' }}>PHARMACIST INSTRUCTIONS</Typography>
                     <TextField 

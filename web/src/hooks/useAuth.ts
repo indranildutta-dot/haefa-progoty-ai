@@ -42,7 +42,7 @@ export const useAuth = () => {
                 name: user.displayName || user.email.split('@')[0],
                 role: 'global_admin',
                 isApproved: true,
-                countryCode: 'BD', // Default
+                country_id: 'BD', // Default
                 assignedCountries: ['BD'],
                 assignedClinics: []
               };

@@ -77,7 +77,7 @@ const ClinicSelection: React.FC<ClinicSelectionProps> = ({ selectedCountry, onSe
       ) : (
         <Grid container spacing={3}>
           {authorizedClinics.map((clinic) => (
-            <Grid item xs={12} sm={6} key={clinic.id}>
+            <Grid size={{ xs: 12, sm: 6 }} key={clinic.id}>
               <Card 
                 sx={{ 
                   borderRadius: 4, 

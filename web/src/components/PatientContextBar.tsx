@@ -40,7 +40,7 @@ const PatientContextBar: React.FC = () => {
   };
 
   const triage = getTriageStyle(selectedPatient.triage_level || 'standard');
-  const vitals = selectedPatient.currentVitals || {};
+  const vitals = selectedPatient.currentVitals;
 
   return (
     <Paper 
@@ -95,13 +95,13 @@ const PatientContextBar: React.FC = () => {
             <Box>
               <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 900, display: 'block', lineHeight: 1 }}>BP</Typography>
               <Typography variant="body2" sx={{ fontWeight: 900, color: '#0f172a' }}>
-                {vitals.systolic || '--'}/{vitals.diastolic || '--'}
+                {vitals?.systolic || '--'}/{vitals?.diastolic || '--'}
               </Typography>
             </Box>
             <Box>
               <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 900, display: 'block', lineHeight: 1 }}>SpO2</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 900, color: (vitals.oxygenSaturation < 94) ? '#ef4444' : '#0f172a' }}>
-                {vitals.oxygenSaturation ? `${vitals.oxygenSaturation}%` : '--'}
+              <Typography variant="body2" sx={{ fontWeight: 900, color: (vitals?.oxygenSaturation && vitals.oxygenSaturation < 94) ? '#ef4444' : '#0f172a' }}>
+                {vitals?.oxygenSaturation ? `${vitals.oxygenSaturation}%` : '--'}
               </Typography>
             </Box>
           </Stack>
@@ -121,8 +121,8 @@ const PatientContextBar: React.FC = () => {
         />
 
         {/* Pregnancy Alert */}
-        {vitals.is_pregnant === 'yes' && (
-          <Tooltip title={`Pregnancy: ${vitals.pregnancy_months || '?'} months`}>
+        {vitals?.is_pregnant === true && (
+          <Tooltip title={`Pregnancy: ${vitals?.pregnancy_months || '?'} months`}>
             <Chip 
               icon={<PregnantWomanIcon style={{ color: 'white', fontSize: 18 }} />}
               label="PREGNANT"
@@ -132,8 +132,8 @@ const PatientContextBar: React.FC = () => {
         )}
 
         {/* Allergy Alert */}
-        {vitals.allergies && vitals.allergies.toLowerCase() !== 'none' && (
-          <Tooltip title={`Allergy: ${vitals.allergies}`}>
+        {vitals?.allergies && vitals?.allergies.length > 0 && (
+          <Tooltip title={`Allergies: ${vitals?.allergies.join(', ')}`}>
             <Chip 
               icon={<WarningIcon style={{ color: 'white', fontSize: 16 }} />}
               label="ALLERGIES"
@@ -143,12 +143,12 @@ const PatientContextBar: React.FC = () => {
         )}
 
         {/* Substance Use (Dhaka Standard) */}
-        {vitals.tobacco_use && vitals.tobacco_use !== 'none' && (
+        {vitals?.tobacco_use && vitals?.tobacco_use !== 'none' && (
           <Chip 
             icon={<SmokingRoomsIcon style={{ color: 'white', fontSize: 16 }} />}
-            label={vitals.tobacco_use === 'chewing' || vitals.tobacco_use === 'both' ? "GUTKHA" : "TOBACCO"}
+            label={vitals?.tobacco_use === 'chewing' || vitals?.tobacco_use === 'both' ? "GUTKHA" : "TOBACCO"}
             sx={{ 
-              bgcolor: (vitals.tobacco_use === 'chewing') ? '#991b1b' : '#f59e0b', 
+              bgcolor: (vitals?.tobacco_use === 'chewing') ? '#991b1b' : '#f59e0b', 
               color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' 
             }}
           />
@@ -163,7 +163,7 @@ const PatientContextBar: React.FC = () => {
           Finalized Station
         </Typography>
         <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 900, fontSize: '0.75rem' }}>
-          {vitals.created_by ? `STN: ${vitals.created_by.substring(0, 5)}` : 'AWAITING TRIAGE'}
+          {vitals?.created_by ? `STN: ${vitals.created_by.substring(0, 5)}` : 'AWAITING TRIAGE'}
         </Typography>
       </Box>
 

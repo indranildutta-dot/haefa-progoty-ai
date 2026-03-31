@@ -69,14 +69,14 @@ const PatientQueueCard: React.FC<PatientQueueCardProps> = ({ patient, onClick })
       
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
         <Avatar src={patient.photoUrl} sx={{ width: 48, height: 48, mr: 1.5, border: '2px solid', borderColor: 'grey.200' }}>
-          {patient.patientName.charAt(0)}
+          {patient.patientName?.charAt(0) || '?'}
         </Avatar>
         <Box sx={{ pr: 8 }}>
           <Typography variant="subtitle2" fontWeight="800" noWrap sx={{ fontSize: '0.95rem', lineHeight: 1.2 }}>
-            {patient.patientName}
+            {patient.patientName || 'Unknown Patient'}
           </Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-            Age: {patient.age} {patient.gender.charAt(0).toUpperCase()}
+            Age: {patient.age ?? 'N/A'} {patient.gender?.charAt(0).toUpperCase() || ''}
           </Typography>
         </Box>
       </Box>

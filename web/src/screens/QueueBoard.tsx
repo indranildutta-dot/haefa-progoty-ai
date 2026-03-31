@@ -3,17 +3,19 @@ import { Typography, Box, IconButton, Grid, Paper, CircularProgress, Chip, Stack
 import RefreshIcon from '@mui/icons-material/Refresh';
 import TimerIcon from '@mui/icons-material/Timer';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db, handleFirestoreError } from '../firebase';
-import { QueuePatient, Patient, QueueItem, OperationType } from '../types';
+import { db } from '../firebase';
+import { QueuePatient, Patient, QueueItem } from '../types';
+import { OperationType, handleFirestoreError } from '../utils/firestoreError';
 import { getPatientById } from '../services/patientService';
 import { useAppStore } from '../store/useAppStore';
 import QueueColumn from '../components/queue/QueueColumn';
 import QueuePatientDetailDrawer from '../components/queue/QueuePatientDetailDrawer';
 import StationLayout from '../components/StationLayout';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 const QueueBoard: React.FC<{ countryId: string }> = ({ countryId }) => {
   const { selectedCountry, selectedClinic, userProfile } = useAppStore();
-  const [queuePatients, setQueuePatients] = useState<QueuePatient[]>([]);
+  const [rawQueueItems, setRawQueueItems] = useState<QueueItem[]>([]);
   const [patientsCache, setPatientsCache] = useState<Record<string, Patient>>({});
   const [selectedPatient, setSelectedPatient] = useState<QueuePatient | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,42 +42,21 @@ const QueueBoard: React.FC<{ countryId: string }> = ({ countryId }) => {
   useEffect(() => {
     if (!selectedCountry || !selectedClinic || !userProfile?.isApproved) return;
     
-    // Querying active queue excluding COMPLETED patients
+    // Querying active queue - filtering status in memory to avoid composite index requirements
     const q = query(collection(db, "queues_active"), 
-              where("country_code", "==", selectedCountry.id), 
-              where("clinic_id", "==", selectedClinic.id), 
-              where("status", "!=", "COMPLETED"));
+              where("country_id", "==", selectedCountry.id), 
+              where("clinic_id", "==", selectedClinic.id));
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       try {
-        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as QueueItem[];
+        const allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as QueueItem[];
+        
+        // Filter status in memory
+        const items = allItems.filter(item => item.status !== 'COMPLETED');
+        
         // Sort by arrival time
         items.sort((a, b) => (a.created_at?.toMillis() || 0) - (b.created_at?.toMillis() || 0));
-
-        // Background cache management for patient names/photos
-        const missingIds = items.map(i => i.patient_id).filter(id => !patientsCache[id]);
-        if (missingIds.length > 0) {
-          const newPatients = { ...patientsCache };
-          await Promise.all(missingIds.map(async id => { 
-            const p = await getPatientById(id); if (p) newPatients[id] = p; 
-          }));
-          setPatientsCache(newPatients);
-        }
-
-        setQueuePatients(items.map(item => {
-          const p = patientsCache[item.patient_id];
-          return {
-            encounterId: item.encounter_id,
-            queueId: item.id,
-            patientId: item.patient_id,
-            patientName: p ? `${p.given_name} ${p.family_name}` : 'Loading...',
-            triageLevel: item.triage_level,
-            encounterStatus: item.status,
-            createdAt: item.created_at,
-            waitTimeDisplay: formatWaitTime(item.created_at),
-            triageColor: getTriageColor(item.triage_level)
-          } as any;
-        }));
+        setRawQueueItems(items);
         setLoading(false);
       } catch (e) { setLoading(false); }
     }, (error) => {
@@ -84,12 +65,52 @@ const QueueBoard: React.FC<{ countryId: string }> = ({ countryId }) => {
     });
 
     return () => unsubscribe();
-  }, [selectedCountry, selectedClinic, patientsCache, userProfile?.isApproved]);
+  }, [selectedCountry, selectedClinic, userProfile?.isApproved]);
+
+  // Background cache management for patient names/photos
+  useEffect(() => {
+    const fetchMissingPatients = async () => {
+      const missingIds = rawQueueItems.map(i => i.patient_id).filter(id => !patientsCache[id]);
+      if (missingIds.length > 0) {
+        const newPatients = { ...patientsCache };
+        await Promise.all(missingIds.map(async id => { 
+          const p = await getPatientById(id); if (p) newPatients[id] = p; 
+        }));
+        setPatientsCache(newPatients);
+      }
+    };
+    fetchMissingPatients();
+  }, [rawQueueItems]);
+
+  const queuePatients = useMemo(() => {
+    return rawQueueItems.map(item => {
+      const p = patientsCache[item.patient_id];
+      return {
+        encounterId: item.encounter_id,
+        queueId: item.id,
+        patientId: item.patient_id,
+        patientName: p ? `${p.given_name} ${p.family_name}` : 'Loading...',
+        triageLevel: item.triage_level,
+        encounterStatus: item.status,
+        createdAt: item.created_at,
+        waitTimeDisplay: formatWaitTime(item.created_at),
+        triageColor: getTriageColor(item.triage_level),
+        photoUrl: p?.photo_url,
+        age: p?.age_years,
+        gender: p?.gender,
+        village: p?.village
+      } as any;
+    });
+  }, [rawQueueItems, patientsCache]);
+
+  const { isMobile, isTablet } = useResponsiveLayout();
 
   const grouped = useMemo(() => {
-    const g: any = { VITALS: [], DOCTOR: [], PHARMACY: [] };
+    const g: any = { VITALS1: [], VITALS2: [], VITALS3: [], DOCTOR: [], PHARMACY: [] };
     queuePatients.forEach(p => {
-      if (p.encounterStatus === 'WAITING_FOR_VITALS' || p.encounterStatus === 'REGISTERED') g.VITALS.push(p);
+      if (p.encounterStatus === 'WAITING_FOR_VITALS' || p.encounterStatus === 'REGISTERED') g.VITALS1.push(p);
+      else if (p.encounterStatus === 'WAITING_FOR_VITALS_2') g.VITALS2.push(p);
+      else if (p.encounterStatus === 'WAITING_FOR_VITALS_3') g.VITALS3.push(p);
       else if (p.encounterStatus === 'READY_FOR_DOCTOR' || p.encounterStatus === 'IN_CONSULTATION') g.DOCTOR.push(p);
       else if (p.encounterStatus === 'WAITING_FOR_PHARMACY') g.PHARMACY.push(p);
     });
@@ -100,18 +121,28 @@ const QueueBoard: React.FC<{ countryId: string }> = ({ countryId }) => {
     <StationLayout title="Live Station Queue" stationName="Queue" showPatientContext={false}
       actions={<IconButton onClick={() => window.location.reload()} color="primary"><RefreshIcon /></IconButton>}
     >
-      <Grid container spacing={3} sx={{ flexGrow: 1, minHeight: 'calc(100vh - 250px)' }}>
-        <Grid item xs={12} md={4}>
-          <QueueColumn title="VITALS STATION" headerColor="#f3e5f5" patients={grouped.VITALS} onPatientClick={setSelectedPatient} loading={loading} />
+      <Grid container spacing={2} sx={{ flexGrow: 1, minHeight: 'calc(100vh - 250px)' }}>
+        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+          <QueueColumn title="BODY MEASURES" headerColor="#f3e5f5" patients={grouped.VITALS1} onPatientClick={setSelectedPatient} loading={loading} />
         </Grid>
-        <Grid item xs={12} md={4}>
-          <QueueColumn title="DOCTOR CONSULTATION" headerColor="#e8f5e9" patients={grouped.DOCTOR} onPatientClick={setSelectedPatient} loading={loading} />
+        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+          <QueueColumn title={isMobile || isTablet ? "VITALS" : "VITAL SIGNS"} headerColor="#f3e5f5" patients={grouped.VITALS2} onPatientClick={setSelectedPatient} loading={loading} />
         </Grid>
-        <Grid item xs={12} md={4}>
-          <QueueColumn title="PHARMACY DISPENSING" headerColor="#fff3e0" patients={grouped.PHARMACY} onPatientClick={setSelectedPatient} loading={loading} />
+        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+          <QueueColumn title="LABS & RISK" headerColor="#f3e5f5" patients={grouped.VITALS3} onPatientClick={setSelectedPatient} loading={loading} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+          <QueueColumn title="DOCTOR" headerColor="#e8f5e9" patients={grouped.DOCTOR} onPatientClick={setSelectedPatient} loading={loading} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+          <QueueColumn title="PHARMACY" headerColor="#fff3e0" patients={grouped.PHARMACY} onPatientClick={setSelectedPatient} loading={loading} />
         </Grid>
       </Grid>
-      <QueuePatientDetailDrawer patient={selectedPatient} onClose={() => setSelectedPatient(null)} />
+      <QueuePatientDetailDrawer patient={selectedPatient} onClose={() => setSelectedPatient(null)} onMove={(encounterId, nextStatus) => {
+        // For now, just close the drawer and reload
+        setSelectedPatient(null);
+        window.location.reload();
+      }} />
     </StationLayout>
   );
 };

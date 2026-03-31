@@ -59,7 +59,6 @@ export const createEncounter = async (patient_id: string) => {
       encounter_status: 'WAITING_FOR_VITALS',
       status: 'WAITING_FOR_VITALS',
       current_station: 'registration',
-      country_code: selectedCountry.id,
       country_id: selectedCountry.id,
       clinic_id: selectedClinic.id,
       created_at: serverTimestamp(),
@@ -96,8 +95,8 @@ export const createEncounter = async (patient_id: string) => {
  * and trigger automated Requisitions for non-inventory items.
  */
 export const saveConsultation = async (
-  diagnosisData: Omit<DiagnosisRecord, 'id' | 'created_at' | 'country_code' | 'clinic_id'>,
-  prescriptionData?: Omit<PrescriptionRecord, 'id' | 'created_at' | 'status' | 'country_code' | 'clinic_id'>
+  diagnosisData: Omit<DiagnosisRecord, 'id' | 'created_at' | 'country_id' | 'clinic_id'>,
+  prescriptionData?: Omit<PrescriptionRecord, 'id' | 'created_at' | 'status' | 'country_id' | 'clinic_id'>
 ) => {
   const { selectedClinic } = getSession();
   if (!selectedClinic) throw new Error("Clinic not selected");
@@ -117,7 +116,7 @@ export const saveConsultation = async (
 
     // Logging the successful hand-off for audit purposes
     await logAction({
-      action: 'CONSULTATION_SAVED_VIA_CLOUD_FUNCTION',
+      action: 'DIAGNOSIS_CREATED',
       encounter_id: diagnosisData.encounter_id,
       patient_id: diagnosisData.patient_id
     });
@@ -194,18 +193,38 @@ export const updateEncounterStatus = async (encounterId: string, status: Encount
   });
 };
 
-export const saveVitals = async (vitalsData: Omit<VitalsRecord, 'id' | 'created_at' | 'country_code' | 'clinic_id'>) => {
+export const saveVitals = async (
+  vitalsData: Omit<VitalsRecord, 'id' | 'created_at' | 'country_id' | 'clinic_id'>,
+  nextStatus: EncounterStatus = 'READY_FOR_DOCTOR'
+) => {
   const { selectedCountry, selectedClinic } = getSession();
   if (!selectedClinic) throw new Error("Clinic not selected");
 
-  await addDoc(collection(db, VITALS_COLLECTION), {
-    ...vitalsData,
-    country_code: selectedCountry.id,
-    country_id: selectedCountry.id,
-    clinic_id: selectedClinic.id,
-    created_at: serverTimestamp(),
-    updated_at: serverTimestamp()
-  });
+  // Check if vitals already exist for this encounter
+  const q = query(
+    collection(db, VITALS_COLLECTION),
+    where("encounter_id", "==", vitalsData.encounter_id),
+    limit(1)
+  );
+  const querySnapshot = await getDocs(q);
+  
+  if (!querySnapshot.empty) {
+    // Update existing
+    const docId = querySnapshot.docs[0].id;
+    await updateDoc(doc(db, VITALS_COLLECTION, docId), {
+      ...vitalsData,
+      updated_at: serverTimestamp()
+    });
+  } else {
+    // Create new
+    await addDoc(collection(db, VITALS_COLLECTION), {
+      ...vitalsData,
+      country_id: selectedCountry.id,
+      clinic_id: selectedClinic.id,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp()
+    });
+  }
   
   const encounterRef = doc(db, ENCOUNTERS_COLLECTION, vitalsData.encounter_id);
   const encounterSnap = await getDoc(encounterRef);
@@ -214,13 +233,18 @@ export const saveVitals = async (vitalsData: Omit<VitalsRecord, 'id' | 'created_
   if (clinicId) {
     await updateQueueMetric(clinicId, {
       waiting_for_vitals: -1,
-      ready_for_doctor: 1
+      ready_for_doctor: nextStatus === 'READY_FOR_DOCTOR' ? 1 : 0
     });
   }
 
+  let station = 'vitals';
+  if (nextStatus === 'READY_FOR_DOCTOR' || nextStatus === 'IN_CONSULTATION') station = 'doctor';
+  else if (nextStatus === 'WAITING_FOR_PHARMACY') station = 'pharmacy';
+  else if (nextStatus === 'COMPLETED') station = 'completed';
+
   await updateDoc(encounterRef, {
-    encounter_status: 'READY_FOR_DOCTOR',
-    current_station: 'vitals',
+    encounter_status: nextStatus,
+    current_station: station,
     updated_at: serverTimestamp()
   });
 

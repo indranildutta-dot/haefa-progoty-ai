@@ -76,7 +76,7 @@ const TopBar: React.FC<TopBarProps> = ({ user, onMenuClick, countryName }) => {
             <Tooltip title="Account settings">
               <IconButton onClick={handleMenu} sx={{ p: 0, border: '2px solid transparent', '&:hover': { borderColor: 'primary.light' } }}>
                 <Avatar sx={{ bgcolor: 'primary.main', width: 36, height: 36, fontSize: '1rem' }}>
-                  {user.name.charAt(0)}
+                  {user.name?.charAt(0) || '?'}
                 </Avatar>
               </IconButton>
             </Tooltip>

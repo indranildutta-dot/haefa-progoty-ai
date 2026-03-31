@@ -75,12 +75,12 @@ const QueuePatientDetailDrawer: React.FC<QueuePatientDetailDrawerProps> = ({ pat
       <DialogContent dividers sx={{ p: 3, bgcolor: 'grey.50' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
           <Avatar src={patient.photoUrl} sx={{ width: 80, height: 80, mr: 3, border: '3px solid', borderColor: 'primary.light' }}>
-            {patient.patientName.charAt(0)}
+            {patient.patientName?.charAt(0) || '?'}
           </Avatar>
           <Box>
-            <Typography variant="h5" fontWeight="900" gutterBottom>{patient.patientName}</Typography>
+            <Typography variant="h5" fontWeight="900" gutterBottom>{patient.patientName || 'Unknown Patient'}</Typography>
             <Typography variant="body1" color="text.secondary" fontWeight="bold">
-              Age: {patient.age} | {patient.gender.toUpperCase()} | Village: {patient.village || 'N/A'}
+              Age: {patient.age ?? 'N/A'} | {patient.gender?.toUpperCase() || 'N/A'} | Village: {patient.village || 'N/A'}
             </Typography>
             <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
               <Typography variant="body2" sx={{ bgcolor: 'warning.light', px: 1, py: 0.5, borderRadius: 1, fontWeight: 'bold' }}>
@@ -136,9 +136,15 @@ const QueuePatientDetailDrawer: React.FC<QueuePatientDetailDrawerProps> = ({ pat
         <Button onClick={onClose} color="inherit" sx={{ fontWeight: 'bold' }}>Close</Button>
         <Box sx={{ display: 'flex', gap: 1 }}>
           {patient.encounterStatus === 'REGISTERED' && (
-            <Button variant="contained" color="secondary" onClick={() => handleMove('WAITING_FOR_VITALS')}>Send to Vitals</Button>
+            <Button variant="contained" color="secondary" onClick={() => handleMove('WAITING_FOR_VITALS')}>Send to Body Measures</Button>
           )}
           {patient.encounterStatus === 'WAITING_FOR_VITALS' && (
+            <Button variant="contained" color="primary" onClick={() => handleMove('WAITING_FOR_VITALS_2')}>Send to Vital Signs</Button>
+          )}
+          {patient.encounterStatus === 'WAITING_FOR_VITALS_2' && (
+            <Button variant="contained" color="primary" onClick={() => handleMove('WAITING_FOR_VITALS_3')}>Send to Labs & Risk</Button>
+          )}
+          {patient.encounterStatus === 'WAITING_FOR_VITALS_3' && (
             <Button variant="contained" color="primary" onClick={() => handleMove('READY_FOR_DOCTOR')}>Send to Doctor</Button>
           )}
           {(patient.encounterStatus === 'READY_FOR_DOCTOR' || patient.encounterStatus === 'IN_CONSULTATION') && (

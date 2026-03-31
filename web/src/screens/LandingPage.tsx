@@ -156,7 +156,7 @@ const LandingPage: React.FC = () => {
 
           <Grid container spacing={3}>
             {countries.map((country, index) => (
-              <Grid item xs={12} sm={6} key={country.id}>
+              <Grid size={{ xs: 12, sm: 6 }} key={country.id}>
                 <motion.div
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}

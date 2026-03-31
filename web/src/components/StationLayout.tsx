@@ -59,9 +59,10 @@ const StationLayout: React.FC<StationLayoutProps> = ({
   const navItems = [
     { label: 'Reg', to: '/registration', icon: <PersonAddIcon /> },
     { label: 'Queue', to: '/queue', icon: <DashboardIcon /> },
-    { label: 'Vitals', to: '/vitals', icon: <LocalHospitalIcon /> },
-    { label: 'Doctor', to: '/doctor', icon: <AssignmentIcon /> },
-    { label: 'Pharmacy', to: '/pharmacy', icon: <MedicationIcon /> },
+    { label: 'Body Measures', to: '/vitals-1', icon: <LocalHospitalIcon /> },
+    { label: 'Vitals', to: '/vitals-2', icon: <LocalHospitalIcon /> },
+    { label: 'Labs', to: '/labs-and-risk', icon: <LocalHospitalIcon /> },
+    { label: 'Doc', to: '/doctor', icon: <AssignmentIcon /> },
   ];
 
   return (

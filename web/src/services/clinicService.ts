@@ -4,17 +4,17 @@ import { ClinicConfigDocument } from "../types";
 
 const CLINICS_COLLECTION = "clinics";
 
-export const getClinicConfig = async (countryCode: string, clinicId: string): Promise<ClinicConfigDocument | null> => {
+export const getClinicConfig = async (countryId: string, clinicId: string): Promise<ClinicConfigDocument | null> => {
   const q = query(
     collection(db, CLINICS_COLLECTION),
-    where("country_code", "==", countryCode),
+    where("country_id", "==", countryId),
     where("clinic_name", "==", clinicId) // Assuming clinic_name or a specific ID field matches. Let's use doc ID or a field.
   );
   
   // Actually, it's better to use the clinicId as the document ID or query by it.
-  // Let's query by country_code and clinic_name for now, or just fetch the doc if the ID is known.
+  // Let's query by country_id and clinic_name for now, or just fetch the doc if the ID is known.
   // The prompt says: "Create a new Firestore collection called 'clinics'."
-  // Let's assume the document ID is `${countryCode}_${clinicId}` or we just query.
+  // Let's assume the document ID is `${countryId}_${clinicId}` or we just query.
   const snap = await getDocs(q);
   if (!snap.empty) {
     return { id: snap.docs[0].id, ...snap.docs[0].data() } as ClinicConfigDocument;
@@ -22,13 +22,14 @@ export const getClinicConfig = async (countryCode: string, clinicId: string): Pr
   return null;
 };
 
-export const createDefaultClinicConfig = async (countryCode: string, countryName: string, clinicId: string, clinicName: string) => {
-  const docId = `${countryCode}_${clinicId}`;
+export const createDefaultClinicConfig = async (countryId: string, countryName: string, clinicId: string, clinicName: string) => {
+  const docId = `${countryId}_${clinicId}`;
   const docRef = doc(db, CLINICS_COLLECTION, docId);
   
   const defaultConfig: Omit<ClinicConfigDocument, 'id'> = {
+    name: clinicName,
     clinic_name: clinicName,
-    country_code: countryCode,
+    country_id: countryId,
     country_name: countryName,
     timezone: "UTC",
     system_name: "HAEFA Progoty",
@@ -56,8 +57,8 @@ export const createDefaultClinicConfig = async (countryCode: string, countryName
   return { id: docId, ...defaultConfig } as ClinicConfigDocument;
 };
 
-export const getOrCreateClinicConfig = async (countryCode: string, countryName: string, clinicId: string, clinicName: string): Promise<ClinicConfigDocument> => {
-  const docId = `${countryCode}_${clinicId}`;
+export const getOrCreateClinicConfig = async (countryId: string, countryName: string, clinicId: string, clinicName: string): Promise<ClinicConfigDocument> => {
+  const docId = `${countryId}_${clinicId}`;
   const docRef = doc(db, CLINICS_COLLECTION, docId);
   const docSnap = await getDoc(docRef);
   
@@ -65,5 +66,5 @@ export const getOrCreateClinicConfig = async (countryCode: string, countryName: 
     return { id: docSnap.id, ...docSnap.data() } as ClinicConfigDocument;
   }
   
-  return await createDefaultClinicConfig(countryCode, countryName, clinicId, clinicName);
+  return await createDefaultClinicConfig(countryId, countryName, clinicId, clinicName);
 };

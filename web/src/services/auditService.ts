@@ -37,7 +37,7 @@ export const logAction = async (params: {
       action: params.action,
       timestamp: serverTimestamp() as any,
       device_id: getDeviceId(),
-      country_code: selectedCountry.id,
+      country_id: selectedCountry.id,
       clinic_id: selectedClinic.id,
       created_at: serverTimestamp() as any,
       updated_at: serverTimestamp() as any

@@ -1,5 +1,4 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { Box, Typography, Button, Paper } from '@mui/material';
 
 interface Props {
   children: ReactNode;
@@ -24,16 +23,21 @@ class ErrorBoundary extends Component<Props, State> {
     console.error('Uncaught error:', error, errorInfo);
   }
 
+  private handleReset = () => {
+    this.setState({ hasError: false, error: null });
+    window.location.href = '/';
+  };
+
   public render() {
     if (this.state.hasError) {
-      let errorMessage = "An unexpected error occurred.";
+      let errorMessage = 'An unexpected error occurred.';
       let isFirestoreError = false;
-      
+
       try {
         if (this.state.error?.message) {
           const parsed = JSON.parse(this.state.error.message);
           if (parsed.error && parsed.operationType) {
-            errorMessage = `Firestore Permission Error: ${parsed.error} during ${parsed.operationType} on ${parsed.path}`;
+            errorMessage = `Firestore Error: ${parsed.error}`;
             isFirestoreError = true;
           }
         }
@@ -42,28 +46,88 @@ class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <Box sx={{ p: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', bgcolor: '#f5f5f5' }}>
-          <Paper sx={{ p: 4, maxWidth: 600, width: '100%', borderRadius: 4, textAlign: 'center' }}>
-            <Typography variant="h5" color="error" gutterBottom fontWeight="bold">
-              Oops! Something went wrong.
-            </Typography>
-            <Typography variant="body1" sx={{ mb: 3, color: 'text.secondary' }}>
-              {errorMessage}
-            </Typography>
-            {isFirestoreError && (
-              <Typography variant="body2" sx={{ mb: 3, p: 2, bgcolor: '#fff5f5', borderRadius: 2, textAlign: 'left', fontFamily: 'monospace' }}>
-                This usually means your Firebase Security Rules are blocking this action. Please ensure the rules are correctly configured in your Firebase Console.
-              </Typography>
-            )}
-            <Button 
-              variant="contained" 
-              onClick={() => window.location.reload()}
-              sx={{ borderRadius: 2 }}
+        <div style={{ 
+          padding: '40px 20px', 
+          textAlign: 'center', 
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          backgroundColor: '#fef2f2',
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '48px', 
+            borderRadius: '24px', 
+            border: '2px solid #ef4444',
+            maxWidth: '600px',
+            width: '100%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }}>
+            <svg 
+              width="80" 
+              height="80" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="#ef4444" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              style={{ marginBottom: '24px' }}
             >
-              Reload Application
-            </Button>
-          </Paper>
-        </Box>
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <h1 style={{ fontSize: '32px', fontWeight: '900', color: '#991b1b', margin: '0 0 16px 0', letterSpacing: '-0.02em' }}>
+              SYSTEM ERROR
+            </h1>
+            <p style={{ fontSize: '18px', color: '#b91c1c', margin: '0 0 32px 0', fontWeight: '500' }}>
+              {errorMessage}
+            </p>
+            
+            {isFirestoreError && (
+              <div style={{ 
+                marginBottom: '32px', 
+                padding: '16px', 
+                backgroundColor: '#fff', 
+                borderRadius: '8px', 
+                textAlign: 'left', 
+                border: '1px solid #fee2e2',
+                overflowX: 'auto'
+              }}>
+                <span style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '12px', color: '#6b7280', textTransform: 'uppercase' }}>
+                  DIAGNOSTIC INFO:
+                </span>
+                <pre style={{ margin: 0, fontSize: '12px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#7f1d1d', fontFamily: 'monospace' }}>
+                  {this.state.error?.message}
+                </pre>
+              </div>
+            )}
+
+            <button 
+              onClick={this.handleReset}
+              style={{ 
+                height: '60px', 
+                padding: '0 48px', 
+                borderRadius: '12px', 
+                fontWeight: '900', 
+                backgroundColor: '#ef4444',
+                color: 'white',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '16px',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#dc2626')}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#ef4444')}
+            >
+              RESTART APPLICATION
+            </button>
+          </div>
+        </div>
       );
     }
 

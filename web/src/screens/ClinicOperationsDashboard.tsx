@@ -31,6 +31,10 @@ import { countries } from '../config/countries';
 import { QueueItem } from '../types';
 import StationLayout from '../components/StationLayout';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import { 
+  handleFirestoreError, 
+  OperationType 
+} from '../utils/firestoreError';
 
 import ClinicBottleneckPanel from '../components/admin/ClinicBottleneckPanel';
 import PatientFlowFunnel from '../components/admin/PatientFlowFunnel';
@@ -90,24 +94,47 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
-    let pQuery = query(collection(db, 'patients'), where('created_at', '>=', startOfDay));
-    let qQuery = query(collection(db, 'queues_active'), where('created_at', '>=', startOfDay));
-
-    if (scope === 'current_clinic' || scope === 'clinic') {
-      pQuery = query(pQuery, where('clinic_id', '==', selectedScopeId));
-      qQuery = query(qQuery, where('clinic_id', '==', selectedScopeId));
-    } else if (scope === 'country') {
-      pQuery = query(pQuery, where('country_code', '==', selectedScopeId));
-      qQuery = query(qQuery, where('country_code', '==', selectedScopeId));
-    }
+    // Use simple queries that don't require composite indexes
+    const pQuery = query(collection(db, 'patients'), where('created_at', '>=', startOfDay));
+    const qQuery = query(collection(db, 'queues_active'), where('created_at', '>=', startOfDay));
 
     const unsubscribePatients = onSnapshot(pQuery, (snapshot) => {
-      setPatientsData(snapshot.docs.map(doc => doc.data()));
-    }, (error) => console.error("Error fetching patients:", error));
+      const allPatients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+      
+      // Filter in memory to avoid index requirements
+      const filtered = allPatients.filter(p => {
+        if (scope === 'current_clinic' || scope === 'clinic') {
+          return p.clinic_id === selectedScopeId;
+        } else if (scope === 'country') {
+          return p.country_id === selectedScopeId;
+        }
+        return true; // global
+      });
+      
+      setPatientsData(filtered);
+    }, (error) => {
+      console.error("Error fetching patients:", error);
+      handleFirestoreError(error, OperationType.LIST, "patients");
+    });
 
     const unsubscribeQueue = onSnapshot(qQuery, (snapshot) => {
-      setQueueData(snapshot.docs.map(doc => doc.data() as QueueItem));
-    }, (error) => console.error("Error fetching queue:", error));
+      const allQueue = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+      
+      // Filter in memory to avoid index requirements
+      const filtered = allQueue.filter(q => {
+        if (scope === 'current_clinic' || scope === 'clinic') {
+          return q.clinic_id === selectedScopeId;
+        } else if (scope === 'country') {
+          return q.country_id === selectedScopeId;
+        }
+        return true; // global
+      });
+      
+      setQueueData(filtered);
+    }, (error) => {
+      console.error("Error fetching queue:", error);
+      handleFirestoreError(error, OperationType.LIST, "queues_active");
+    });
 
     return () => {
       unsubscribePatients();
@@ -134,7 +161,7 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
     
     // Initialize breakdown with all patients
     patientsData.forEach(p => {
-      const cc = p.country_code;
+      const cc = p.country_id;
       if (!countryBreakdown[cc]) countryBreakdown[cc] = { patientsToday: 0, activeQueue: 0 };
       countryBreakdown[cc].patientsToday++;
     });
@@ -158,7 +185,7 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
         waitTimeCount++;
       }
 
-      const cc = item.country_code;
+      const cc = item.country_id;
       if (!countryBreakdown[cc]) countryBreakdown[cc] = { patientsToday: 0, activeQueue: 0 };
       if (!isCompleted) {
         countryBreakdown[cc].activeQueue++;

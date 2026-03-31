@@ -4,7 +4,7 @@ import { handleFirestoreError, OperationType } from '../utils/firestoreError';
 
 export const updateMetrics = async (
   clinicId: string,
-  countryCode: string,
+  countryId: string,
   updates: {
     patients_today?: number;
     active_queue?: number;
@@ -16,15 +16,14 @@ export const updateMetrics = async (
   const today = new Date().toISOString().split('T')[0];
   
   const clinicRef = doc(db, 'clinic_metrics', `${clinicId}_${today}`);
-  const countryRef = doc(db, 'country_metrics', `${countryCode}_${today}`);
+  const countryRef = doc(db, 'country_metrics', `${countryId}_${today}`);
   const globalRef = doc(db, 'global_metrics', `global_${today}`);
 
   const buildUpdate = (u: any) => {
     const res: any = { 
       last_updated: serverTimestamp(),
       clinic_id: clinicId,
-      country_code: countryCode,
-      country_id: countryCode,
+      country_id: countryId,
       date: today
     };
     if (u.patients_today) res.patients_today = increment(u.patients_today);
@@ -42,7 +41,7 @@ export const updateMetrics = async (
   delete countryUpdateData.clinic_id;
   
   const globalUpdateData = { ...countryUpdateData };
-  delete globalUpdateData.country_code;
+  delete globalUpdateData.country_id;
   
   try {
     await Promise.all([

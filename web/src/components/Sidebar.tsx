@@ -21,6 +21,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import HistoryIcon from '@mui/icons-material/History';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import { NavLink, useLocation } from 'react-router-dom';
 import { UserProfile } from '../types';
 
 const drawerWidth = 240;
@@ -32,42 +33,45 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ user, mobileOpen, onClose }) => {
+  const location = useLocation();
   const getMenuItems = () => {
     if (!user) return [];
 
     switch (user.role) {
       case 'registration':
         return [
-          { text: 'Patient Registration', icon: <PeopleIcon />, path: 'registration' },
-          { text: 'Patient Lookup', icon: <SearchIcon />, path: 'lookup' },
-          { text: 'Queue Overview', icon: <ListAltIcon />, path: 'queue' },
+          { text: 'Patient Registration', icon: <PeopleIcon />, path: '/registration' },
+          { text: 'Patient Lookup', icon: <SearchIcon />, path: '/lookup' },
+          { text: 'Queue Overview', icon: <ListAltIcon />, path: '/queue' },
         ];
       case 'nurse':
         return [
-          { text: 'Vitals Station', icon: <LocalHospitalIcon />, path: 'vitals' },
-          { text: 'Waiting Patients', icon: <PeopleIcon />, path: 'waiting' },
-          { text: 'Queue Overview', icon: <ListAltIcon />, path: 'queue' },
+          { text: 'Body Measures', icon: <LocalHospitalIcon />, path: '/vitals-1' },
+          { text: 'Vital Signs', icon: <LocalHospitalIcon />, path: '/vitals-2' },
+          { text: 'Labs & Risk', icon: <LocalHospitalIcon />, path: '/labs-and-risk' },
+          { text: 'Waiting Patients', icon: <PeopleIcon />, path: '/waiting' },
+          { text: 'Queue Overview', icon: <ListAltIcon />, path: '/queue' },
         ];
       case 'doctor':
         return [
-          { text: 'Doctor Dashboard', icon: <DashboardIcon />, path: 'doctor' },
-          { text: 'Consultation Queue', icon: <AssignmentIcon />, path: 'consultation' },
-          { text: 'Patient History Search', icon: <HistoryIcon />, path: 'history' },
+          { text: 'Doctor Dashboard', icon: <DashboardIcon />, path: '/doctor' },
+          { text: 'Consultation Queue', icon: <AssignmentIcon />, path: '/consultation' },
+          { text: 'Patient History Search', icon: <HistoryIcon />, path: '/history' },
         ];
       case 'pharmacy':
         return [
-          { text: 'Pharmacy Queue', icon: <MedicationIcon />, path: 'pharmacy' },
-          { text: 'Dispense Medication', icon: <MedicationIcon />, path: 'dispense' },
-          { text: 'Completed Prescriptions', icon: <AssignmentIcon />, path: 'completed' },
+          { text: 'Pharmacy Queue', icon: <MedicationIcon />, path: '/pharmacy' },
+          { text: 'Dispense Medication', icon: <MedicationIcon />, path: '/dispense' },
+          { text: 'Completed Prescriptions', icon: <AssignmentIcon />, path: '/completed' },
         ];
       case 'admin':
         return [
-          { text: 'System Dashboard', icon: <DashboardIcon />, path: 'admin' },
-          { text: 'Analytics', icon: <AssessmentIcon />, path: 'analytics' },
-          { text: 'Clinic Settings', icon: <SettingsIcon />, path: 'settings' },
+          { text: 'System Dashboard', icon: <DashboardIcon />, path: '/admin' },
+          { text: 'Analytics', icon: <AssessmentIcon />, path: '/analytics' },
+          { text: 'Clinic Settings', icon: <SettingsIcon />, path: '/settings' },
         ];
       default:
-        return [{ text: 'Dashboard', icon: <DashboardIcon />, path: 'dashboard' }];
+        return [{ text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' }];
     }
   };
 
@@ -86,8 +90,15 @@ const Sidebar: React.FC<SidebarProps> = ({ user, mobileOpen, onClose }) => {
           {menuItems.map((item) => (
             <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton 
+                component={NavLink}
+                to={item.path}
+                onClick={onClose}
                 sx={{ 
                   borderRadius: 2,
+                  '&.active': {
+                    backgroundColor: 'primary.main',
+                    '& .MuiListItemIcon-root, & .MuiListItemText-primary': { color: 'primary.contrastText' }
+                  },
                   '&:hover': { backgroundColor: 'primary.light', '& .MuiListItemIcon-root, & .MuiListItemText-primary': { color: 'primary.contrastText' } }
                 }}
               >

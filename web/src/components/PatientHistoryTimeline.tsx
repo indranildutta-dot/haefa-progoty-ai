@@ -15,7 +15,8 @@ import {
   Chip,
   IconButton,
   Grid,
-  Tooltip
+  Tooltip,
+  Paper
 } from '@mui/material';
 import HistoryIcon from '@mui/icons-material/History';
 import LocalPrintshopIcon from '@mui/icons-material/LocalPrintshop';
@@ -219,7 +220,7 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
                 </Box>
                 
                 <Grid container spacing={3} sx={{ mt: 1 }}>
-                  <Grid item xs={12} md={4}>
+                  <Grid size={{ xs: 12, md: 4 }}>
                     <Typography variant="subtitle2" fontWeight="900" color="text.secondary">VITAL SIGNS & TRIAGE</Typography>
                     <Paper variant="outlined" sx={{ p: 2, mt: 1, borderRadius: 2 }}>
                       <Typography variant="body2">BP: <strong>{item.vitals?.systolic}/{item.vitals?.diastolic}</strong></Typography>
@@ -233,7 +234,7 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
                     </Paper>
                   </Grid>
                   
-                  <Grid item xs={12} md={8}>
+                  <Grid size={{ xs: 12, md: 8 }}>
                     <Typography variant="subtitle2" fontWeight="900" color="text.secondary">CLINICAL ASSESSMENT</Typography>
                     <Box sx={{ mt: 1 }}>
                       <Typography variant="body1" fontWeight="800">{item.diagnosis?.diagnosis}</Typography>
