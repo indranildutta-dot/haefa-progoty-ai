@@ -8,10 +8,12 @@ import { Timestamp } from "firebase-admin/firestore";
 import * as crypto from "crypto";
 
 // Initialize Admin SDK once
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-const db = admin.firestore();
+const getDb = () => {
+  if (!admin.apps.length) {
+    admin.initializeApp();
+  }
+  return admin.firestore();
+};
 
 // ==========================================
 // CONFIGURATION & GLOBAL SETTINGS
@@ -86,7 +88,7 @@ export const syncUserPermissions = onCall(
       }
       const uid = userRecord.uid;
       await admin.auth().setCustomUserClaims(uid, { role });
-      await db.collection("users").doc(uid).set({
+      await getDb().collection("users").doc(uid).set({
         email, role, countryCode: countryCode || null,
         assignedCountries: assignedCountries || [],
         assignedClinics: assignedClinics || [],
@@ -113,7 +115,7 @@ export const deleteUser = onCall(
     }
     try {
       await admin.auth().deleteUser(uid);
-      await db.collection("users").doc(uid).delete();
+      await getDb().collection("users").doc(uid).delete();
       return { success: true };
     } catch (error: any) {
       throw new HttpsError("internal", error.message);
@@ -130,6 +132,7 @@ export const wipeTestData = onCall(
 
     const collections = ["patients", "encounters", "queues_active", "requisitions", "procurement_requests"];
     let totalDeleted = 0;
+    const db = getDb();
 
     for (const colName of collections) {
       let hasMore = true;
@@ -160,6 +163,7 @@ export const wipeDemoData = onCall(
       throw new HttpsError("permission-denied", "Unauthorized.");
     }
     const collectionsToWipe = ["patients", "encounters", "queues_active", "requisitions"];
+    const db = getDb();
     try {
       for (const colName of collectionsToWipe) {
         const snapshot = await db.collection(colName).get();
@@ -200,9 +204,9 @@ export const initClinics = onCall(
     };
 
     try {
-      const batch = db.batch();
+      const batch = getDb().batch();
       clinicsToCreate.forEach((clinic) => {
-        const docRef = db.collection('clinics').doc(clinic.id);
+        const docRef = getDb().collection('clinics').doc(clinic.id);
         batch.set(docRef, { ...clinic, ...commonSettings }, { merge: true });
       });
       await batch.commit();
@@ -239,20 +243,20 @@ export const registerPatient = onCall(
         photoUrl = signedUrls[0];
       }
       
-      const batch = db.batch();
-      batch.set(db.collection("patients").doc(patientId), { 
+      const batch = getDb().batch();
+      batch.set(getDb().collection("patients").doc(patientId), { 
         ...sanitizeData(patientData), 
         photo_url: photoUrl, 
         created_at: new Date() 
       });
       
-      batch.set(db.collection("encounters").doc(encounterId), { 
+      batch.set(getDb().collection("encounters").doc(encounterId), { 
         patient_id: patientId, clinic_id: clinicId, country_code: countryCode, 
         status: 'WAITING_FOR_VITALS', created_at: new Date() 
       });
       
       const fullName = `${patientData.given_name || ''} ${patientData.family_name || ''}`.trim();
-      batch.set(db.collection("queues_active").doc(), { 
+      batch.set(getDb().collection("queues_active").doc(), { 
         encounter_id: encounterId, patient_id: patientId, patient_name: fullName, 
         station: 'vitals', status: 'WAITING_FOR_VITALS', clinic_id: clinicId, 
         country_code: countryCode, created_at: new Date(), updated_at: new Date() 
@@ -271,6 +275,7 @@ export const saveConsultation = onCall(
   async (request: any) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
     const { encounterId, patientId, clinicId, prescriptions, diagnosis, notes } = request.data;
+    const db = getDb();
     
     // Optimization: Check the queue existence before the heavy transaction
     const qSnap = await db.collection("queues_active").where("encounter_id", "==", encounterId).get();
@@ -320,6 +325,7 @@ export const dispenseMedication = onCall(
   async (request: any) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
     const { clinicId, medications, encounterId, patientId } = request.data;
+    const db = getDb();
 
     return await db.runTransaction(async (transaction) => {
       const results: any[] = [];
@@ -331,49 +337,49 @@ export const dispenseMedication = onCall(
         
         let actualDeducted = 0;
 
-        if (mode !== 'OUT_OF_STOCK') {
-          const inventoryRef = db.collection(`clinics/${clinicId}/inventory`);
-          const q = inventoryRef.where("med_id_lower", "==", medIdLower);
-          const snapshot = await transaction.get(q);
+      if (mode !== 'OUT_OF_STOCK') {
+        const inventoryRef = db.collection(`clinics/${clinicId}/inventory`);
+        const q = inventoryRef.where("med_id_lower", "==", medIdLower);
+        const snapshot = await transaction.get(q);
 
-          let remaining = Number(qty);
-          for (const doc of snapshot.docs) {
-            if (remaining <= 0) break;
-            const available = Number(doc.data().quantity) || 0;
-            const toTake = Math.min(available, remaining);
-            const newQty = available - toTake;
-            
-            transaction.update(doc.ref, { quantity: newQty });
-            actualDeducted += toTake;
-            remaining -= toTake;
+        let remaining = Number(qty);
+        for (const doc of snapshot.docs) {
+          if (remaining <= 0) break;
+          const available = Number(doc.data().quantity) || 0;
+          const toTake = Math.min(available, remaining);
+          const newQty = available - toTake;
+          
+          transaction.update(doc.ref, { quantity: newQty });
+          actualDeducted += toTake;
+          remaining -= toTake;
 
-            if (newQty < REQUISITION_THRESHOLD) {
-              transaction.set(db.collection("requisitions").doc(), {
-                clinic_id: clinicId, medication_name: targetMedName,
-                current_stock: newQty, type: 'LOW_STOCK_ALERT', status: 'PENDING',
-                created_at: admin.firestore.FieldValue.serverTimestamp()
-              });
-            }
+          if (newQty < REQUISITION_THRESHOLD) {
+            transaction.set(db.collection("requisitions").doc(), {
+              clinic_id: clinicId, medication_name: targetMedName,
+              current_stock: newQty, type: 'LOW_STOCK_ALERT', status: 'PENDING',
+              created_at: admin.firestore.FieldValue.serverTimestamp()
+            });
           }
         }
-
-        if (mode === 'PARTIAL' || mode === 'OUT_OF_STOCK') {
-          transaction.set(db.collection("requisitions").doc(), {
-            clinic_id: clinicId, patient_id: patientId, medication_name: medication_name,
-            type: 'PATIENT_IOU_SHORTFALL', status: 'WAITING_FOR_STOCK',
-            return_date: return_on || null, encounter_id: encounterId,
-            created_at: admin.firestore.FieldValue.serverTimestamp()
-          });
-        }
-        results.push({ medication: medication_name, dispensed: actualDeducted });
       }
 
-      transaction.update(db.collection("encounters").doc(encounterId), { 
-        status: 'COMPLETED', last_updated: admin.firestore.FieldValue.serverTimestamp() 
-      });
-      return { success: true, summary: results };
+      if (mode === 'PARTIAL' || mode === 'OUT_OF_STOCK') {
+        transaction.set(db.collection("requisitions").doc(), {
+          clinic_id: clinicId, patient_id: patientId, medication_name: medication_name,
+          type: 'PATIENT_IOU_SHORTFALL', status: 'WAITING_FOR_STOCK',
+          return_date: return_on || null, encounter_id: encounterId,
+          created_at: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
+      results.push({ medication: medication_name, dispensed: actualDeducted });
+    }
+
+    transaction.update(db.collection("encounters").doc(encounterId), { 
+      status: 'COMPLETED', last_updated: admin.firestore.FieldValue.serverTimestamp() 
     });
-  }
+    return { success: true, summary: results };
+  });
+}
 );
 
 /**
@@ -390,6 +396,7 @@ export const bulkUpload = onCall(
     
     await workbook.xlsx.load(Buffer.from(fileBase64, 'base64') as any);
     const worksheet = workbook.getWorksheet(1);
+    const db = getDb();
     const batch = db.batch();
     
     worksheet?.eachRow((row, rowNumber) => {
@@ -435,6 +442,7 @@ export const getInventoryTemplate = onCall(
 
 export const stockAlerts = onSchedule("every 24 hours", async (event: ScheduledEvent) => {
   const ninetyDays = new Date(); ninetyDays.setDate(ninetyDays.getDate() + 90);
+  const db = getDb();
   const clinics = await db.collection("clinics").get();
   for (const doc of clinics.docs) {
     const expiring = await db.collection(`clinics/${doc.id}/inventory`).where("expiry_date", "<=", Timestamp.fromDate(ninetyDays)).where("quantity", ">", 0).get();
