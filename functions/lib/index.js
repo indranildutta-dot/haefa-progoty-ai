@@ -36,60 +36,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.stockAlerts = exports.getInventoryTemplate = exports.bulkUpload = exports.dispenseMedication = exports.saveConsultation = exports.registerPatient = exports.initClinics = exports.wipeDemoData = exports.wipeTestData = exports.deleteUser = exports.syncUserPermissions = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
-let adminCache = null;
-const getAdmin = async () => {
-    if (!adminCache) {
-        adminCache = await Promise.resolve().then(() => __importStar(require("firebase-admin")));
-        if (!adminCache.apps.length) {
-            adminCache.initializeApp();
-        }
-    }
-    return adminCache;
-};
-const getDb = async () => {
-    const admin = await getAdmin();
-    return admin.firestore();
-};
-const getCrypto = async () => {
-    return await Promise.resolve().then(() => __importStar(require("crypto")));
-};
-const SUPER_ADMIN_EMAILS = [
-    'indranil_dutta@haefa.org',
-    'ruhul_abid@haefa.org'
-];
-const REQUISITION_THRESHOLD = 500;
-const checkIsGlobalAdmin = (auth) => {
-    if (!auth)
-        return false;
-    const email = auth.token.email?.toLowerCase();
-    const role = auth.token.role;
-    return SUPER_ADMIN_EMAILS.includes(email) || role === 'global_admin';
-};
-const generateId = async () => {
-    try {
-        const crypto = await getCrypto();
-        return crypto.randomUUID();
-    }
-    catch (e) {
-        return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    }
-};
-const sanitizeData = (data) => {
-    if (!data || typeof data !== 'object')
-        return {};
-    const sanitized = {};
-    for (const key in data) {
-        if (Object.prototype.hasOwnProperty.call(data, key)) {
-            const value = data[key];
-            if (value !== undefined && value !== null) {
-                sanitized[key] = value;
-            }
-        }
-    }
-    return sanitized;
-};
-exports.syncUserPermissions = (0, https_1.onCall)({ region: "us-central1", maxInstances: 10 }, async (request) => {
-    if (!checkIsGlobalAdmin(request.auth)) {
+const v2_1 = require("firebase-functions/v2");
+const utils_1 = require("./utils");
+(0, v2_1.setGlobalOptions)({
+    region: "us-central1",
+    maxInstances: 10
+});
+exports.syncUserPermissions = (0, https_1.onCall)(async (request) => {
+    if (!request.auth || !(0, utils_1.checkIsGlobalAdmin)(request.auth)) {
         throw new https_1.HttpsError("permission-denied", "Unauthorized: Global Admin required.");
     }
     const { email, role, countryCode, assignedCountries, assignedClinics, isApproved } = request.data;
@@ -97,8 +51,8 @@ exports.syncUserPermissions = (0, https_1.onCall)({ region: "us-central1", maxIn
         throw new https_1.HttpsError("invalid-argument", "Missing email or role.");
     }
     try {
-        const admin = await getAdmin();
-        const db = await getDb();
+        const admin = await (0, utils_1.getAdmin)();
+        const db = await (0, utils_1.getDb)();
         let userRecord;
         try {
             userRecord = await admin.auth().getUserByEmail(email);
@@ -126,8 +80,8 @@ exports.syncUserPermissions = (0, https_1.onCall)({ region: "us-central1", maxIn
         throw new https_1.HttpsError("internal", error.message);
     }
 });
-exports.deleteUser = (0, https_1.onCall)({ region: "us-central1" }, async (request) => {
-    if (!checkIsGlobalAdmin(request.auth)) {
+exports.deleteUser = (0, https_1.onCall)(async (request) => {
+    if (!request.auth || !(0, utils_1.checkIsGlobalAdmin)(request.auth)) {
         throw new https_1.HttpsError("permission-denied", "Unauthorized.");
     }
     const { uid } = request.data;
@@ -137,8 +91,8 @@ exports.deleteUser = (0, https_1.onCall)({ region: "us-central1" }, async (reque
         throw new https_1.HttpsError("failed-precondition", "You cannot delete yourself.");
     }
     try {
-        const admin = await getAdmin();
-        const db = await getDb();
+        const admin = await (0, utils_1.getAdmin)();
+        const db = await (0, utils_1.getDb)();
         await admin.auth().deleteUser(uid);
         await db.collection("users").doc(uid).delete();
         return { success: true };
@@ -147,36 +101,36 @@ exports.deleteUser = (0, https_1.onCall)({ region: "us-central1" }, async (reque
         throw new https_1.HttpsError("internal", error.message);
     }
 });
-exports.wipeTestData = (0, https_1.onCall)({ region: "us-central1", timeoutSeconds: 540, memory: "1GiB" }, async (request) => {
-    if (!checkIsGlobalAdmin(request.auth)) {
+exports.wipeTestData = (0, https_1.onCall)({ timeoutSeconds: 540, memory: "1GiB" }, async (request) => {
+    if (!request.auth || !(0, utils_1.checkIsGlobalAdmin)(request.auth)) {
         throw new https_1.HttpsError("permission-denied", "Unauthorized.");
     }
     const collections = ["patients", "encounters", "queues_active", "requisitions", "procurement_requests"];
     let totalDeleted = 0;
-    const db = await getDb();
+    const db = await (0, utils_1.getDb)();
     for (const colName of collections) {
         let hasMore = true;
         while (hasMore) {
-            const querySnapshot = await db.collection(colName).limit(500).get();
-            if (querySnapshot.empty) {
+            const snapshot = await db.collection(colName).limit(500).get();
+            if (snapshot.empty) {
                 hasMore = false;
-                break;
             }
-            const batch = db.batch();
-            querySnapshot.docs.forEach((doc) => batch.delete(doc.ref));
-            await batch.commit();
-            totalDeleted += querySnapshot.size;
-            await new Promise(resolve => setTimeout(resolve, 50));
+            else {
+                const batch = db.batch();
+                snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+                await batch.commit();
+                totalDeleted += snapshot.size;
+            }
         }
     }
     return { success: true, deletedCount: totalDeleted };
 });
-exports.wipeDemoData = (0, https_1.onCall)({ region: "us-central1" }, async (request) => {
-    if (!checkIsGlobalAdmin(request.auth)) {
+exports.wipeDemoData = (0, https_1.onCall)({ timeoutSeconds: 540 }, async (request) => {
+    if (!request.auth || !(0, utils_1.checkIsGlobalAdmin)(request.auth)) {
         throw new https_1.HttpsError("permission-denied", "Unauthorized.");
     }
     const collectionsToWipe = ["patients", "encounters", "queues_active", "requisitions"];
-    const db = await getDb();
+    const db = await (0, utils_1.getDb)();
     try {
         for (const colName of collectionsToWipe) {
             const snapshot = await db.collection(colName).get();
@@ -190,15 +144,14 @@ exports.wipeDemoData = (0, https_1.onCall)({ region: "us-central1" }, async (req
         throw new https_1.HttpsError("internal", error.message);
     }
 });
-exports.initClinics = (0, https_1.onCall)({ region: "us-central1" }, async (request) => {
-    if (!checkIsGlobalAdmin(request.auth)) {
+exports.initClinics = (0, https_1.onCall)(async (request) => {
+    if (!request.auth || !(0, utils_1.checkIsGlobalAdmin)(request.auth)) {
         throw new https_1.HttpsError("permission-denied", "Unauthorized.");
     }
     const clinicsToCreate = [
-        { id: 'BD-01', name: 'Dhaka Clinic', country: 'Bangladesh', code: 'BD', currency: 'BDT' },
-        { id: 'BD-02', name: 'Cox’s Bazar Clinic', country: 'Bangladesh', code: 'BD', currency: 'BDT' },
-        { id: 'SB-01', name: 'SL Island 1', country: 'Solomon Islands', code: 'SB', currency: 'SBD' },
-        { id: 'NP-01', name: 'Kathmandu 1', country: 'Nepal', code: 'NP', currency: 'NPR' }
+        { id: 'dhaka-main', name: 'Dhaka Main Clinic', country: 'Bangladesh', countryCode: 'BD' },
+        { id: 'cox-bazar', name: 'Cox\'s Bazar Relief Center', country: 'Bangladesh', countryCode: 'BD' },
+        { id: 'kutupalong', name: 'Kutupalong Camp Clinic', country: 'Bangladesh', countryCode: 'BD' }
     ];
     const commonSettings = {
         max_patients_per_day: 1000,
@@ -209,10 +162,10 @@ exports.initClinics = (0, https_1.onCall)({ region: "us-central1" }, async (requ
             { id: 'consultation', name: 'Doctor Consultation', order: 3 },
             { id: 'pharmacy', name: 'Pharmacy/Dispensing', order: 4 }
         ],
-        created_at: (await getAdmin()).firestore.FieldValue.serverTimestamp()
+        created_at: (await (0, utils_1.getAdmin)()).firestore.FieldValue.serverTimestamp()
     };
     try {
-        const db = await getDb();
+        const db = await (0, utils_1.getDb)();
         const batch = db.batch();
         clinicsToCreate.forEach((clinic) => {
             const docRef = db.collection('clinics').doc(clinic.id);
@@ -225,16 +178,17 @@ exports.initClinics = (0, https_1.onCall)({ region: "us-central1" }, async (requ
         throw new https_1.HttpsError("internal", error.message);
     }
 });
-exports.registerPatient = (0, https_1.onCall)({ region: "us-central1" }, async (request) => {
-    const data = request.data || {};
-    const { patientData, photoBase64, clinicId, countryCode } = data;
+exports.registerPatient = (0, https_1.onCall)(async (request) => {
+    if (!request.auth)
+        throw new https_1.HttpsError("unauthenticated", "Login required.");
+    const { patientData, photoBase64, clinicId, countryCode } = request.data;
     if (!patientData || !clinicId || !countryCode) {
         throw new https_1.HttpsError("invalid-argument", "Missing registration data");
     }
     try {
-        const crypto = await getCrypto();
-        const admin = await getAdmin();
-        const db = await getDb();
+        const crypto = await (0, utils_1.getCrypto)();
+        const admin = await (0, utils_1.getAdmin)();
+        const db = await (0, utils_1.getDb)();
         const patientId = crypto.randomUUID();
         const encounterId = crypto.randomUUID();
         let photoUrl = "";
@@ -248,7 +202,7 @@ exports.registerPatient = (0, https_1.onCall)({ region: "us-central1" }, async (
         }
         const batch = db.batch();
         batch.set(db.collection("patients").doc(patientId), {
-            ...sanitizeData(patientData),
+            ...(0, utils_1.sanitizeData)(patientData),
             photo_url: photoUrl,
             created_at: new Date()
         });
@@ -269,12 +223,12 @@ exports.registerPatient = (0, https_1.onCall)({ region: "us-central1" }, async (
         throw new https_1.HttpsError("internal", error.message);
     }
 });
-exports.saveConsultation = (0, https_1.onCall)({ region: "us-central1" }, async (request) => {
+exports.saveConsultation = (0, https_1.onCall)(async (request) => {
     if (!request.auth)
         throw new https_1.HttpsError("unauthenticated", "Login required.");
     const { encounterId, patientId, clinicId, prescriptions, diagnosis, notes } = request.data;
-    const db = await getDb();
-    const admin = await getAdmin();
+    const db = await (0, utils_1.getDb)();
+    const admin = await (0, utils_1.getAdmin)();
     const qSnap = await db.collection("queues_active").where("encounter_id", "==", encounterId).get();
     return await db.runTransaction(async (transaction) => {
         const encounterRef = db.collection("encounters").doc(encounterId);
@@ -306,12 +260,12 @@ exports.saveConsultation = (0, https_1.onCall)({ region: "us-central1" }, async 
         return { success: true };
     });
 });
-exports.dispenseMedication = (0, https_1.onCall)({ region: "us-central1" }, async (request) => {
+exports.dispenseMedication = (0, https_1.onCall)(async (request) => {
     if (!request.auth)
         throw new https_1.HttpsError("unauthenticated", "Login required.");
     const { clinicId, medications, encounterId, patientId } = request.data;
-    const db = await getDb();
-    const admin = await getAdmin();
+    const db = await (0, utils_1.getDb)();
+    const admin = await (0, utils_1.getAdmin)();
     return await db.runTransaction(async (transaction) => {
         const results = [];
         for (const med of medications) {
@@ -333,7 +287,7 @@ exports.dispenseMedication = (0, https_1.onCall)({ region: "us-central1" }, asyn
                     transaction.update(doc.ref, { quantity: newQty });
                     actualDeducted += toTake;
                     remaining -= toTake;
-                    if (newQty < REQUISITION_THRESHOLD) {
+                    if (newQty < utils_1.REQUISITION_THRESHOLD) {
                         transaction.set(db.collection("requisitions").doc(), {
                             clinic_id: clinicId, medication_name: targetMedName,
                             current_stock: newQty, type: 'LOW_STOCK_ALERT', status: 'PENDING',
@@ -358,14 +312,14 @@ exports.dispenseMedication = (0, https_1.onCall)({ region: "us-central1" }, asyn
         return { success: true, summary: results };
     });
 });
-exports.bulkUpload = (0, https_1.onCall)({ region: "us-central1" }, async (request) => {
+exports.bulkUpload = (0, https_1.onCall)(async (request) => {
     const { clinicId, fileBase64 } = request.data;
     const ExcelJS = await Promise.resolve().then(() => __importStar(require('exceljs')));
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(Buffer.from(fileBase64, 'base64'));
     const worksheet = workbook.getWorksheet(1);
-    const db = await getDb();
-    const admin = await getAdmin();
+    const db = await (0, utils_1.getDb)();
+    const admin = await (0, utils_1.getAdmin)();
     const batch = db.batch();
     worksheet?.eachRow((row, rowNumber) => {
         if (rowNumber === 1)
@@ -386,7 +340,7 @@ exports.bulkUpload = (0, https_1.onCall)({ region: "us-central1" }, async (reque
     await batch.commit();
     return { success: true };
 });
-exports.getInventoryTemplate = (0, https_1.onCall)({ region: "us-central1" }, async (request) => {
+exports.getInventoryTemplate = (0, https_1.onCall)(async (request) => {
     const ExcelJS = await Promise.resolve().then(() => __importStar(require('exceljs')));
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Inventory Template');
@@ -405,7 +359,7 @@ exports.getInventoryTemplate = (0, https_1.onCall)({ region: "us-central1" }, as
 exports.stockAlerts = (0, scheduler_1.onSchedule)("every 24 hours", async (event) => {
     const ninetyDays = new Date();
     ninetyDays.setDate(ninetyDays.getDate() + 90);
-    const db = await getDb();
+    const db = await (0, utils_1.getDb)();
     const { Timestamp } = await Promise.resolve().then(() => __importStar(require("firebase-admin/firestore")));
     const clinics = await db.collection("clinics").get();
     for (const doc of clinics.docs) {
