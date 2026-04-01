@@ -46,7 +46,7 @@ exports.syncUserPermissions = (0, https_1.onCall)(async (request) => {
     if (!request.auth || !(0, utils_1.checkIsGlobalAdmin)(request.auth)) {
         throw new https_1.HttpsError("permission-denied", "Unauthorized: Global Admin required.");
     }
-    const { email, role, countryCode, assignedCountries, assignedClinics, isApproved } = request.data;
+    const { email, role, country_id, assignedCountries, assignedClinics, isApproved } = request.data;
     if (!email || !role) {
         throw new https_1.HttpsError("invalid-argument", "Missing email or role.");
     }
@@ -68,7 +68,7 @@ exports.syncUserPermissions = (0, https_1.onCall)(async (request) => {
         const uid = userRecord.uid;
         await admin.auth().setCustomUserClaims(uid, { role });
         await db.collection("users").doc(uid).set({
-            email, role, countryCode: countryCode || null,
+            email, role, country_id: country_id || null,
             assignedCountries: assignedCountries || [],
             assignedClinics: assignedClinics || [],
             isApproved: isApproved ?? false,
@@ -149,9 +149,9 @@ exports.initClinics = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError("permission-denied", "Unauthorized.");
     }
     const clinicsToCreate = [
-        { id: 'dhaka-main', name: 'Dhaka Main Clinic', country: 'Bangladesh', countryCode: 'BD' },
-        { id: 'cox-bazar', name: 'Cox\'s Bazar Relief Center', country: 'Bangladesh', countryCode: 'BD' },
-        { id: 'kutupalong', name: 'Kutupalong Camp Clinic', country: 'Bangladesh', countryCode: 'BD' }
+        { id: 'dhaka-main', name: 'Dhaka Main Clinic', country: 'Bangladesh', country_id: 'BD' },
+        { id: 'cox-bazar', name: 'Cox\'s Bazar Relief Center', country: 'Bangladesh', country_id: 'BD' },
+        { id: 'kutupalong', name: 'Kutupalong Camp Clinic', country: 'Bangladesh', country_id: 'BD' }
     ];
     const commonSettings = {
         max_patients_per_day: 1000,
@@ -181,8 +181,8 @@ exports.initClinics = (0, https_1.onCall)(async (request) => {
 exports.registerPatient = (0, https_1.onCall)(async (request) => {
     if (!request.auth)
         throw new https_1.HttpsError("unauthenticated", "Login required.");
-    const { patientData, photoBase64, clinicId, countryCode } = request.data;
-    if (!patientData || !clinicId || !countryCode) {
+    const { patientData, photoBase64, clinicId, country_id } = request.data;
+    if (!patientData || !clinicId || !country_id) {
         throw new https_1.HttpsError("invalid-argument", "Missing registration data");
     }
     try {
@@ -207,14 +207,14 @@ exports.registerPatient = (0, https_1.onCall)(async (request) => {
             created_at: new Date()
         });
         batch.set(db.collection("encounters").doc(encounterId), {
-            patient_id: patientId, clinic_id: clinicId, country_code: countryCode,
+            patient_id: patientId, clinic_id: clinicId, country_id: country_id,
             status: 'WAITING_FOR_VITALS', created_at: new Date()
         });
         const fullName = `${patientData.given_name || ''} ${patientData.family_name || ''}`.trim();
         batch.set(db.collection("queues_active").doc(), {
             encounter_id: encounterId, patient_id: patientId, patient_name: fullName,
             station: 'vitals', status: 'WAITING_FOR_VITALS', clinic_id: clinicId,
-            country_code: countryCode, created_at: new Date(), updated_at: new Date()
+            country_id: country_id, created_at: new Date(), updated_at: new Date()
         });
         await batch.commit();
         return { patientId, encounterId };
@@ -253,7 +253,7 @@ exports.saveConsultation = (0, https_1.onCall)(async (request) => {
                 });
             }
         }
-        qSnap.forEach(doc => transaction.update(doc.ref, {
+        qSnap.forEach((doc) => transaction.update(doc.ref, {
             station: 'pharmacy', status: 'WAITING_FOR_PHARMACY',
             updated_at: admin.firestore.FieldValue.serverTimestamp()
         }));

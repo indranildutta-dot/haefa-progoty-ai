@@ -1,10 +1,8 @@
-import { HttpsError } from "firebase-functions/v2/https";
-
 // ==========================================
 // LAZY LOADERS
 // ==========================================
 
-let adminCache: typeof import("firebase-admin") | null = null;
+let adminCache: any = null;
 export const getAdmin = async () => {
   if (!adminCache) {
     adminCache = await import("firebase-admin");

@@ -26,7 +26,7 @@ export const syncUserPermissions = onCall(async (request) => {
   if (!request.auth || !checkIsGlobalAdmin(request.auth)) {
     throw new HttpsError("permission-denied", "Unauthorized: Global Admin required.");
   }
-  const { email, role, countryCode, assignedCountries, assignedClinics, isApproved } = request.data;
+  const { email, role, country_id, assignedCountries, assignedClinics, isApproved } = request.data;
   if (!email || !role) {
     throw new HttpsError("invalid-argument", "Missing email or role.");
   }
@@ -46,7 +46,7 @@ export const syncUserPermissions = onCall(async (request) => {
     const uid = userRecord.uid;
     await admin.auth().setCustomUserClaims(uid, { role });
     await db.collection("users").doc(uid).set({
-      email, role, countryCode: countryCode || null,
+      email, role, country_id: country_id || null,
       assignedCountries: assignedCountries || [],
       assignedClinics: assignedClinics || [],
       isApproved: isApproved ?? false,
@@ -99,7 +99,7 @@ export const wipeTestData = onCall({ timeoutSeconds: 540, memory: "1GiB" }, asyn
         hasMore = false;
       } else {
         const batch = db.batch();
-        snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+        snapshot.docs.forEach((doc: any) => batch.delete(doc.ref));
         await batch.commit();
         totalDeleted += snapshot.size;
       }
@@ -118,7 +118,7 @@ export const wipeDemoData = onCall({ timeoutSeconds: 540 }, async (request) => {
     for (const colName of collectionsToWipe) {
       const snapshot = await db.collection(colName).get();
       const batch = db.batch();
-      snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+      snapshot.docs.forEach((doc: any) => batch.delete(doc.ref));
       await batch.commit();
     }
     return { success: true };
@@ -132,9 +132,9 @@ export const initClinics = onCall(async (request) => {
     throw new HttpsError("permission-denied", "Unauthorized.");
   }
   const clinicsToCreate = [
-    { id: 'dhaka-main', name: 'Dhaka Main Clinic', country: 'Bangladesh', countryCode: 'BD' },
-    { id: 'cox-bazar', name: 'Cox\'s Bazar Relief Center', country: 'Bangladesh', countryCode: 'BD' },
-    { id: 'kutupalong', name: 'Kutupalong Camp Clinic', country: 'Bangladesh', countryCode: 'BD' }
+    { id: 'dhaka-main', name: 'Dhaka Main Clinic', country: 'Bangladesh', country_id: 'BD' },
+    { id: 'cox-bazar', name: 'Cox\'s Bazar Relief Center', country: 'Bangladesh', country_id: 'BD' },
+    { id: 'kutupalong', name: 'Kutupalong Camp Clinic', country: 'Bangladesh', country_id: 'BD' }
   ];
 
   const commonSettings = {
@@ -169,8 +169,8 @@ export const initClinics = onCall(async (request) => {
 
 export const registerPatient = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
-  const { patientData, photoBase64, clinicId, countryCode } = request.data;
-  if (!patientData || !clinicId || !countryCode) {
+  const { patientData, photoBase64, clinicId, country_id } = request.data;
+  if (!patientData || !clinicId || !country_id) {
     throw new HttpsError("invalid-argument", "Missing registration data");
   }
   try {
@@ -198,7 +198,7 @@ export const registerPatient = onCall(async (request) => {
     });
     
     batch.set(db.collection("encounters").doc(encounterId), { 
-      patient_id: patientId, clinic_id: clinicId, country_code: countryCode, 
+      patient_id: patientId, clinic_id: clinicId, country_id: country_id, 
       status: 'WAITING_FOR_VITALS', created_at: new Date() 
     });
     
@@ -206,7 +206,7 @@ export const registerPatient = onCall(async (request) => {
     batch.set(db.collection("queues_active").doc(), { 
       encounter_id: encounterId, patient_id: patientId, patient_name: fullName, 
       station: 'vitals', status: 'WAITING_FOR_VITALS', clinic_id: clinicId, 
-      country_code: countryCode, created_at: new Date(), updated_at: new Date() 
+      country_id: country_id, created_at: new Date(), updated_at: new Date() 
     });
     
     await batch.commit();
@@ -224,7 +224,7 @@ export const saveConsultation = onCall(async (request) => {
   
   const qSnap = await db.collection("queues_active").where("encounter_id", "==", encounterId).get();
 
-  return await db.runTransaction(async (transaction) => {
+  return await db.runTransaction(async (transaction: any) => {
     const encounterRef = db.collection("encounters").doc(encounterId);
     transaction.update(encounterRef, {
       status: 'WAITING_FOR_PHARMACY',
@@ -250,7 +250,7 @@ export const saveConsultation = onCall(async (request) => {
       }
     }
 
-    qSnap.forEach(doc => transaction.update(doc.ref, { 
+    qSnap.forEach((doc: any) => transaction.update(doc.ref, { 
       station: 'pharmacy', status: 'WAITING_FOR_PHARMACY', 
       updated_at: admin.firestore.FieldValue.serverTimestamp() 
     }));
@@ -269,7 +269,7 @@ export const dispenseMedication = onCall(async (request) => {
   const db = await getDb();
   const admin = await getAdmin();
 
-  return await db.runTransaction(async (transaction) => {
+  return await db.runTransaction(async (transaction: any) => {
     const results: any[] = [];
 
     for (const med of medications) {
