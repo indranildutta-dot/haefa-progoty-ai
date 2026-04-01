@@ -36,14 +36,22 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.stockAlerts = exports.getInventoryTemplate = exports.bulkUpload = exports.dispenseMedication = exports.saveConsultation = exports.registerPatient = exports.initClinics = exports.wipeDemoData = exports.wipeTestData = exports.deleteUser = exports.syncUserPermissions = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
-const admin = __importStar(require("firebase-admin"));
-const firestore_1 = require("firebase-admin/firestore");
-const crypto = __importStar(require("crypto"));
-const getDb = () => {
-    if (!admin.apps.length) {
-        admin.initializeApp();
+let adminCache = null;
+const getAdmin = async () => {
+    if (!adminCache) {
+        adminCache = await Promise.resolve().then(() => __importStar(require("firebase-admin")));
+        if (!adminCache.apps.length) {
+            adminCache.initializeApp();
+        }
     }
+    return adminCache;
+};
+const getDb = async () => {
+    const admin = await getAdmin();
     return admin.firestore();
+};
+const getCrypto = async () => {
+    return await Promise.resolve().then(() => __importStar(require("crypto")));
 };
 const SUPER_ADMIN_EMAILS = [
     'indranil_dutta@haefa.org',
@@ -57,8 +65,9 @@ const checkIsGlobalAdmin = (auth) => {
     const role = auth.token.role;
     return SUPER_ADMIN_EMAILS.includes(email) || role === 'global_admin';
 };
-const generateId = () => {
+const generateId = async () => {
     try {
+        const crypto = await getCrypto();
         return crypto.randomUUID();
     }
     catch (e) {
@@ -88,6 +97,8 @@ exports.syncUserPermissions = (0, https_1.onCall)({ region: "us-central1", maxIn
         throw new https_1.HttpsError("invalid-argument", "Missing email or role.");
     }
     try {
+        const admin = await getAdmin();
+        const db = await getDb();
         let userRecord;
         try {
             userRecord = await admin.auth().getUserByEmail(email);
@@ -102,7 +113,7 @@ exports.syncUserPermissions = (0, https_1.onCall)({ region: "us-central1", maxIn
         }
         const uid = userRecord.uid;
         await admin.auth().setCustomUserClaims(uid, { role });
-        await getDb().collection("users").doc(uid).set({
+        await db.collection("users").doc(uid).set({
             email, role, countryCode: countryCode || null,
             assignedCountries: assignedCountries || [],
             assignedClinics: assignedClinics || [],
@@ -126,8 +137,10 @@ exports.deleteUser = (0, https_1.onCall)({ region: "us-central1" }, async (reque
         throw new https_1.HttpsError("failed-precondition", "You cannot delete yourself.");
     }
     try {
+        const admin = await getAdmin();
+        const db = await getDb();
         await admin.auth().deleteUser(uid);
-        await getDb().collection("users").doc(uid).delete();
+        await db.collection("users").doc(uid).delete();
         return { success: true };
     }
     catch (error) {
@@ -140,7 +153,7 @@ exports.wipeTestData = (0, https_1.onCall)({ region: "us-central1", timeoutSecon
     }
     const collections = ["patients", "encounters", "queues_active", "requisitions", "procurement_requests"];
     let totalDeleted = 0;
-    const db = getDb();
+    const db = await getDb();
     for (const colName of collections) {
         let hasMore = true;
         while (hasMore) {
@@ -163,7 +176,7 @@ exports.wipeDemoData = (0, https_1.onCall)({ region: "us-central1" }, async (req
         throw new https_1.HttpsError("permission-denied", "Unauthorized.");
     }
     const collectionsToWipe = ["patients", "encounters", "queues_active", "requisitions"];
-    const db = getDb();
+    const db = await getDb();
     try {
         for (const colName of collectionsToWipe) {
             const snapshot = await db.collection(colName).get();
@@ -196,12 +209,13 @@ exports.initClinics = (0, https_1.onCall)({ region: "us-central1" }, async (requ
             { id: 'consultation', name: 'Doctor Consultation', order: 3 },
             { id: 'pharmacy', name: 'Pharmacy/Dispensing', order: 4 }
         ],
-        created_at: admin.firestore.FieldValue.serverTimestamp()
+        created_at: (await getAdmin()).firestore.FieldValue.serverTimestamp()
     };
     try {
-        const batch = getDb().batch();
+        const db = await getDb();
+        const batch = db.batch();
         clinicsToCreate.forEach((clinic) => {
-            const docRef = getDb().collection('clinics').doc(clinic.id);
+            const docRef = db.collection('clinics').doc(clinic.id);
             batch.set(docRef, { ...clinic, ...commonSettings }, { merge: true });
         });
         await batch.commit();
@@ -218,6 +232,9 @@ exports.registerPatient = (0, https_1.onCall)({ region: "us-central1" }, async (
         throw new https_1.HttpsError("invalid-argument", "Missing registration data");
     }
     try {
+        const crypto = await getCrypto();
+        const admin = await getAdmin();
+        const db = await getDb();
         const patientId = crypto.randomUUID();
         const encounterId = crypto.randomUUID();
         let photoUrl = "";
@@ -229,18 +246,18 @@ exports.registerPatient = (0, https_1.onCall)({ region: "us-central1" }, async (
             const signedUrls = await file.getSignedUrl({ action: "read", expires: "03-01-2500" });
             photoUrl = signedUrls[0];
         }
-        const batch = getDb().batch();
-        batch.set(getDb().collection("patients").doc(patientId), {
+        const batch = db.batch();
+        batch.set(db.collection("patients").doc(patientId), {
             ...sanitizeData(patientData),
             photo_url: photoUrl,
             created_at: new Date()
         });
-        batch.set(getDb().collection("encounters").doc(encounterId), {
+        batch.set(db.collection("encounters").doc(encounterId), {
             patient_id: patientId, clinic_id: clinicId, country_code: countryCode,
             status: 'WAITING_FOR_VITALS', created_at: new Date()
         });
         const fullName = `${patientData.given_name || ''} ${patientData.family_name || ''}`.trim();
-        batch.set(getDb().collection("queues_active").doc(), {
+        batch.set(db.collection("queues_active").doc(), {
             encounter_id: encounterId, patient_id: patientId, patient_name: fullName,
             station: 'vitals', status: 'WAITING_FOR_VITALS', clinic_id: clinicId,
             country_code: countryCode, created_at: new Date(), updated_at: new Date()
@@ -256,7 +273,8 @@ exports.saveConsultation = (0, https_1.onCall)({ region: "us-central1" }, async 
     if (!request.auth)
         throw new https_1.HttpsError("unauthenticated", "Login required.");
     const { encounterId, patientId, clinicId, prescriptions, diagnosis, notes } = request.data;
-    const db = getDb();
+    const db = await getDb();
+    const admin = await getAdmin();
     const qSnap = await db.collection("queues_active").where("encounter_id", "==", encounterId).get();
     return await db.runTransaction(async (transaction) => {
         const encounterRef = db.collection("encounters").doc(encounterId);
@@ -292,7 +310,8 @@ exports.dispenseMedication = (0, https_1.onCall)({ region: "us-central1" }, asyn
     if (!request.auth)
         throw new https_1.HttpsError("unauthenticated", "Login required.");
     const { clinicId, medications, encounterId, patientId } = request.data;
-    const db = getDb();
+    const db = await getDb();
+    const admin = await getAdmin();
     return await db.runTransaction(async (transaction) => {
         const results = [];
         for (const med of medications) {
@@ -345,7 +364,8 @@ exports.bulkUpload = (0, https_1.onCall)({ region: "us-central1" }, async (reque
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(Buffer.from(fileBase64, 'base64'));
     const worksheet = workbook.getWorksheet(1);
-    const db = getDb();
+    const db = await getDb();
+    const admin = await getAdmin();
     const batch = db.batch();
     worksheet?.eachRow((row, rowNumber) => {
         if (rowNumber === 1)
@@ -385,10 +405,11 @@ exports.getInventoryTemplate = (0, https_1.onCall)({ region: "us-central1" }, as
 exports.stockAlerts = (0, scheduler_1.onSchedule)("every 24 hours", async (event) => {
     const ninetyDays = new Date();
     ninetyDays.setDate(ninetyDays.getDate() + 90);
-    const db = getDb();
+    const db = await getDb();
+    const { Timestamp } = await Promise.resolve().then(() => __importStar(require("firebase-admin/firestore")));
     const clinics = await db.collection("clinics").get();
     for (const doc of clinics.docs) {
-        const expiring = await db.collection(`clinics/${doc.id}/inventory`).where("expiry_date", "<=", firestore_1.Timestamp.fromDate(ninetyDays)).where("quantity", ">", 0).get();
+        const expiring = await db.collection(`clinics/${doc.id}/inventory`).where("expiry_date", "<=", Timestamp.fromDate(ninetyDays)).where("quantity", ">", 0).get();
         if (!expiring.empty)
             console.log(`Alert: ${expiring.size} expiring batches in ${doc.id}`);
     }
