@@ -7,7 +7,8 @@ import {
   BottomNavigationAction,
   Paper,
   Snackbar,
-  Alert
+  Alert,
+  Stack
 } from '@mui/material';
 import { 
   PersonAdd as PersonAddIcon,
@@ -19,12 +20,14 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import TopNavigation from './TopNavigation';
 import PatientContextBar from './PatientContextBar';
+import ClinicalSidebar from './ClinicalSidebar';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import { useAppStore } from '../store/useAppStore';
 
 interface StationLayoutProps {
   children: React.ReactNode;
   showPatientContext?: boolean;
+  hideSidebar?: boolean;
   title?: string;
   stationName?: string;
   actions?: React.ReactNode;
@@ -33,14 +36,15 @@ interface StationLayoutProps {
 const StationLayout: React.FC<StationLayoutProps> = ({ 
   children, 
   showPatientContext = true,
+  hideSidebar = false,
   title,
   stationName,
   actions
 }) => {
-  const { isMobile, isTablet } = useResponsiveLayout();
+  const { isMobile, isTablet, isDesktop } = useResponsiveLayout();
   const navigate = useNavigate();
   const location = useLocation();
-  const { notifications } = useAppStore();
+  const { notifications, selectedPatient } = useAppStore();
   const [open, setOpen] = useState(false);
   const [currentNotification, setCurrentNotification] = useState<any>(null);
 
@@ -63,7 +67,10 @@ const StationLayout: React.FC<StationLayoutProps> = ({
     { label: 'Vitals', to: '/vitals-2', icon: <LocalHospitalIcon /> },
     { label: 'Labs', to: '/labs-and-risk', icon: <LocalHospitalIcon /> },
     { label: 'Doc', to: '/doctor', icon: <AssignmentIcon /> },
+    { label: 'Pharmacy', to: '/pharmacy', icon: <MedicationIcon /> },
   ];
+
+  const showSidebar = showPatientContext && selectedPatient && !isMobile && !hideSidebar;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f8fafc' }}>
@@ -126,8 +133,13 @@ const StationLayout: React.FC<StationLayoutProps> = ({
             </Box>
           )}
           
-          {/* Dashboard/Workspace Content */}
-          {children}
+          {/* Dashboard/Workspace Content with Sidebar */}
+          <Stack direction="row" spacing={4} alignItems="flex-start">
+            <Box sx={{ flexGrow: 1 }}>
+              {children}
+            </Box>
+            {showSidebar && <ClinicalSidebar />}
+          </Stack>
         </Container>
       </Box>
 

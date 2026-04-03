@@ -64,7 +64,6 @@ const PrescriptionPrintView: React.FC<PrescriptionPrintViewProps> = ({
     <Box sx={{ width: '100%', bgcolor: 'white', color: 'black', p: 4, fontFamily: 'sans-serif' }} className="print-container">
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 }}>
-        <img src="/logo.png" alt="HAEFA Logo" style={{ height: 60, marginRight: 16 }} />
         <Typography variant="h5" fontWeight="bold">Health and Education for All Prescription</Typography>
       </Box>
       <Divider sx={{ borderBottomWidth: 2, borderColor: 'black', mb: 2 }} />

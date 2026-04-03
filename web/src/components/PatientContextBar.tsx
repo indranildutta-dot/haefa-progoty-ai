@@ -11,6 +11,8 @@ import WineBarIcon from '@mui/icons-material/WineBar';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import PregnantWomanIcon from '@mui/icons-material/PregnantWoman';
 import SpeedIcon from '@mui/icons-material/Speed';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import OpacityIcon from '@mui/icons-material/Opacity';
 
 const PatientContextBar: React.FC = () => {
   const { selectedPatient } = useAppStore();
@@ -121,7 +123,7 @@ const PatientContextBar: React.FC = () => {
         />
 
         {/* Pregnancy Alert */}
-        {vitals?.is_pregnant === true && (
+        {selectedPatient?.gender?.toLowerCase() === 'female' && vitals?.is_pregnant === true && (
           <Tooltip title={`Pregnancy: ${vitals?.pregnancy_months || '?'} months`}>
             <Chip 
               icon={<PregnantWomanIcon style={{ color: 'white', fontSize: 18 }} />}
@@ -132,8 +134,8 @@ const PatientContextBar: React.FC = () => {
         )}
 
         {/* Allergy Alert */}
-        {vitals?.allergies && vitals?.allergies.length > 0 && (
-          <Tooltip title={`Allergies: ${vitals?.allergies.join(', ')}`}>
+        {vitals?.allergies && (Array.isArray(vitals.allergies) ? vitals.allergies.length > 0 : String(vitals.allergies).length > 0) && (
+          <Tooltip title={`Allergies: ${Array.isArray(vitals.allergies) ? vitals.allergies.join(', ') : vitals.allergies}`}>
             <Chip 
               icon={<WarningIcon style={{ color: 'white', fontSize: 16 }} />}
               label="ALLERGIES"
@@ -144,13 +146,65 @@ const PatientContextBar: React.FC = () => {
 
         {/* Substance Use (Dhaka Standard) */}
         {vitals?.tobacco_use && vitals?.tobacco_use !== 'none' && (
+          <>
+            {(vitals.tobacco_use === 'smoking' || vitals.tobacco_use === 'both') && (
+              <Chip 
+                icon={<SmokingRoomsIcon style={{ color: 'white', fontSize: 16 }} />}
+                label="SMOKING"
+                sx={{ bgcolor: '#f59e0b', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
+              />
+            )}
+            {(vitals.tobacco_use === 'chewing' || vitals.tobacco_use === 'both') && (
+              <Chip 
+                icon={<SmokingRoomsIcon style={{ color: 'white', fontSize: 16 }} />}
+                label="GUTKHA"
+                sx={{ bgcolor: '#991b1b', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
+              />
+            )}
+          </>
+        )}
+
+        {/* Alcohol Alert */}
+        {vitals?.alcohol_consumption && vitals?.alcohol_consumption !== 'none' && (
           <Chip 
-            icon={<SmokingRoomsIcon style={{ color: 'white', fontSize: 16 }} />}
-            label={vitals?.tobacco_use === 'chewing' || vitals?.tobacco_use === 'both' ? "GUTKHA" : "TOBACCO"}
-            sx={{ 
-              bgcolor: (vitals?.tobacco_use === 'chewing') ? '#991b1b' : '#f59e0b', 
-              color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' 
-            }}
+            icon={<WineBarIcon style={{ color: 'white', fontSize: 16 }} />}
+            label={vitals.alcohol_consumption.toUpperCase()}
+            sx={{ bgcolor: '#4338ca', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
+          />
+        )}
+
+        {/* BMI Alert */}
+        {vitals?.bmi_class && (vitals.bmi_class === 'Obese' || vitals.bmi_class === 'Underweight') && (
+          <Chip 
+            icon={<SpeedIcon style={{ color: 'white', fontSize: 16 }} />}
+            label={vitals.bmi_class.toUpperCase()}
+            sx={{ bgcolor: vitals.bmi_class === 'Obese' ? '#7c2d12' : '#0369a1', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
+          />
+        )}
+
+        {/* BP Alert */}
+        {(vitals?.systolic >= 140 || vitals?.diastolic >= 90) && (
+          <Chip 
+            icon={<FavoriteIcon style={{ color: 'white', fontSize: 16 }} />}
+            label="HYPERTENSION"
+            sx={{ bgcolor: '#b91c1c', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
+          />
+        )}
+
+        {/* SpO2 Alert */}
+        {vitals?.oxygenSaturation && vitals.oxygenSaturation < 94 && (
+          <Chip 
+            icon={<OpacityIcon style={{ color: 'white', fontSize: 16 }} />}
+            label="LOW SpO2"
+            sx={{ bgcolor: '#7f1d1d', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
+          />
+        )}
+
+        {/* Blood Sugar Alert */}
+        {vitals?.blood_sugar && vitals.blood_sugar >= 200 && (
+          <Chip 
+            label="HIGH SUGAR"
+            sx={{ bgcolor: '#9d174d', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
           />
         )}
       </Stack>

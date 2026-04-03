@@ -171,6 +171,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
       title="Doctor Dashboard" 
       stationName="Doctor" 
       showPatientContext={!!selectedItem}
+      hideSidebar={!!selectedItem}
     >
       {!selectedItem ? (
         <TableContainer 
@@ -243,17 +244,15 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
           </Table>
         </TableContainer>
       ) : (
-        <Box sx={{ bgcolor: '#f1f5f9', mt: -3, mx: -3, p: 3, minHeight: '100vh' }}>
-          <PatientContextBar />
-          
+        <Box sx={{ mt: -3 }}>
           <Grid container spacing={3} sx={{ mt: 1 }}>
             {/* LEFT COLUMN: Vitals & Lab Results */}
-            <Grid size={{ xs: 12, lg: 3 }}>
+            <Grid size={{ xs: 12, md: 3 }}>
               <VitalsSnapshot vitals={currentVitals} />
             </Grid>
 
             {/* MIDDLE COLUMN: Clinical Assessment & Prescription */}
-            <Grid size={{ xs: 12, lg: 6 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Paper 
                 elevation={0}
                 sx={{ 
@@ -305,7 +304,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
             </Grid>
 
             {/* RIGHT COLUMN: Patient History & Trends */}
-            <Grid size={{ xs: 12, lg: 3 }}>
+            <Grid size={{ xs: 12, md: 3 }}>
               <PatientHistoryTimeline patientId={selectedItem.patient_id} />
             </Grid>
           </Grid>

@@ -29,9 +29,14 @@ export type TriageLevel = 'emergency' | 'urgent' | 'standard' | 'low';
 export interface Patient {
   id?: string;
   given_name: string;
+  middle_name?: string;
   family_name: string;
   gender: 'male' | 'female' | 'other';
   date_of_birth: string;
+  estimated_birth_year?: number;
+  is_minor?: boolean;
+  parent_name?: string;
+  parent_id?: string;
   age_years?: number;
   age_months?: number;
   age_days?: number;
@@ -46,9 +51,19 @@ export interface Patient {
   address_line?: string;
   village?: string;
   thana?: string;
+  upazila?: string;
+  union?: string;
   post_code?: string;
   district?: string;
   country?: string;
+  permanent_address_same_as_present?: boolean;
+  perm_address_line?: string;
+  perm_village?: string;
+  perm_district?: string;
+  perm_upazila?: string;
+  perm_union?: string;
+  perm_post_code?: string;
+  perm_country?: string;
   photo_url?: string;
   country_id: string;
   clinic_id: string;
@@ -68,13 +83,18 @@ export interface Vitals {
   weight: number;
   height: number;
   bmi?: number;
+  bmi_class?: string;
+  muac?: number;
+  muac_class?: string;
+  blood_group?: string;
   oxygenSaturation?: number;
-  blood_sugar?: string;
-  hemoglobin?: string;
-  is_pregnant?: 'yes' | 'no';
-  pregnancy_months?: string;
-  allergies?: string;
+  blood_sugar?: number;
+  hemoglobin?: number;
+  is_pregnant?: boolean;
+  pregnancy_months?: number;
+  allergies?: string[];
   tobacco_use?: string;
+  alcohol_consumption?: string;
   created_by?: string;
 }
 
@@ -141,6 +161,10 @@ export interface VitalsRecord {
   weight?: number;
   height?: number;
   bmi?: number;
+  bmi_class?: string;
+  muac?: number;
+  muac_class?: string;
+  blood_group?: string;
   oxygenSaturation?: number;
   blood_sugar?: number;
   hemoglobin?: number;
@@ -148,7 +172,16 @@ export interface VitalsRecord {
   pregnancy_months?: number;
   allergies?: string[];
   tobacco_use?: string;
+  alcohol_consumption?: string;
   created_by?: string;
+  chief_complaint?: string;
+  onset_date?: string;
+  duration_value?: string;
+  duration_unit?: string;
+  chronic_conditions?: string[];
+  nurse_priority?: string;
+  suggested_priority?: string;
+  assigned_priority?: string;
 }
 
 export interface DiagnosisRecord {

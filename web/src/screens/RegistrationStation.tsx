@@ -36,11 +36,16 @@ import {
   StepLabel,
   StepContent,
   Stack,
-  InputAdornment
+  InputAdornment,
+  Switch,
+  FormControlLabel,
+  FormGroup,
+  FormLabel
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import EditIcon from '@mui/icons-material/Edit';
+import PrintIcon from '@mui/icons-material/Print';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
@@ -176,9 +181,14 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
   // --- PATIENT DATA MODEL ---
   const initialPatientState = {
     given_name: '',
+    middle_name: '',
     family_name: '',
     gender: 'male' as 'male' | 'female' | 'other',
     date_of_birth: '',
+    estimated_birth_year: '' as string | number,
+    is_minor: false,
+    parent_name: '',
+    parent_id: '',
     age_years: '' as string | number,
     age_months: '' as string | number,
     age_days: '' as string | number,
@@ -193,9 +203,19 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
     address_line: '',
     village: '',
     thana: '',
+    upazila: '',
+    union: '',
     post_code: '',
     district: '',
-    country: ''
+    country: '',
+    permanent_address_same_as_present: true,
+    perm_address_line: '',
+    perm_village: '',
+    perm_district: '',
+    perm_upazila: '',
+    perm_union: '',
+    perm_post_code: '',
+    perm_country: ''
   };
 
   const [newPatient, setNewPatient] = useState(initialPatientState);
@@ -205,12 +225,33 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
     national_id: '',
     rohingya_number: '',
     nepal_id: '',
-    bhutanese_refugee_number: ''
+    bhutanese_refugee_number: '',
+    date_of_birth: ''
   });
 
   // ===========================================================================
   // VALIDATION LOGIC (RESTORED REGEX SUITE)
   // ===========================================================================
+
+  /**
+   * Date of Birth Validation (DD/MM/YYYY)
+   */
+  const validateDOB = useCallback((value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+    if (!regex.test(trimmed)) return "Invalid format. Use DD/MM/YYYY.";
+    const [_, day, month, year] = trimmed.match(regex)!;
+    const d = parseInt(day, 10);
+    const m = parseInt(month, 10);
+    const y = parseInt(year, 10);
+    if (m < 1 || m > 12) return "Invalid month.";
+    const daysInMonth = new Date(y, m, 0).getDate();
+    if (d < 1 || d > daysInMonth) return "Invalid day for this month.";
+    const currentYear = new Date().getFullYear();
+    if (y < 1900 || y > currentYear) return "Invalid year.";
+    return '';
+  }, []);
 
   /**
    * Bangladesh National ID (NID) Validation
@@ -262,10 +303,29 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
 
   // --- FIELD CHANGE HANDLERS ---
 
-  const handleFieldChange = (field: string, value: string) => {
+  const handleFieldChange = (field: string, value: any) => {
+    if (field === 'permanent_address_same_as_present' && value === true) {
+      setNewPatient(prev => ({
+        ...prev,
+        permanent_address_same_as_present: true,
+        perm_address_line: prev.address_line,
+        perm_village: prev.village,
+        perm_district: prev.district,
+        perm_upazila: prev.upazila,
+        perm_union: prev.union,
+        perm_post_code: prev.post_code,
+        perm_country: prev.country
+      }));
+      return;
+    }
+    
     setNewPatient(prev => ({ ...prev, [field]: value }));
     
     // Real-time validation trigger
+    if (field === 'date_of_birth') {
+      setValidationErrors(prev => ({ ...prev, date_of_birth: validateDOB(value) }));
+    }
+    
     if (selectedCountry?.id === 'BD') {
       if (field === 'national_id') {
         setValidationErrors(prev => ({ ...prev, national_id: validateNID(value) }));
@@ -285,6 +345,10 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
     const value = (newPatient as any)[field] || '';
     
     // Final check validation trigger
+    if (field === 'date_of_birth') {
+      setValidationErrors(prev => ({ ...prev, date_of_birth: validateDOB(value) }));
+    }
+
     if (selectedCountry?.id === 'BD') {
       if (field === 'national_id') {
         setValidationErrors(prev => ({ ...prev, national_id: validateNID(value) }));
@@ -409,6 +473,32 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
   };
 
   const handleNext = () => {
+    // Step 0 Validation: Given Name, Family Name, and (DOB or Estimated Birth Year)
+    if (activeStep === 0) {
+      const errors: string[] = [];
+      if (!newPatient.given_name.trim()) errors.push("Given Name is required.");
+      if (!newPatient.family_name.trim()) errors.push("Family Name is required.");
+      if (!newPatient.date_of_birth.trim() && !newPatient.estimated_birth_year) {
+        errors.push("Either Date of Birth or Estimated Birth Year must be provided.");
+      }
+      if (!patientPhotoUrl) {
+        errors.push("Patient photo is required.");
+      }
+
+      if (errors.length > 0) {
+        notify(errors.join(" "), "error");
+        return;
+      }
+    }
+
+    // Step 1 Validation: Marital Status
+    if (activeStep === 1) {
+      if (!newPatient.marital_status) {
+        notify("Marital status is required.", "error");
+        return;
+      }
+    }
+
     // Check for validation errors before proceeding
     const hasErrors = Object.values(validationErrors).some(err => err !== '');
     if (hasErrors) {
@@ -442,7 +532,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
               </Box>
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField 
                 fullWidth 
                 label="Given Name" 
@@ -455,7 +545,19 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
               />
             </Grid>
 
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid size={{ xs: 12, sm: 4 }}>
+              <TextField 
+                fullWidth 
+                label="Middle Name" 
+                value={newPatient.middle_name} 
+                onChange={(e) => handleFieldChange('middle_name', e.target.value)} 
+                InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}}
+                InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 }}}
+                sx={{ bgcolor: 'white' }}
+              />
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField 
                 fullWidth 
                 label="Family Name" 
@@ -490,12 +592,42 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
               <TextField 
                 fullWidth 
                 label="Date of Birth" 
-                type="date"
-                InputLabelProps={{ shrink: true, sx: { fontSize: '1.1rem', fontWeight: 600 } }} 
+                placeholder="DD/MM/YYYY"
+                helperText={validationErrors.date_of_birth || "Format: DD/MM/YYYY (Required if Birth Year empty)"}
+                error={!!validationErrors.date_of_birth}
+                InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 } }} 
                 InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}}
                 value={newPatient.date_of_birth} 
                 onChange={(e) => handleFieldChange('date_of_birth', e.target.value)}
+                onBlur={() => handleFieldBlur('date_of_birth')}
                 sx={{ bgcolor: 'white' }}
+              />
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField 
+                fullWidth 
+                label="Estimated Birth Year" 
+                type="number"
+                placeholder="e.g. 1980"
+                helperText="Required if Date of Birth is empty"
+                InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 } }} 
+                InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}}
+                value={newPatient.estimated_birth_year} 
+                onChange={(e) => handleFieldChange('estimated_birth_year', e.target.value)}
+                sx={{ bgcolor: 'white' }}
+              />
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField 
+                fullWidth 
+                label="Country" 
+                disabled
+                value={selectedCountry?.name || ''} 
+                InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 } }} 
+                InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}}
+                sx={{ bgcolor: '#f1f5f9' }}
               />
             </Grid>
           </Grid>
@@ -503,6 +635,50 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
       case 1: // IDENTITY & CREDENTIALS
         return (
           <Grid container spacing={4}>
+            <Grid size={{ xs: 12 }}>
+              <FormControl component="fieldset" variant="standard">
+                <FormControlLabel
+                  control={
+                    <Switch 
+                      checked={newPatient.is_minor} 
+                      onChange={(e) => handleFieldChange('is_minor', e.target.checked)} 
+                      color="primary"
+                    />
+                  }
+                  label={<Typography variant="h6" fontWeight="700">Is this patient a minor?</Typography>}
+                />
+              </FormControl>
+            </Grid>
+
+            {newPatient.is_minor && (
+              <>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField 
+                    fullWidth 
+                    label="Parent / Guardian Name" 
+                    required={newPatient.is_minor}
+                    value={newPatient.parent_name} 
+                    onChange={(e) => handleFieldChange('parent_name', e.target.value)} 
+                    InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}}
+                    InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 }}}
+                    sx={{ bgcolor: 'white' }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField 
+                    fullWidth 
+                    label="Parent / Guardian ID Number" 
+                    required={newPatient.is_minor}
+                    value={newPatient.parent_id} 
+                    onChange={(e) => handleFieldChange('parent_id', e.target.value)} 
+                    InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}}
+                    InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 }}}
+                    sx={{ bgcolor: 'white' }}
+                  />
+                </Grid>
+              </>
+            )}
+
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField 
                 fullWidth 
@@ -669,12 +845,45 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
                 sx={{ bgcolor: 'white' }}
               />
             </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField 
+                fullWidth 
+                label="Upazila" 
+                value={newPatient.upazila} 
+                onChange={(e) => handleFieldChange('upazila', e.target.value)} 
+                InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}}
+                InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 }}}
+                sx={{ bgcolor: 'white' }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField 
+                fullWidth 
+                label="Union" 
+                value={newPatient.union} 
+                onChange={(e) => handleFieldChange('union', e.target.value)} 
+                InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}}
+                InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 }}}
+                sx={{ bgcolor: 'white' }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField 
+                fullWidth 
+                label="Post Code" 
+                value={newPatient.post_code} 
+                onChange={(e) => handleFieldChange('post_code', e.target.value)} 
+                InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}}
+                InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 }}}
+                sx={{ bgcolor: 'white' }}
+              />
+            </Grid>
             <Grid size={{ xs: 12 }}>
               <TextField 
                 fullWidth 
                 label="Detailed Address Information" 
                 multiline 
-                rows={4} 
+                rows={2} 
                 value={newPatient.address_line} 
                 onChange={(e) => handleFieldChange('address_line', e.target.value)} 
                 InputProps={{ sx: { fontSize: '1.5rem', fontWeight: 700, p: 3 }}}
@@ -682,6 +891,106 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
                 sx={{ bgcolor: 'white' }}
               />
             </Grid>
+
+            <Grid size={{ xs: 12 }}>
+              <Divider sx={{ my: 4 }}>
+                <Chip label="PERMANENT ADDRESS" sx={{ fontWeight: 900, fontSize: '1rem' }} />
+              </Divider>
+              <FormControlLabel
+                control={
+                  <Switch 
+                    checked={newPatient.permanent_address_same_as_present} 
+                    onChange={(e) => handleFieldChange('permanent_address_same_as_present', e.target.checked as any)} 
+                    color="primary"
+                  />
+                }
+                label={<Typography variant="h6" fontWeight="700">Same as present address</Typography>}
+              />
+            </Grid>
+
+            {!newPatient.permanent_address_same_as_present && (
+              <>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField 
+                    fullWidth 
+                    label="Village / Ward / Camp (Permanent)" 
+                    value={newPatient.perm_village} 
+                    onChange={(e) => handleFieldChange('perm_village', e.target.value)} 
+                    InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}}
+                    InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 }}}
+                    sx={{ bgcolor: 'white' }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField 
+                    fullWidth 
+                    label="District / Province (Permanent)" 
+                    value={newPatient.perm_district} 
+                    onChange={(e) => handleFieldChange('perm_district', e.target.value)} 
+                    InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}}
+                    InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 }}}
+                    sx={{ bgcolor: 'white' }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField 
+                    fullWidth 
+                    label="Upazila (Permanent)" 
+                    value={newPatient.perm_upazila} 
+                    onChange={(e) => handleFieldChange('perm_upazila', e.target.value)} 
+                    InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}}
+                    InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 }}}
+                    sx={{ bgcolor: 'white' }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField 
+                    fullWidth 
+                    label="Union (Permanent)" 
+                    value={newPatient.perm_union} 
+                    onChange={(e) => handleFieldChange('perm_union', e.target.value)} 
+                    InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}}
+                    InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 }}}
+                    sx={{ bgcolor: 'white' }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField 
+                    fullWidth 
+                    label="Post Code (Permanent)" 
+                    value={newPatient.perm_post_code} 
+                    onChange={(e) => handleFieldChange('perm_post_code', e.target.value)} 
+                    InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}}
+                    InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 }}}
+                    sx={{ bgcolor: 'white' }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField 
+                    fullWidth 
+                    label="Country (Permanent)" 
+                    value={newPatient.perm_country} 
+                    onChange={(e) => handleFieldChange('perm_country', e.target.value)} 
+                    InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}}
+                    InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 }}}
+                    sx={{ bgcolor: 'white' }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <TextField 
+                    fullWidth 
+                    label="Detailed Address (Permanent)" 
+                    multiline 
+                    rows={2} 
+                    value={newPatient.perm_address_line} 
+                    onChange={(e) => handleFieldChange('perm_address_line', e.target.value)} 
+                    InputProps={{ sx: { fontSize: '1.5rem', fontWeight: 700, p: 3 }}}
+                    InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 }}}
+                    sx={{ bgcolor: 'white' }}
+                  />
+                </Grid>
+              </>
+            )}
           </Grid>
         );
       default:
@@ -704,6 +1013,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
     try {
       const patientData: any = {
         ...newPatient,
+        estimated_birth_year: newPatient.estimated_birth_year ? Number(newPatient.estimated_birth_year) : null,
         country_id: selectedCountry.id,
         clinic_id: selectedClinic.id,
         photo_url: patientPhotoUrl || null,
@@ -756,6 +1066,172 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  // --- PRINT HANDLER ---
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow || !badgeData) return;
+
+    const html = `
+      <html>
+        <head>
+          <title>Health Card - ${badgeData.name}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+            @media print {
+              body { margin: 0; padding: 0; }
+              @page { size: 85.6mm 54mm; margin: 0; }
+            }
+            body { 
+              font-family: 'Inter', sans-serif; 
+              display: flex; 
+              justify-content: center; 
+              align-items: center; 
+              height: 100vh; 
+              margin: 0;
+              background: #f0f2f5;
+            }
+            .card {
+              width: 85.6mm;
+              height: 54mm;
+              background: white;
+              border: 1px solid #004d40;
+              border-radius: 4px;
+              padding: 8px;
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              position: relative;
+              text-align: center;
+            }
+            .header {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              margin-bottom: 4px;
+              border-bottom: 1.5px solid #004d40;
+              padding-bottom: 4px;
+              text-align: center;
+            }
+            .org-name {
+              font-size: 9px;
+              font-weight: 900;
+              color: #333;
+              text-transform: uppercase;
+              line-height: 1.1;
+              text-align: center;
+              width: 100%;
+            }
+            .card-title {
+              font-size: 14px;
+              font-weight: 900;
+              color: #00796b;
+              margin: 2px 0;
+            }
+            .clinic-name {
+              font-size: 11px;
+              font-weight: 800;
+              color: #333;
+              margin-bottom: 2px;
+            }
+            .patient-name {
+              font-size: 13px;
+              font-weight: 900;
+              margin-bottom: 1px;
+              color: #1a237e;
+            }
+            .id-no {
+              font-size: 11px;
+              font-weight: 800;
+              color: #444;
+              margin-bottom: 4px;
+            }
+            .card-content {
+              display: flex;
+              flex-direction: row;
+              gap: 12px;
+              flex: 1;
+              align-items: center;
+              text-align: left;
+              padding: 4px 0;
+            }
+            .photo-container {
+              width: 20mm;
+              height: 24mm;
+              border: 1px solid #004d40;
+              background: #f9f9f9;
+              overflow: hidden;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              border-radius: 2px;
+            }
+            .photo-container img {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+            }
+            .info-container {
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+            }
+            .qr-container {
+              position: absolute;
+              bottom: 6px;
+              right: 6px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+            }
+            .qr-code {
+              width: 14mm;
+              height: 14mm;
+            }
+            .footer {
+              font-size: 6px;
+              color: #999;
+              position: absolute;
+              bottom: 4px;
+              left: 8px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="header">
+              <div class="org-name">HEALTH AND EDUCATION FOR ALL, USA</div>
+            </div>
+            <div class="card-title">Health Card</div>
+            <div class="card-content">
+              <div class="photo-container">
+                ${badgeData.photoUrl ? `<img src="${badgeData.photoUrl}" />` : '<div style="font-size: 8px; color: #999;">NO PHOTO</div>'}
+              </div>
+              <div class="info-container">
+                <div class="clinic-name">${badgeData.clinicName || 'N/A'}</div>
+                <div class="patient-name">${badgeData.name}</div>
+                <div class="id-no">ID: ${badgeData.patientId.slice(0, 12).toUpperCase()}</div>
+              </div>
+            </div>
+            <div class="qr-container">
+              <img src="${badgeData.qrCode}" class="qr-code" />
+            </div>
+            <div class="footer">HAEFA Clinical Registry System</div>
+          </div>
+          <script>
+            window.onload = () => {
+              window.print();
+              window.onafterprint = () => window.close();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   // ===========================================================================
@@ -821,6 +1297,53 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
                     InputProps={{ sx: { height: 70, fontSize: '1.2rem', fontWeight: 700 }}}
                   />
                 </Grid>
+                
+                {selectedCountry?.id === 'BD' && (
+                  <>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <TextField 
+                        fullWidth 
+                        label="National ID" 
+                        value={searchParams.national_id}
+                        onChange={(e) => setSearchParams({ ...searchParams, national_id: e.target.value })}
+                        InputProps={{ sx: { height: 70, fontSize: '1.2rem', fontWeight: 700 }}}
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <TextField 
+                        fullWidth 
+                        label="Rohingya Number" 
+                        value={searchParams.rohingya_number}
+                        onChange={(e) => setSearchParams({ ...searchParams, rohingya_number: e.target.value })}
+                        InputProps={{ sx: { height: 70, fontSize: '1.2rem', fontWeight: 700 }}}
+                      />
+                    </Grid>
+                  </>
+                )}
+
+                {selectedCountry?.id === 'NP' && (
+                  <>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <TextField 
+                        fullWidth 
+                        label="Nepal ID" 
+                        value={searchParams.nepal_id}
+                        onChange={(e) => setSearchParams({ ...searchParams, nepal_id: e.target.value })}
+                        InputProps={{ sx: { height: 70, fontSize: '1.2rem', fontWeight: 700 }}}
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <TextField 
+                        fullWidth 
+                        label="Bhutanese Refugee ID" 
+                        value={searchParams.bhutanese_refugee_number}
+                        onChange={(e) => setSearchParams({ ...searchParams, bhutanese_refugee_number: e.target.value })}
+                        InputProps={{ sx: { height: 70, fontSize: '1.2rem', fontWeight: 700 }}}
+                      />
+                    </Grid>
+                  </>
+                )}
+
                 <Grid size={{ xs: 12 }}>
                   <Button 
                     fullWidth 
@@ -870,6 +1393,26 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
                           </Typography>
                         </Box>
                         <Stack direction="row" spacing={1}>
+                          <Tooltip title="Reprint Health Card">
+                            <IconButton 
+                              color="info" 
+                              onClick={async () => {
+                                const qrToken = `HAEFA-${p.id!.slice(0, 8)}`;
+                                const qrCodeDataUrl = await QRCode.toDataURL(qrToken);
+                                setBadgeData({
+                                  patientId: p.id!,
+                                  name: `${p.given_name} ${p.family_name}`,
+                                  qrCode: qrCodeDataUrl,
+                                  photoUrl: p.photo_url,
+                                  clinicName: selectedClinic?.name
+                                });
+                                setShowBadgeModal(true);
+                              }} 
+                              sx={{ bgcolor: 'info.50' }}
+                            >
+                              <PrintIcon />
+                            </IconButton>
+                          </Tooltip>
                           <IconButton color="secondary" onClick={() => handleEditPatient(p)} sx={{ bgcolor: 'secondary.50' }}>
                             <EditIcon />
                           </IconButton>
@@ -946,27 +1489,90 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
       <Modal open={showBadgeModal} onClose={() => setShowBadgeModal(false)}>
         <Box sx={{ 
           position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', 
-          bgcolor: 'white', p: 6, borderRadius: 8, width: 500, textAlign: 'center',
+          bgcolor: 'white', p: 6, borderRadius: 8, width: 550, textAlign: 'center',
           boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
         }}>
           <Typography variant="h4" fontWeight="900" color="primary" gutterBottom sx={{ mb: 4 }}>
-            IDENTITY CARD GENERATED
+            HEALTH CARD GENERATED
           </Typography>
           {badgeData && (
-            <Box sx={{ p: 4, border: '2px solid #f1f5f9', borderRadius: 6, bgcolor: '#f8fafc', mb: 6 }}>
-              <Avatar 
-                src={badgeData.photoUrl} 
-                sx={{ width: 160, height: 160, mx: 'auto', mb: 3, border: '6px solid white', boxShadow: 2 }} 
-              />
-              <Typography variant="h4" fontWeight="900" sx={{ mb: 1 }}>{badgeData.name}</Typography>
-              <Typography variant="subtitle1" color="text.secondary" fontWeight="700" sx={{ mb: 4 }}>
-                ID: {badgeData.patientId.slice(0, 12).toUpperCase()}
+            <Box sx={{ 
+              p: 3, 
+              border: '2px solid #004d40', 
+              borderRadius: 4, 
+              bgcolor: 'white', 
+              mb: 6,
+              textAlign: 'center',
+              position: 'relative',
+              boxShadow: 3,
+              minHeight: 250,
+              display: 'flex',
+              flexDirection: 'column'
+            }}>
+              {/* Card Header */}
+              <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ mb: 1, borderBottom: '2px solid #004d40', pb: 1, textAlign: 'center' }}>
+                <Typography variant="h6" fontWeight="900" sx={{ fontSize: '1.1rem', color: '#333', lineHeight: 1.2, textAlign: 'center', width: '100%' }}>
+                  HEALTH AND EDUCATION FOR ALL, USA
+                </Typography>
+              </Stack>
+
+              <Typography variant="h5" fontWeight="900" sx={{ color: '#00796b', mb: 2, letterSpacing: 1 }}>
+                Health Card
               </Typography>
-              <Box 
-                component="img" 
-                src={badgeData.qrCode} 
-                sx={{ width: 220, height: 220, p: 2, bgcolor: 'white', borderRadius: 4, border: '1px solid #eee' }} 
-              />
+
+              <Stack direction="row" spacing={3} sx={{ flex: 1, alignItems: 'center' }}>
+                {/* Photo Column */}
+                <Box sx={{ 
+                  width: 120, 
+                  height: 150, 
+                  border: '2px solid #004d40', 
+                  borderRadius: 2, 
+                  overflow: 'hidden',
+                  bgcolor: '#f5f5f5',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {badgeData.photoUrl ? (
+                    <Box component="img" src={badgeData.photoUrl} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">NO PHOTO</Typography>
+                  )}
+                </Box>
+
+                {/* Info Column */}
+                <Box sx={{ textAlign: 'left', flex: 1 }}>
+                  <Typography variant="h6" fontWeight="800" sx={{ mb: 0.5, color: '#333', fontSize: '1rem' }}>
+                    {badgeData.clinicName}
+                  </Typography>
+
+                  <Typography variant="h5" fontWeight="900" sx={{ mb: 0.5, fontSize: '1.4rem', color: '#1a237e' }}>
+                    {badgeData.name}
+                  </Typography>
+
+                  <Typography variant="h6" color="text.secondary" fontWeight="800" sx={{ mb: 2, fontSize: '1.1rem' }}>
+                    ID: {badgeData.patientId.slice(0, 12).toUpperCase()}
+                  </Typography>
+                </Box>
+
+                {/* QR Column */}
+                <Box sx={{ textAlign: 'center' }}>
+                  <Box 
+                    component="img" 
+                    src={badgeData.qrCode} 
+                    sx={{ 
+                      width: 80, 
+                      height: 80, 
+                      p: 0.5, 
+                      bgcolor: 'white', 
+                      border: '1px solid #eee' 
+                    }} 
+                  />
+                  <Typography variant="caption" display="block" sx={{ mt: 0.5, fontWeight: 700, fontSize: '0.6rem' }}>
+                    SCAN TO VERIFY
+                  </Typography>
+                </Box>
+              </Stack>
             </Box>
           )}
           <Stack spacing={2}>
@@ -975,6 +1581,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
               variant="contained" 
               color="success" 
               size="large" 
+              onClick={handlePrint}
               sx={{ height: 80, fontWeight: 900, borderRadius: 4, fontSize: '1.5rem' }}
             >
               PRINT IDENTIFICATION

@@ -59,6 +59,30 @@ const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals }) => {
             </Typography>
           </Box>
         </Grid>
+        <Grid size={6}>
+          <Box sx={{ p: 1, borderRadius: 1, bgcolor: 'white', border: '1px solid divider' }}>
+            <Typography variant="caption" color="textSecondary" display="block">BMI</Typography>
+            <Typography variant="body2" fontWeight="bold">
+              {vitals.bmi} ({vitals.bmi_class})
+            </Typography>
+          </Box>
+        </Grid>
+        <Grid size={6}>
+          <Box sx={{ p: 1, borderRadius: 1, bgcolor: 'white', border: '1px solid divider' }}>
+            <Typography variant="caption" color="textSecondary" display="block">MUAC</Typography>
+            <Typography variant="body2" fontWeight="bold">
+              {vitals.muac} ({vitals.muac_class})
+            </Typography>
+          </Box>
+        </Grid>
+        <Grid size={12}>
+          <Box sx={{ p: 1, borderRadius: 1, bgcolor: 'white', border: '1px solid divider' }}>
+            <Typography variant="caption" color="textSecondary" display="block">Blood Group</Typography>
+            <Typography variant="body2" fontWeight="bold" color="error.main">
+              {vitals.blood_group || 'Not Recorded'}
+            </Typography>
+          </Box>
+        </Grid>
       </Grid>
     </Paper>
   );

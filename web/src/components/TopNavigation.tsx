@@ -135,7 +135,6 @@ const TopNavigation: React.FC = () => {
           )}
 
           <Box component={NavLink} to="/" sx={{ display: 'flex', alignItems: 'center', mr: 3, textDecoration: 'none' }}>
-            <img src="/logo.png" alt="HAEFA Logo" style={{ height: 32, marginRight: 12 }} />
             <Typography
               variant="h6"
               noWrap
