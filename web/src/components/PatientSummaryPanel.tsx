@@ -6,6 +6,8 @@ import { Patient, TriageAssessment } from '../types';
 import PatientAllergies from './PatientAllergies';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
+import { calculateAgeDisplay } from '../utils/patient';
+
 interface PatientSummaryPanelProps {
   patient: Patient;
   triage: TriageAssessment | null;
@@ -13,6 +15,7 @@ interface PatientSummaryPanelProps {
 
 const PatientSummaryPanel: React.FC<PatientSummaryPanelProps> = ({ patient, triage }) => {
   const [hasOwedMedication, setHasOwedMedication] = useState(false);
+  const ageDisplay = calculateAgeDisplay(patient);
 
   useEffect(() => {
     if (!patient.id) return;
@@ -59,7 +62,7 @@ const PatientSummaryPanel: React.FC<PatientSummaryPanelProps> = ({ patient, tria
           Basic Information
         </Typography>
         <Typography variant="body2" sx={{ mb: 0.5 }}><strong>Name:</strong> {patient.given_name} {patient.family_name}</Typography>
-        <Typography variant="body2" sx={{ mb: 0.5 }}><strong>Age/Gender:</strong> {patient.age_years !== undefined ? `${patient.age_years} YRS` : patient.date_of_birth} / {patient.gender}</Typography>
+        <Typography variant="body2" sx={{ mb: 0.5 }}><strong>Age/Gender:</strong> {ageDisplay || 'N/A'} / {patient.gender}</Typography>
         <Typography variant="body2" sx={{ mb: 0.5 }}><strong>Village:</strong> {patient.village || 'N/A'}</Typography>
         <Typography variant="body2" sx={{ mb: 0.5 }}><strong>Phone:</strong> {patient.phone || 'N/A'}</Typography>
       </Box>

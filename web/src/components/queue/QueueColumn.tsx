@@ -17,7 +17,7 @@ const QueueColumn: React.FC<QueueColumnProps> = ({ title, patients, onPatientCli
       elevation={0} 
       sx={{ 
         flex: 1,
-        minWidth: 320, 
+        minWidth: 200, 
         bgcolor: 'grey.50', 
         borderRadius: 3, 
         display: 'flex', 

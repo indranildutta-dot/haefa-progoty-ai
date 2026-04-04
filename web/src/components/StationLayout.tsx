@@ -79,7 +79,7 @@ const StationLayout: React.FC<StationLayoutProps> = ({
       {/* Sticky Patient Alert Bar */}
       {showPatientContext && <PatientContextBar />}
       
-      <Box component="main" sx={{ flexGrow: 1, pb: (isMobile || isTablet) ? 14 : 10 }}>
+      <Box component="main" sx={{ flexGrow: 1, pb: isMobile ? 14 : 10 }}>
         <Container maxWidth="xl" sx={{ mt: isMobile ? 2 : 4 }}>
           {(title || stationName) && (
             <Box sx={{ 
@@ -150,8 +150,8 @@ const StationLayout: React.FC<StationLayoutProps> = ({
         </Alert>
       </Snackbar>
 
-      {/* Mobile/Tablet Persistent Footer Navigation */}
-      {(isMobile || isTablet) && (
+      {/* Mobile Persistent Footer Navigation */}
+      {isMobile && (
         <Paper sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1200, borderTop: '1px solid #e2e8f0' }} elevation={10}>
           <BottomNavigation
             showLabels

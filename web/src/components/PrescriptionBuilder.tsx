@@ -174,11 +174,23 @@ const PrescriptionBuilder: React.FC<{ onPrescriptionChange?: (p: Prescription[])
                 {/* Schedule Row */}
                 <Grid size={{ xs: 12, md: 9 }}>
                    <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
-                      <TextField label="Freq" type="number" sx={{ width: 80 }} value={med.frequencyValue} onChange={(e) => updateMed(i, 'frequencyValue', e.target.value)} />
+                      <TextField 
+                        label="Freq" 
+                        type="number" 
+                        sx={{ width: 80 }} 
+                        value={isNaN(med.frequencyValue) ? '' : med.frequencyValue} 
+                        onChange={(e) => updateMed(i, 'frequencyValue', e.target.value === '' ? NaN : Number(e.target.value))} 
+                      />
                       <Select value={med.frequencyUnit} sx={{ flexGrow: 1 }} onChange={(e) => updateMed(i, 'frequencyUnit', e.target.value)}>
                         <MenuItem value="times daily">times daily</MenuItem><MenuItem value="times weekly">times weekly</MenuItem>
                       </Select>
-                      <TextField label="Dur" type="number" sx={{ width: 80 }} value={med.durationValue} onChange={(e) => updateMed(i, 'durationValue', e.target.value)} />
+                      <TextField 
+                        label="Dur" 
+                        type="number" 
+                        sx={{ width: 80 }} 
+                        value={isNaN(med.durationValue) ? '' : med.durationValue} 
+                        onChange={(e) => updateMed(i, 'durationValue', e.target.value === '' ? NaN : Number(e.target.value))} 
+                      />
                       <Select value={med.durationUnit} sx={{ flexGrow: 1 }} onChange={(e) => updateMed(i, 'durationUnit', e.target.value)}>
                         <MenuItem value="days">days</MenuItem><MenuItem value="weeks">weeks</MenuItem><MenuItem value="months">months</MenuItem>
                       </Select>

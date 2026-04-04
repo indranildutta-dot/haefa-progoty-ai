@@ -332,9 +332,8 @@ service cloud.firestore {
     }
 
     match /clinics/{clinicId}/inventory/{batchId} {
-      allow read: if isAuthenticated();
-      // Debug: Allow any authenticated user to write to inventory
-      allow write: if isAuthenticated();
+      allow read: if isApproved() && (isGlobalAdmin() || isStaff(clinicId));
+      allow write: if isApproved() && (isGlobalAdmin() || isStaff(clinicId));
     }
 
     match /inventory_logs/{logId} {

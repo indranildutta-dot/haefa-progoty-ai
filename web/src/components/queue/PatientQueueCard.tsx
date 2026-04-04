@@ -17,13 +17,12 @@ const PatientQueueCard: React.FC<PatientQueueCardProps> = ({ patient, onClick })
     return `${hrs} hr ${mins} min`;
   };
 
-  const getTriageColor = (level?: string) => {
+  const getHaloColor = (level?: string) => {
     switch (level?.toLowerCase()) {
-      case 'emergency': return 'error.main';
-      case 'urgent': return 'warning.main';
-      case 'standard': return 'warning.light'; // Yellow
-      case 'low': return 'success.main';
-      default: return 'grey.400';
+      case 'emergency': return '#ef4444'; // Red
+      case 'urgent': return '#f59e0b';    // Yellow
+      case 'standard': return '#10b981';  // Green
+      default: return '#94a3b8';         // Grey
     }
   };
 
@@ -33,60 +32,70 @@ const PatientQueueCard: React.FC<PatientQueueCardProps> = ({ patient, onClick })
     return 'text.secondary';
   };
 
+  const nameParts = (patient.patientName || 'Unknown Patient').split(' ');
+  const firstName = nameParts[0];
+  const lastName = nameParts.slice(1).join(' ');
+
   return (
     <Box 
       onClick={() => onClick(patient)}
       sx={{ 
-        p: 1.5, 
-        mb: 1.5, 
+        p: 1, 
+        mb: 1, 
         bgcolor: 'background.paper', 
-        borderRadius: 2, 
-        border: '1px solid',
+        borderRadius: 3, 
+        border: '1.5px solid',
         borderColor: 'divider',
         cursor: 'pointer',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-        '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.main' },
+        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+        '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.main', transform: 'translateY(-2px)' },
+        transition: 'all 0.2s ease',
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
-        gap: 0.5
+        minWidth: 0
       }}
     >
-      <Box sx={{ position: 'absolute', top: 8, right: 8 }}>
-        <Chip 
-          label={patient.triageLevel?.toUpperCase() || 'STANDARD'} 
-          size="small" 
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Avatar 
+          src={patient.photoUrl} 
           sx={{ 
-            bgcolor: getTriageColor(patient.triageLevel),
-            color: patient.triageLevel === 'standard' ? 'black' : 'white',
-            fontWeight: 900,
-            fontSize: '0.65rem',
-            height: 20,
-            borderRadius: 1
-          }} 
-        />
-      </Box>
-      
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-        <Avatar src={patient.photoUrl} sx={{ width: 48, height: 48, mr: 1.5, border: '2px solid', borderColor: 'grey.200' }}>
+            width: 56, 
+            height: 56, 
+            border: '6px solid', 
+            borderColor: getHaloColor(patient.triageLevel),
+            boxShadow: `0 0 0 2px white, 0 0 15px ${getHaloColor(patient.triageLevel)}66`,
+            flexShrink: 0
+          }}
+        >
           {patient.patientName?.charAt(0) || '?'}
         </Avatar>
-        <Box sx={{ pr: 8 }}>
-          <Typography variant="subtitle2" fontWeight="800" noWrap sx={{ fontSize: '0.95rem', lineHeight: 1.2 }}>
-            {patient.patientName || 'Unknown Patient'}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-            Age: {patient.age ?? 'N/A'} {patient.gender?.charAt(0).toUpperCase() || ''}
+        
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+            <Typography variant="subtitle2" fontWeight="900" noWrap sx={{ fontSize: '0.9rem', lineHeight: 1.1, color: 'text.primary' }}>
+              {firstName}
+            </Typography>
+            <Typography variant="subtitle2" fontWeight="900" noWrap sx={{ fontSize: '0.9rem', lineHeight: 1.1, color: 'text.primary' }}>
+              {lastName}
+            </Typography>
+          </Box>
+          <Typography variant="caption" color="text.secondary" fontWeight="700" sx={{ display: 'block', mt: 0.5, fontSize: '0.75rem' }}>
+            {patient.ageDisplay ? `${patient.ageDisplay} • ` : ''}{patient.gender?.charAt(0).toUpperCase() || 'N/A'}
           </Typography>
         </Box>
       </Box>
       
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mt: 0.5 }}>
-        <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: '60%' }}>
-          Village: {patient.village || 'N/A'}
-        </Typography>
-        <Typography variant="caption" sx={{ color: getWaitTimeColor(waitMinutes), fontWeight: '900', bgcolor: waitMinutes > 30 ? (waitMinutes > 60 ? 'error.50' : 'warning.50') : 'transparent', px: waitMinutes > 30 ? 1 : 0, py: waitMinutes > 30 ? 0.5 : 0, borderRadius: 1 }}>
-          Waiting: {formatWaitTime(waitMinutes)}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1, pt: 0.5, borderTop: '1px dashed', borderColor: 'divider' }}>
+        <Typography variant="caption" sx={{ 
+          color: getWaitTimeColor(waitMinutes), 
+          fontWeight: '900', 
+          fontSize: '0.7rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0.5
+        }}>
+          WAITING: {formatWaitTime(waitMinutes)}
         </Typography>
       </Box>
     </Box>

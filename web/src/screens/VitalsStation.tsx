@@ -103,8 +103,8 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
 
   const getMUACClass = (muac: number) => {
     if (!muac) return '';
-    if (muac < 21) return 'Severely Malnourished';
-    if (muac < 23) return 'Moderately Malnourished';
+    if (muac < 11.5) return 'Severely Malnourished';
+    if (muac < 12.5) return 'Moderately Malnourished';
     return 'Normal';
   };
 
@@ -119,8 +119,10 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
       updates.bmi_class = getBMIClass(bmi);
     }
 
-    if (vitals.muac) {
+    if (vitals.muac && !isNaN(vitals.muac)) {
       updates.muac_class = getMUACClass(vitals.muac);
+    } else {
+      updates.muac_class = '';
     }
 
     if (Object.keys(updates).length > 0) {
@@ -128,15 +130,42 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
     }
   }, [vitals.weight, vitals.height, vitals.muac]);
 
-  // SAFETY SENTINEL SYNC: Ensures top bar updates as nurse types
+  // SAFETY SENTINEL SYNC: Ensures top bar updates as nurse types all fields
   useEffect(() => {
     if (selectedPatient) {
+      const triage = evaluateTriage(vitals, selectedPatient?.age_years, selectedPatient?.age_months);
+      
+      // CRITICAL: Force is_pregnant to false for non-females to prevent data leakage
+      const isFemale = selectedPatient.gender?.toLowerCase() === 'female';
+      const safeIsPregnant = isFemale ? !!vitals.is_pregnant : false;
+
       setSelectedPatient({
         ...selectedPatient,
-        currentVitals: { ...vitals, triage_level: evaluateTriage(vitals, selectedPatient?.age_years, selectedPatient?.age_months).triage_level }
+        triage_level: triage.triage_level,
+        currentVitals: { 
+          ...vitals, 
+          is_pregnant: safeIsPregnant,
+          triage_level: triage.triage_level 
+        }
       });
     }
-  }, [vitals.is_pregnant, vitals.tobacco_use, vitals.allergies]);
+  }, [
+    vitals.systolic, 
+    vitals.diastolic, 
+    vitals.heartRate, 
+    vitals.oxygenSaturation, 
+    vitals.temperature,
+    vitals.is_pregnant, 
+    vitals.tobacco_use, 
+    vitals.allergies,
+    vitals.weight,
+    vitals.height,
+    vitals.bmi,
+    vitals.bmi_class,
+    vitals.muac_class,
+    vitals.blood_sugar,
+    vitals.hemoglobin
+  ]);
 
   // Smart Wait-Time Formatting: Shows hours if > 60 mins
   const formatWaitTime = (createdAt: any) => {
@@ -149,6 +178,30 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
   };
 
   const systemTriage = evaluateTriage(vitals, selectedPatient?.age_years, selectedPatient?.age_months);
+
+  const getAgeYears = (p: any): number => {
+    if (!p) return 0;
+    let years: number | undefined;
+    if (p.age_years !== null && p.age_years !== undefined) {
+      if (p.age_years > 1900) years = new Date().getFullYear() - p.age_years;
+      else years = p.age_years;
+    } else if (p.date_of_birth) {
+      const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+      if (regex.test(p.date_of_birth)) {
+        const [_, day, month, year] = p.date_of_birth.match(regex)!;
+        const birthDate = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
+        const today = new Date();
+        years = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) years--;
+      }
+    } else if (p.estimated_birth_year) {
+      years = new Date().getFullYear() - p.estimated_birth_year;
+    }
+    return years ?? 0;
+  };
+
+  const isUnderFive = getAgeYears(selectedPatient) < 5;
 
   const getVitalStatus = (type: 'bp' | 'hr' | 'o2', val1: number, val2?: number) => {
     if (type === 'bp') {
@@ -295,7 +348,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       fullWidth 
                       label="Weight (kg)" 
                       type="number" 
-                      value={vitals.weight} 
+                      value={isNaN(vitals.weight) ? '' : vitals.weight} 
                       onChange={(e) => setVitals({...vitals, weight: parseFloat(e.target.value)})} 
                       InputProps={{ sx: { height: 100, fontSize: '2rem', fontWeight: 800 }}} 
                       InputLabelProps={{ sx: { fontWeight: 700 }}}
@@ -306,7 +359,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       fullWidth 
                       label="Height (cm)" 
                       type="number" 
-                      value={vitals.height} 
+                      value={isNaN(vitals.height) ? '' : vitals.height} 
                       onChange={(e) => setVitals({...vitals, height: parseFloat(e.target.value)})} 
                       InputProps={{ sx: { height: 100, fontSize: '2rem', fontWeight: 800 }}} 
                       InputLabelProps={{ sx: { fontWeight: 700 }}}
@@ -318,7 +371,19 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       label="BMI" 
                       disabled
                       value={vitals.bmi || ''} 
-                      InputProps={{ sx: { height: 100, fontSize: '2rem', fontWeight: 800, bgcolor: '#f8fafc' }}} 
+                      InputProps={{ 
+                        sx: { 
+                          height: 100, 
+                          fontSize: '2rem', 
+                          fontWeight: 800, 
+                          bgcolor: '#f8fafc',
+                          border: vitals.bmi_class === 'Obese' ? '4px solid #ef4444' : 
+                                  vitals.bmi_class === 'Overweight' ? '4px solid #f59e0b' : 'none',
+                          borderRadius: 2,
+                          boxShadow: vitals.bmi_class === 'Obese' ? '0 0 15px rgba(239, 68, 68, 0.3)' : 
+                                     vitals.bmi_class === 'Overweight' ? '0 0 15px rgba(245, 158, 11, 0.3)' : 'none'
+                        }
+                      }} 
                       InputLabelProps={{ sx: { fontWeight: 700 }}}
                     />
                   </Grid>
@@ -328,31 +393,67 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       label="BMI Class" 
                       disabled
                       value={vitals.bmi_class || ''} 
-                      InputProps={{ sx: { height: 100, fontSize: '1.5rem', fontWeight: 800, bgcolor: '#f8fafc', color: 'primary.main' }}} 
+                      InputProps={{ 
+                        sx: { 
+                          height: 100, 
+                          fontSize: '1.5rem', 
+                          fontWeight: 800, 
+                          bgcolor: '#f8fafc', 
+                          color: vitals.bmi_class === 'Obese' ? '#ef4444' : 
+                                 vitals.bmi_class === 'Overweight' ? '#f59e0b' : 'primary.main',
+                          border: vitals.bmi_class === 'Obese' ? '4px solid #ef4444' : 
+                                  vitals.bmi_class === 'Overweight' ? '4px solid #f59e0b' : 'none',
+                          borderRadius: 2,
+                          boxShadow: vitals.bmi_class === 'Obese' ? '0 0 15px rgba(239, 68, 68, 0.3)' : 
+                                     vitals.bmi_class === 'Overweight' ? '0 0 15px rgba(245, 158, 11, 0.3)' : 'none'
+                        }
+                      }} 
                       InputLabelProps={{ sx: { fontWeight: 700 }}}
                     />
                   </Grid>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <TextField 
-                      fullWidth 
-                      label="MUAC (cm)" 
-                      type="number" 
-                      value={vitals.muac} 
-                      onChange={(e) => setVitals({...vitals, muac: parseFloat(e.target.value)})} 
-                      InputProps={{ sx: { height: 100, fontSize: '2rem', fontWeight: 800 }}} 
-                      InputLabelProps={{ sx: { fontWeight: 700 }}}
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <TextField 
-                      fullWidth 
-                      label="MUAC Class" 
-                      disabled
-                      value={vitals.muac_class || ''} 
-                      InputProps={{ sx: { height: 100, fontSize: '1.5rem', fontWeight: 800, bgcolor: '#f8fafc', color: 'primary.main' }}} 
-                      InputLabelProps={{ sx: { fontWeight: 700 }}}
-                    />
-                  </Grid>
+
+                  {isUnderFive && (
+                    <>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField 
+                          fullWidth 
+                          label="MUAC (cm)" 
+                          type="number" 
+                          value={isNaN(vitals.muac) ? '' : vitals.muac} 
+                          onChange={(e) => setVitals({...vitals, muac: parseFloat(e.target.value)})} 
+                          InputProps={{ 
+                            sx: { 
+                              height: 100, 
+                              fontSize: '2rem', 
+                              fontWeight: 800,
+                              border: vitals.muac ? (vitals.muac < 11.5 ? '4px solid #ef4444' : vitals.muac < 12.5 ? '4px solid #f59e0b' : '4px solid #10b981') : 'none',
+                              boxShadow: vitals.muac ? (vitals.muac < 11.5 ? '0 0 15px #ef444444' : vitals.muac < 12.5 ? '0 0 15px #f59e0b44' : '0 0 15px #10b98144') : 'none',
+                            }
+                          }} 
+                          InputLabelProps={{ sx: { fontWeight: 700 }}}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField 
+                          fullWidth 
+                          label="MUAC Class" 
+                          disabled
+                          value={vitals.muac_class || ''} 
+                          InputProps={{ 
+                            sx: { 
+                              height: 100, 
+                              fontSize: '1.5rem', 
+                              fontWeight: 800, 
+                              bgcolor: '#f8fafc', 
+                              color: vitals.muac_class === 'Severely Malnourished' ? '#ef4444' : vitals.muac_class === 'Moderately Malnourished' ? '#f59e0b' : '#10b981'
+                            }
+                          }} 
+                          InputLabelProps={{ sx: { fontWeight: 700 }}}
+                        />
+                      </Grid>
+                    </>
+                  )}
+
                   <Grid size={{ xs: 12 }}>
                     <FormControl fullWidth>
                       <InputLabel sx={{ fontWeight: 700 }}>Blood Group</InputLabel>
@@ -404,7 +505,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                     <TextField 
                       label="Systolic" 
                       type="number" 
-                      value={vitals.systolic} 
+                      value={isNaN(vitals.systolic) ? '' : vitals.systolic} 
                       onChange={(e) => setVitals({...vitals, systolic: parseInt(e.target.value)})} 
                       InputProps={{ sx: { fontSize: '5rem', fontWeight: 900, textAlign: 'center', height: 150 }}} 
                       InputLabelProps={{ sx: { fontSize: '1.5rem', fontWeight: 700 }}}
@@ -413,7 +514,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                     <TextField 
                       label="Diastolic" 
                       type="number" 
-                      value={vitals.diastolic} 
+                      value={isNaN(vitals.diastolic) ? '' : vitals.diastolic} 
                       onChange={(e) => setVitals({...vitals, diastolic: parseInt(e.target.value)})} 
                       InputProps={{ sx: { fontSize: '5rem', fontWeight: 900, textAlign: 'center', height: 150 }}} 
                       InputLabelProps={{ sx: { fontSize: '1.5rem', fontWeight: 700 }}}
@@ -430,7 +531,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                         fullWidth 
                         label="Heart Rate (bpm)" 
                         type="number"
-                        value={vitals.heartRate} 
+                        value={isNaN(vitals.heartRate) ? '' : vitals.heartRate} 
                         onChange={(e) => setVitals({...vitals, heartRate: parseInt(e.target.value)})} 
                         InputProps={{ sx: { height: 100, fontSize: '2.5rem', fontWeight: 800 }}}
                       />
@@ -445,7 +546,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                         fullWidth 
                         label="SpO2 (%)" 
                         type="number"
-                        value={vitals.oxygenSaturation} 
+                        value={isNaN(vitals.oxygenSaturation) ? '' : vitals.oxygenSaturation} 
                         onChange={(e) => setVitals({...vitals, oxygenSaturation: parseInt(e.target.value)})} 
                         InputProps={{ sx: { height: 100, fontSize: '2.5rem', fontWeight: 800 }}}
                       />
@@ -540,8 +641,8 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       fullWidth 
                       label="Blood Sugar (mg/dL)" 
                       type="number"
-                      value={vitals.blood_sugar} 
-                      onChange={(e) => setVitals({...vitals, blood_sugar: parseFloat(e.target.value) || 0})} 
+                      value={isNaN(vitals.blood_sugar) ? '' : vitals.blood_sugar} 
+                      onChange={(e) => setVitals({...vitals, blood_sugar: parseFloat(e.target.value)})} 
                       InputProps={{ sx: { height: 100, fontSize: '2.5rem', fontWeight: 800 }}}
                     />
                   </Grid>
@@ -550,8 +651,8 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       fullWidth 
                       label="Hemoglobin (g/dL)" 
                       type="number"
-                      value={vitals.hemoglobin} 
-                      onChange={(e) => setVitals({...vitals, hemoglobin: parseFloat(e.target.value) || 0})} 
+                      value={isNaN(vitals.hemoglobin) ? '' : vitals.hemoglobin} 
+                      onChange={(e) => setVitals({...vitals, hemoglobin: parseFloat(e.target.value)})} 
                       InputProps={{ sx: { height: 100, fontSize: '2.5rem', fontWeight: 800 }}}
                     />
                   </Grid>

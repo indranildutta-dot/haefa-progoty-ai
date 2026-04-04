@@ -14,6 +14,8 @@ import SpeedIcon from '@mui/icons-material/Speed';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import OpacityIcon from '@mui/icons-material/Opacity';
 
+import { calculateAgeDisplay } from '../utils/patient';
+
 const PatientContextBar: React.FC = () => {
   const { selectedPatient } = useAppStore();
   const { isMobile } = useResponsiveLayout();
@@ -21,11 +23,7 @@ const PatientContextBar: React.FC = () => {
   if (!selectedPatient) return null;
 
   // 1. Precise Age Calculation
-  const age = selectedPatient.age_years !== undefined 
-    ? selectedPatient.age_years 
-    : (selectedPatient.date_of_birth 
-        ? new Date().getFullYear() - new Date(selectedPatient.date_of_birth).getFullYear() 
-        : '??');
+  const ageDisplay = calculateAgeDisplay(selectedPatient);
 
   // 2. Triage Color System (Global Clinical Standard)
   const getTriageStyle = (level: string) => {
@@ -69,9 +67,10 @@ const PatientContextBar: React.FC = () => {
         sx={{ 
           width: 52, 
           height: 52, 
-          border: '2px solid white', 
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-          bgcolor: 'primary.main'
+          border: `4px solid ${triage.bg}`, 
+          boxShadow: `0 0 15px ${triage.bg}66`,
+          bgcolor: 'primary.main',
+          transition: 'all 0.3s ease'
         }}
       >
         {selectedPatient.given_name?.[0]}{selectedPatient.family_name?.[0]}
@@ -83,7 +82,7 @@ const PatientContextBar: React.FC = () => {
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
           <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', textTransform: 'uppercase', bgcolor: '#f1f5f9', px: 1, borderRadius: 1 }}>
-            {selectedPatient.gender} • {age} YRS
+            {selectedPatient.gender} • {ageDisplay || '??'}
           </Typography>
         </Box>
       </Box>
@@ -113,15 +112,6 @@ const PatientContextBar: React.FC = () => {
 
       {/* SECTION: The Risk Sentinel (Alert Network) */}
       <Stack direction="row" spacing={1} alignItems="center">
-        {/* Triage Badge */}
-        <Chip 
-          label={triage.label} 
-          sx={{ 
-            bgcolor: triage.bg, color: triage.text, fontWeight: 900, 
-            borderRadius: 1.5, height: 28, border: triage.border, fontSize: '0.7rem'
-          }} 
-        />
-
         {/* Pregnancy Alert */}
         {selectedPatient?.gender?.toLowerCase() === 'female' && vitals?.is_pregnant === true && (
           <Tooltip title={`Pregnancy: ${vitals?.pregnancy_months || '?'} months`}>
@@ -134,7 +124,7 @@ const PatientContextBar: React.FC = () => {
         )}
 
         {/* Allergy Alert */}
-        {vitals?.allergies && (Array.isArray(vitals.allergies) ? vitals.allergies.length > 0 : String(vitals.allergies).length > 0) && (
+        {!!vitals?.allergies && (Array.isArray(vitals.allergies) ? vitals.allergies.length > 0 : String(vitals.allergies).length > 0) && (
           <Tooltip title={`Allergies: ${Array.isArray(vitals.allergies) ? vitals.allergies.join(', ') : vitals.allergies}`}>
             <Chip 
               icon={<WarningIcon style={{ color: 'white', fontSize: 16 }} />}
@@ -145,7 +135,7 @@ const PatientContextBar: React.FC = () => {
         )}
 
         {/* Substance Use (Dhaka Standard) */}
-        {vitals?.tobacco_use && vitals?.tobacco_use !== 'none' && (
+        {!!vitals?.tobacco_use && vitals?.tobacco_use !== 'none' && (
           <>
             {(vitals.tobacco_use === 'smoking' || vitals.tobacco_use === 'both') && (
               <Chip 
@@ -165,7 +155,7 @@ const PatientContextBar: React.FC = () => {
         )}
 
         {/* Alcohol Alert */}
-        {vitals?.alcohol_consumption && vitals?.alcohol_consumption !== 'none' && (
+        {!!vitals?.alcohol_consumption && vitals?.alcohol_consumption !== 'none' && (
           <Chip 
             icon={<WineBarIcon style={{ color: 'white', fontSize: 16 }} />}
             label={vitals.alcohol_consumption.toUpperCase()}
@@ -174,7 +164,7 @@ const PatientContextBar: React.FC = () => {
         )}
 
         {/* BMI Alert */}
-        {vitals?.bmi_class && (vitals.bmi_class === 'Obese' || vitals.bmi_class === 'Underweight') && (
+        {!!vitals?.bmi_class && (vitals.bmi_class === 'Obese' || vitals.bmi_class === 'Underweight') && (
           <Chip 
             icon={<SpeedIcon style={{ color: 'white', fontSize: 16 }} />}
             label={vitals.bmi_class.toUpperCase()}
@@ -192,7 +182,7 @@ const PatientContextBar: React.FC = () => {
         )}
 
         {/* SpO2 Alert */}
-        {vitals?.oxygenSaturation && vitals.oxygenSaturation < 94 && (
+        {vitals?.oxygenSaturation !== undefined && vitals.oxygenSaturation < 94 && (
           <Chip 
             icon={<OpacityIcon style={{ color: 'white', fontSize: 16 }} />}
             label="LOW SpO2"
@@ -201,7 +191,7 @@ const PatientContextBar: React.FC = () => {
         )}
 
         {/* Blood Sugar Alert */}
-        {vitals?.blood_sugar && vitals.blood_sugar >= 200 && (
+        {vitals?.blood_sugar !== undefined && vitals.blood_sugar >= 200 && (
           <Chip 
             label="HIGH SUGAR"
             sx={{ bgcolor: '#9d174d', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}

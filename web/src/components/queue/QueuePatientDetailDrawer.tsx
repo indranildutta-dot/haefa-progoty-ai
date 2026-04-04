@@ -65,7 +65,18 @@ const QueuePatientDetailDrawer: React.FC<QueuePatientDetailDrawerProps> = ({ pat
     }
   };
 
+  const getHaloColor = (level?: string) => {
+    switch (level?.toLowerCase()) {
+      case 'emergency': return '#ef4444'; // Red
+      case 'urgent': return '#f59e0b';    // Yellow
+      case 'standard': return '#10b981';  // Green
+      default: return '#94a3b8';         // Grey
+    }
+  };
+
   if (!patient) return null;
+
+  const haloColor = getHaloColor(patient.triageLevel);
 
   return (
     <Dialog open={!!patient} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
@@ -74,18 +85,25 @@ const QueuePatientDetailDrawer: React.FC<QueuePatientDetailDrawerProps> = ({ pat
       </DialogTitle>
       <DialogContent dividers sx={{ p: 3, bgcolor: 'grey.50' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-          <Avatar src={patient.photoUrl} sx={{ width: 80, height: 80, mr: 3, border: '3px solid', borderColor: 'primary.light' }}>
+          <Avatar 
+            src={patient.photoUrl} 
+            sx={{ 
+              width: 80, 
+              height: 80, 
+              mr: 3, 
+              border: '6px solid', 
+              borderColor: haloColor,
+              boxShadow: `0 0 0 2px white, 0 0 20px ${haloColor}66`
+            }}
+          >
             {patient.patientName?.charAt(0) || '?'}
           </Avatar>
           <Box>
             <Typography variant="h5" fontWeight="900" gutterBottom>{patient.patientName || 'Unknown Patient'}</Typography>
             <Typography variant="body1" color="text.secondary" fontWeight="bold">
-              Age: {patient.age ?? 'N/A'} | {patient.gender?.toUpperCase() || 'N/A'} | Village: {patient.village || 'N/A'}
+              {patient.ageDisplay ? `Age: ${patient.ageDisplay} | ` : ''}{patient.gender?.toUpperCase() || 'N/A'} | Village: {patient.village || 'N/A'}
             </Typography>
             <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
-              <Typography variant="body2" sx={{ bgcolor: 'warning.light', px: 1, py: 0.5, borderRadius: 1, fontWeight: 'bold' }}>
-                Triage: {patient.triageLevel?.toUpperCase() || 'STANDARD'}
-              </Typography>
               <Typography variant="body2" sx={{ bgcolor: 'info.light', px: 1, py: 0.5, borderRadius: 1, fontWeight: 'bold' }}>
                 Status: {patient.encounterStatus.replace(/_/g, ' ')}
               </Typography>

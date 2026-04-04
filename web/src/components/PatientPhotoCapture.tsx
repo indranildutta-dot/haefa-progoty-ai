@@ -24,6 +24,7 @@ interface PatientPhotoCaptureProps {
   patientId?: string;
   onPhotoUploaded?: (url: string) => void;
   currentPhoto?: string;
+  isNewPatient?: boolean;
 }
 
 type UIState = 'idle' | 'capturing' | 'processing' | 'uploading' | 'complete' | 'error';
@@ -31,7 +32,12 @@ type UIState = 'idle' | 'capturing' | 'processing' | 'uploading' | 'complete' | 
 const DB_NAME = 'haefa-offline-photos';
 const STORE_NAME = 'pending-uploads';
 
-const PatientPhotoCapture: React.FC<PatientPhotoCaptureProps> = ({ patientId, onPhotoUploaded, currentPhoto }) => {
+const PatientPhotoCapture: React.FC<PatientPhotoCaptureProps> = ({ 
+  patientId, 
+  onPhotoUploaded, 
+  currentPhoto,
+  isNewPatient = false
+}) => {
   const { selectedCountry, selectedClinic, notify } = useAppStore();
   const [state, setState] = useState<UIState>(currentPhoto ? 'complete' : 'idle');
   const [progress, setProgress] = useState(0);
@@ -190,16 +196,20 @@ const PatientPhotoCapture: React.FC<PatientPhotoCaptureProps> = ({ patientId, on
           const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
           
           // Update Firestore: patients/{patientId} -> photo_url: downloadURL
-          const patientRef = doc(db, "patients", patientId);
-          try {
-            await updateDoc(patientRef, { photo_url: downloadURL });
-          } catch (updateErr: any) {
-            // If document doesn't exist, it's likely a new registration.
-            // The parent component will handle the initial setDoc.
-            if (updateErr.code !== 'not-found') {
-              throw updateErr;
+          // ONLY if it's an existing patient (edit mode).
+          // For new registrations, the parent component handles the initial setDoc.
+          if (!isNewPatient) {
+            const patientRef = doc(db, "patients", patientId);
+            try {
+              await updateDoc(patientRef, { photo_url: downloadURL });
+            } catch (updateErr: any) {
+              // If document doesn't exist, it's likely a new registration.
+              // The parent component will handle the initial setDoc.
+              if (updateErr.code !== 'not-found' && updateErr.code !== 'permission-denied') {
+                throw updateErr;
+              }
+              console.log("Patient document not found or permission denied, skipping immediate update (likely new registration)");
             }
-            console.log("Patient document not found, skipping immediate update (likely new registration)");
           }
           
           // Clear offline storage if it existed

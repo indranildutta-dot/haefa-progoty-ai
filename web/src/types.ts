@@ -48,6 +48,12 @@ export interface Patient {
   nepal_id?: string;
   patient_type?: string;
   address_type?: 'home' | 'refugee camp';
+  is_fdmn?: boolean;
+  camp_name?: string;
+  block_number?: string;
+  majhi_name?: string;
+  tent_number?: string;
+  fcn_number?: string;
   address_line?: string;
   village?: string;
   thana?: string;
@@ -56,6 +62,10 @@ export interface Patient {
   post_code?: string;
   district?: string;
   country?: string;
+  father_given_name?: string;
+  father_family_name?: string;
+  mother_given_name?: string;
+  mother_family_name?: string;
   permanent_address_same_as_present?: boolean;
   perm_address_line?: string;
   perm_village?: string;
@@ -69,6 +79,9 @@ export interface Patient {
   clinic_id: string;
   created_at: Timestamp;
   updated_at?: Timestamp;
+  last_visit_date?: Timestamp;
+  latest_encounter_id?: string;
+  encounter_count?: number;
   triage_level?: string;
   currentVitals?: VitalsRecord;
   chronic_diseases?: string[];
@@ -238,7 +251,7 @@ export interface QueuePatient {
   waitTimeDisplay: string;
   triageColor: string;
   photoUrl?: string;
-  age?: number;
+  ageDisplay?: string;
   gender?: string;
   village?: string;
 }

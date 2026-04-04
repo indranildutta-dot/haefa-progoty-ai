@@ -13,6 +13,8 @@ import QueuePatientDetailDrawer from '../components/queue/QueuePatientDetailDraw
 import StationLayout from '../components/StationLayout';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
+import { calculateAgeDisplay } from '../utils/patient';
+
 const QueueBoard: React.FC<{ countryId: string }> = ({ countryId }) => {
   const { selectedCountry, selectedClinic, userProfile } = useAppStore();
   const [rawQueueItems, setRawQueueItems] = useState<QueueItem[]>([]);
@@ -96,7 +98,7 @@ const QueueBoard: React.FC<{ countryId: string }> = ({ countryId }) => {
         waitTimeDisplay: formatWaitTime(item.created_at),
         triageColor: getTriageColor(item.triage_level),
         photoUrl: p?.photo_url,
-        age: p?.age_years,
+        ageDisplay: calculateAgeDisplay(p),
         gender: p?.gender,
         village: p?.village
       } as any;
