@@ -20,7 +20,17 @@ The queue board provides real-time monitoring of patient flow and triage priorit
   - **Compact Layout**: Keep column widths at **200px** and split names into two lines.
   - **Real-time Updates**: Ensure `onSnapshot` listeners are correctly implemented for all stations.
 
-## 3. Search & Identification
+## 3. Vitals Station Reference
+The Vitals workflow is split into three modes (Body Measures, Vital Signs, Labs & Risk).
+- **Documentation**: Refer to `/vitals_station.md` for the full specification of fields, thresholds, and logic.
+- **Key Constraints**:
+  - **Clinical Thresholds**: Always use the age-based thresholds for Heart Rate (HR) and Respiratory Rate (RR) as defined in `vitals_station.md`.
+  - **Glucose Thresholds**: Use the EMR logic for FBG (Normal < 100, Alert >= 100, High >= 126) and RBG (Normal < 140, Alert >= 140, Critical >= 200).
+  - **Patient Halo**: The halo color must reflect the highest severity across all vitals. **Nurse Override** takes absolute precedence if set.
+  - **Safety Sentinel Sync**: Ensure the `useEffect` in `VitalsStation.tsx` is maintained to sync inputs with the top bar in real-time.
+  - **Units**: Always display units clearly (kg, cm, bpm, %, °C, mmol/L).
+
+## 4. Search & Identification
 - Search must support multiple identifiers (NID, FDMN, Nepal ID, Phone).
 - Results must display the patient photo for verification.
 - Actions (Reprint, Edit, Start Visit) must remain functional across all country configurations.

@@ -124,8 +124,6 @@ const ClinicalSidebar: React.FC = () => {
                   value={v.bmi} 
                   unit={v.bmi_class} 
                   color="primary.main"
-                  isObese={v.bmi_class === 'Obese'}
-                  isOverweight={v.bmi_class === 'Overweight'}
                 />
                 {v.muac && <DataRow icon={<WeightIcon />} label="MUAC" value={v.muac} unit={v.muac_class} />}
                 {v.blood_group && <DataRow icon={<OpacityIcon />} label="Blood Group" value={v.blood_group} color="error.main" />}

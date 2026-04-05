@@ -42,6 +42,114 @@ const PatientContextBar: React.FC = () => {
   const triage = getTriageStyle(selectedPatient.triage_level || 'standard');
   const vitals = selectedPatient.currentVitals;
 
+  // 3. Highest Alert Color System (Halo)
+  const getHighestAlertColor = () => {
+    const colors = {
+      RED: '#ef4444',
+      YELLOW: '#f59e0b',
+      GREEN: '#10b981',
+      GRAY: '#94a3b8'
+    };
+
+    let highestPriority = 0; // 0: Gray, 1: Green, 2: Yellow, 3: Red
+    let finalColor = colors.GRAY;
+
+    const updatePriority = (color: string) => {
+      let p = 0;
+      if (color === colors.RED || color === '#f43f5e') p = 3;
+      else if (color === colors.YELLOW) p = 2;
+      else if (color === colors.GREEN) p = 1;
+
+      if (p > highestPriority) {
+        highestPriority = p;
+        finalColor = color;
+      }
+    };
+
+    // Factor: Triage Level
+    updatePriority(triage.bg);
+
+    if (vitals) {
+      // Helper to get age in years
+      const getAgeYears = () => {
+        let years = selectedPatient.age_years;
+        if (selectedPatient.date_of_birth) {
+          const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+          if (regex.test(selectedPatient.date_of_birth)) {
+            const [_, day, month, year] = selectedPatient.date_of_birth.match(regex)!;
+            const birthDate = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
+            const today = new Date();
+            years = today.getFullYear() - birthDate.getFullYear();
+            const m = today.getMonth() - birthDate.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) years--;
+          }
+        } else if (selectedPatient.estimated_birth_year) {
+          years = new Date().getFullYear() - selectedPatient.estimated_birth_year;
+        }
+        return years ?? 0;
+      };
+
+      const age = getAgeYears();
+
+      // Factor: BP
+      const s = vitals.systolic_2 || vitals.systolic;
+      const d = vitals.diastolic_2 || vitals.diastolic;
+      if (s >= 180 || d >= 120) updatePriority(colors.RED);
+      else if (s >= 130 || d >= 80) updatePriority(colors.YELLOW);
+      else if (s > 0) updatePriority(colors.GREEN);
+
+      // Factor: HR
+      if (vitals.heartRate > 0) {
+        let hrLow = 60, hrHigh = 100;
+        if (age < 1) { hrLow = 100; hrHigh = 160; }
+        else if (age <= 2) { hrLow = 98; hrHigh = 140; }
+        else if (age <= 5) { hrLow = 80; hrHigh = 120; }
+        else if (age <= 12) { hrLow = 75; hrHigh = 110; }
+
+        if (vitals.heartRate > hrHigh || vitals.heartRate < hrLow) updatePriority(colors.RED);
+        else if (vitals.heartRate > (hrHigh - 5) || vitals.heartRate < (hrLow + 5)) updatePriority(colors.YELLOW);
+        else updatePriority(colors.GREEN);
+      }
+
+      // Factor: RR
+      if (vitals.respiratoryRate > 0) {
+        let rrLow = 12, rrHigh = 20;
+        if (age < 1) { rrLow = 30; rrHigh = 60; }
+        else if (age <= 12) { rrLow = 18; rrHigh = 30; }
+
+        if (vitals.respiratoryRate > rrHigh || vitals.respiratoryRate < rrLow) updatePriority(colors.RED);
+        else if (vitals.respiratoryRate > (rrHigh - 2) || vitals.respiratoryRate < (rrLow + 2)) updatePriority(colors.YELLOW);
+        else updatePriority(colors.GREEN);
+      }
+
+      // Factor: SpO2
+      if (vitals.oxygenSaturation > 0) {
+        if (vitals.oxygenSaturation < 90) updatePriority(colors.RED);
+        else if (vitals.oxygenSaturation <= 92) updatePriority(colors.YELLOW);
+        else updatePriority(colors.GREEN);
+      }
+
+      // Factor: BMI
+      if (vitals.bmi_class === 'Obese' || vitals.bmi_class === 'Underweight') updatePriority(colors.RED);
+      else if (vitals.bmi > 0) updatePriority(colors.GREEN);
+
+      // Factor: Glucose (FBG/RBG)
+      if (vitals.fbg >= 126 || vitals.rbg >= 200) updatePriority(colors.RED);
+      else if (vitals.fbg >= 100 || vitals.rbg >= 140) updatePriority(colors.YELLOW);
+      else if (vitals.fbg > 0 || vitals.rbg > 0) updatePriority(colors.GREEN);
+
+      // CRITICAL: Nurse Override takes absolute precedence if set
+      if (vitals.nurse_priority) {
+        const overrideStyle = getTriageStyle(vitals.nurse_priority);
+        return overrideStyle.bg;
+      }
+    }
+
+    return finalColor;
+  };
+
+  const haloColor = getHighestAlertColor();
+
   return (
     <Paper 
       elevation={4} 
@@ -67,8 +175,8 @@ const PatientContextBar: React.FC = () => {
         sx={{ 
           width: 52, 
           height: 52, 
-          border: `4px solid ${triage.bg}`, 
-          boxShadow: `0 0 15px ${triage.bg}66`,
+          border: `4px solid ${haloColor}`, 
+          boxShadow: `0 0 15px ${haloColor}66`,
           bgcolor: 'primary.main',
           transition: 'all 0.3s ease'
         }}
@@ -105,6 +213,12 @@ const PatientContextBar: React.FC = () => {
                 {vitals?.oxygenSaturation ? `${vitals.oxygenSaturation}%` : '--'}
               </Typography>
             </Box>
+            <Box>
+              <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 900, display: 'block', lineHeight: 1 }}>RR</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 900, color: '#0f172a' }}>
+                {vitals?.respiratoryRate || '--'}
+              </Typography>
+            </Box>
           </Stack>
           <Divider orientation="vertical" flexItem sx={{ mx: 1, height: 35, alignSelf: 'center' }} />
         </>
@@ -134,33 +248,43 @@ const PatientContextBar: React.FC = () => {
           </Tooltip>
         )}
 
-        {/* Substance Use (Dhaka Standard) */}
-        {!!vitals?.tobacco_use && vitals?.tobacco_use !== 'none' && (
+        {/* Social History Alerts */}
+        {vitals?.social_history?.take_any && (
           <>
-            {(vitals.tobacco_use === 'smoking' || vitals.tobacco_use === 'both') && (
+            {vitals.social_history.smoking && (
               <Chip 
                 icon={<SmokingRoomsIcon style={{ color: 'white', fontSize: 16 }} />}
                 label="SMOKING"
                 sx={{ bgcolor: '#f59e0b', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
               />
             )}
-            {(vitals.tobacco_use === 'chewing' || vitals.tobacco_use === 'both') && (
+            {vitals.social_history.chewing_tobacco && (
               <Chip 
                 icon={<SmokingRoomsIcon style={{ color: 'white', fontSize: 16 }} />}
-                label="GUTKHA"
+                label="CHEWING"
                 sx={{ bgcolor: '#991b1b', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
               />
             )}
+            {vitals.alcohol_use && vitals.alcohol_use !== 'None' && (
+              <Chip 
+                icon={<WineBarIcon style={{ color: 'white', fontSize: 16 }} />}
+                label={`ALCOHOL: ${vitals.alcohol_use.toUpperCase()}`}
+                sx={{ bgcolor: '#4338ca', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
+              />
+            )}
+            {vitals.social_history.betel_nuts && (
+              <Chip 
+                label="BETEL NUTS"
+                sx={{ bgcolor: '#7c2d12', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
+              />
+            )}
+            {vitals.social_history.recreational_drugs && (
+              <Chip 
+                label="DRUGS"
+                sx={{ bgcolor: '#1e1b4b', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
+              />
+            )}
           </>
-        )}
-
-        {/* Alcohol Alert */}
-        {!!vitals?.alcohol_consumption && vitals?.alcohol_consumption !== 'none' && (
-          <Chip 
-            icon={<WineBarIcon style={{ color: 'white', fontSize: 16 }} />}
-            label={vitals.alcohol_consumption.toUpperCase()}
-            sx={{ bgcolor: '#4338ca', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
-          />
         )}
 
         {/* BMI Alert */}
@@ -172,8 +296,9 @@ const PatientContextBar: React.FC = () => {
           />
         )}
 
-        {/* BP Alert */}
-        {(vitals?.systolic >= 140 || vitals?.diastolic >= 90) && (
+        {/* BP Alert - Hypertension if second reading is also abnormal (>= 130/80) */}
+        {((vitals?.systolic_2 >= 130 || vitals?.diastolic_2 >= 80) || 
+          (vitals?.systolic_2 === undefined && (vitals?.systolic >= 130 || vitals?.diastolic >= 80))) && (
           <Chip 
             icon={<FavoriteIcon style={{ color: 'white', fontSize: 16 }} />}
             label="HYPERTENSION"

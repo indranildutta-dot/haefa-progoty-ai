@@ -88,10 +88,23 @@ export interface Patient {
 }
 
 // FIXED: Added missing properties requested by AI Studio
+export interface SocialHistory {
+  take_any: boolean;
+  smoking: boolean;
+  betel_nuts: boolean;
+  chewing_tobacco: boolean;
+  recreational_drugs: boolean;
+  housing: 'Catcha' | 'Paka';
+  water_source: 'Safe' | 'Unsafe';
+}
+
 export interface Vitals {
   systolic: number;
   diastolic: number;
+  systolic_2?: number;
+  diastolic_2?: number;
   heartRate: number;
+  respiratoryRate: number;
   temperature: number;
   weight: number;
   height: number;
@@ -102,12 +115,15 @@ export interface Vitals {
   blood_group?: string;
   oxygenSaturation?: number;
   blood_sugar?: number;
+  rbg?: number;
+  fbg?: number;
+  hours_since_meal?: number;
   hemoglobin?: number;
   is_pregnant?: boolean;
   pregnancy_months?: number;
   allergies?: string[];
-  tobacco_use?: string;
-  alcohol_consumption?: string;
+  social_history?: SocialHistory;
+  alcohol_use?: string;
   created_by?: string;
 }
 
@@ -170,6 +186,7 @@ export interface VitalsRecord {
   systolic?: number;
   diastolic?: number;
   heartRate?: number;
+  respiratoryRate?: number;
   temperature?: number;
   weight?: number;
   height?: number;
@@ -180,12 +197,17 @@ export interface VitalsRecord {
   blood_group?: string;
   oxygenSaturation?: number;
   blood_sugar?: number;
+  rbg?: number;
+  fbg?: number;
+  hours_since_meal?: number;
   hemoglobin?: number;
+  systolic_2?: number;
+  diastolic_2?: number;
   is_pregnant?: boolean;
   pregnancy_months?: number;
   allergies?: string[];
-  tobacco_use?: string;
-  alcohol_consumption?: string;
+  social_history?: SocialHistory;
+  alcohol_use?: string;
   created_by?: string;
   chief_complaint?: string;
   onset_date?: string;

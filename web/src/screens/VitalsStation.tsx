@@ -3,7 +3,7 @@ import {
   Typography, Box, Paper, Grid, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
   Button, Chip, TextField, Divider, Card, CardContent, MenuItem, Select, FormControl, 
   InputLabel, Stepper, Step, StepLabel, Stack, RadioGroup, FormControlLabel, Radio, Autocomplete,
-  ToggleButton, ToggleButtonGroup
+  ToggleButton, ToggleButtonGroup, Switch
 } from '@mui/material';
 import { EncounterStatus } from '../types';
 import { 
@@ -17,7 +17,8 @@ import {
   ArrowBack as BackIcon,
   Save as SaveIcon,
   Timer as TimerIcon,
-  Opacity as OpacityIcon
+  Opacity as OpacityIcon,
+  ExpandMore as ExpandMoreIcon
 } from '@mui/icons-material';
 
 import { subscribeToQueue, updateQueueStatus, updateQueueTriage } from '../services/queueService';
@@ -61,7 +62,10 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
   const initialVitals = {
     systolic: 120,
     diastolic: 80,
+    systolic_2: NaN,
+    diastolic_2: NaN,
     heartRate: 72,
+    respiratoryRate: 16,
     temperature: 36.5,
     weight: 70,
     height: 170,
@@ -72,15 +76,22 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
     blood_group: '',
     oxygenSaturation: 98,
     blood_sugar: 0,
+    rbg: 0,
+    fbg: 0,
+    hours_since_meal: 0,
     hemoglobin: 0, 
-    chief_complaint: '',
-    onset_date: '',
-    duration_value: '',
-    duration_unit: 'days',
     is_pregnant: false,
     pregnancy_months: 0,
-    alcohol_consumption: 'none',
-    tobacco_use: 'none', 
+    social_history: {
+      take_any: false,
+      smoking: false,
+      betel_nuts: false,
+      chewing_tobacco: false,
+      recreational_drugs: false,
+      housing: 'Catcha',
+      water_source: 'Safe'
+    },
+    alcohol_use: 'None',
     allergies: '',
     chronic_conditions: [],
     nurse_priority: '' 
@@ -139,13 +150,15 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
       const isFemale = selectedPatient.gender?.toLowerCase() === 'female';
       const safeIsPregnant = isFemale ? !!vitals.is_pregnant : false;
 
+      const finalTriageLevel = vitals.nurse_priority || triage.triage_level;
+
       setSelectedPatient({
         ...selectedPatient,
-        triage_level: triage.triage_level,
+        triage_level: finalTriageLevel,
         currentVitals: { 
           ...vitals, 
           is_pregnant: safeIsPregnant,
-          triage_level: triage.triage_level 
+          triage_level: finalTriageLevel 
         }
       });
     }
@@ -153,6 +166,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
     vitals.systolic, 
     vitals.diastolic, 
     vitals.heartRate, 
+    vitals.respiratoryRate,
     vitals.oxygenSaturation, 
     vitals.temperature,
     vitals.is_pregnant, 
@@ -164,7 +178,11 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
     vitals.bmi_class,
     vitals.muac_class,
     vitals.blood_sugar,
-    vitals.hemoglobin
+    vitals.rbg,
+    vitals.fbg,
+    vitals.hours_since_meal,
+    vitals.hemoglobin,
+    vitals.nurse_priority
   ]);
 
   // Smart Wait-Time Formatting: Shows hours if > 60 mins
@@ -203,34 +221,70 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
 
   const isUnderFive = getAgeYears(selectedPatient) < 5;
 
-  const getVitalStatus = (type: 'bp' | 'hr' | 'o2', val1: number, val2?: number) => {
+  const getVitalStatus = (type: 'bp' | 'hr' | 'o2' | 'rr' | 'fbg' | 'rbg', val1: number, val2?: number) => {
     if (type === 'bp') {
-      if (val1 >= 180 || (val2 && val2 >= 120)) return { color: '#ef4444', label: 'EMERGENCY' };
-      if (val1 >= 140 || (val2 && val2 >= 90)) return { color: '#f59e0b', label: 'URGENT' };
+      if (val1 >= 180 || (val2 && val2 >= 120)) return { color: '#ef4444', label: 'CRITICAL' };
+      if (val1 >= 130 || (val2 && val2 >= 80)) return { color: '#f59e0b', label: 'WARNING' };
       return { color: '#10b981', label: 'NORMAL' };
     }
     if (type === 'hr') {
-      const age_years = selectedPatient?.age_years ?? 25;
+      const age_years = getAgeYears(selectedPatient);
       const age_months = selectedPatient?.age_months ?? 0;
-      let hrLow = 50;
-      let hrHigh = 120;
+      let hrLow = 60;
+      let hrHigh = 100;
 
-      if (age_years < 1 || (age_years === 0 && age_months > 0)) {
+      if (age_years === 0 && age_months === 0) {
         hrLow = 100;
-        hrHigh = 180;
-      } else if (age_years >= 1 && age_years <= 12) {
-        hrLow = 60;
+        hrHigh = 160;
+      } else if (age_years === 0 && age_months > 0) {
+        hrLow = 100;
+        hrHigh = 150;
+      } else if (age_years >= 1 && age_years <= 2) {
+        hrLow = 98;
         hrHigh = 140;
+      } else if (age_years >= 3 && age_years <= 5) {
+        hrLow = 80;
+        hrHigh = 120;
+      } else if (age_years >= 6 && age_years <= 12) {
+        hrLow = 75;
+        hrHigh = 110;
       }
 
       if (val1 > hrHigh || val1 < hrLow) return { color: '#ef4444', label: 'EMERGENCY' };
-      if (val1 > (hrHigh - 10) || val1 < (hrLow + 10)) return { color: '#f59e0b', label: 'URGENT' };
+      if (val1 > (hrHigh - 5) || val1 < (hrLow + 5)) return { color: '#f59e0b', label: 'URGENT' };
+      return { color: '#10b981', label: 'NORMAL' };
+    }
+    if (type === 'rr') {
+      const age_years = getAgeYears(selectedPatient);
+      let rrLow = 12;
+      let rrHigh = 20;
+
+      if (age_years < 1) {
+        rrLow = 30;
+        rrHigh = 60;
+      } else if (age_years <= 12) {
+        rrLow = 18;
+        rrHigh = 30;
+      }
+
+      if (val1 > rrHigh || val1 < rrLow) return { color: '#ef4444', label: 'EMERGENCY' };
+      if (val1 > (rrHigh - 2) || val1 < (rrLow + 2)) return { color: '#f59e0b', label: 'URGENT' };
       return { color: '#10b981', label: 'NORMAL' };
     }
     if (type === 'o2') {
       if (val1 < 88) return { color: '#ef4444', label: 'EMERGENCY' };
       if (val1 < 90) return { color: '#f43f5e', label: 'CRITICAL' };
       if (val1 <= 92) return { color: '#f59e0b', label: 'WARNING' };
+      return { color: '#10b981', label: 'NORMAL' };
+    }
+    if (type === 'fbg') {
+      if (val1 >= 126) return { color: '#ef4444', label: 'HIGH' };
+      if (val1 >= 100) return { color: '#f59e0b', label: 'ALERT' };
+      return { color: '#10b981', label: 'NORMAL' };
+    }
+    if (type === 'rbg') {
+      if (val1 >= 200) return { color: '#ef4444', label: 'CRITICAL' };
+      if (val1 >= 140) return { color: '#f59e0b', label: 'ALERT' };
       return { color: '#10b981', label: 'NORMAL' };
     }
     return { color: '#e2e8f0', label: '' };
@@ -257,6 +311,10 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
     }
   };
 
+  const isBPAbnormal = (s: number, d: number) => {
+    return s >= 130 || d >= 80;
+  };
+
   const handleSaveVitals = async (nextStatus: EncounterStatus) => {
     if (!selectedQueueItem) return;
     setIsSaving(true);
@@ -268,7 +326,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
         ...vitals,
         is_pregnant: !!vitals.is_pregnant,
         pregnancy_months: parseInt(vitals.pregnancy_months) || 0,
-        allergies: vitals.allergies ? vitals.allergies.split(',').map((s: string) => s.trim()) : [],
+        allergies: vitals.allergies ? (Array.isArray(vitals.allergies) ? vitals.allergies : vitals.allergies.split(',').map((s: string) => s.trim())) : [],
         suggested_priority: systemTriage.triage_level,
         assigned_priority: finalPriority,
         encounter_id: selectedQueueItem.encounter_id,
@@ -497,9 +555,11 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
             {mode === 2 && (
               <Stack spacing={6}>
                 <Typography variant="h4" fontWeight="900" color="primary" textAlign="center">VITALS & HABITS</Typography>
+                
+                {/* First BP Reading */}
                 <Box sx={{ p: 5, borderRadius: 5, border: `10px solid ${getVitalStatus('bp', vitals.systolic, vitals.diastolic).color}`, textAlign: 'center', bgcolor: 'white' }}>
                   <Typography variant="h5" fontWeight="900" color={getVitalStatus('bp', vitals.systolic, vitals.diastolic).color} sx={{ mb: 2 }}>
-                    {getVitalStatus('bp', vitals.systolic, vitals.diastolic).label}
+                    {getVitalStatus('bp', vitals.systolic, vitals.diastolic).label} (READING 1)
                   </Typography>
                   <Stack direction="row" spacing={4} justifyContent="center" alignItems="center">
                     <TextField 
@@ -521,8 +581,40 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                     />
                   </Stack>
                 </Box>
+
+                {/* Second BP Reading - Only if first is abnormal */}
+                {isBPAbnormal(vitals.systolic, vitals.diastolic) && (
+                  <Box sx={{ p: 5, borderRadius: 5, border: `10px solid ${getVitalStatus('bp', vitals.systolic_2, vitals.diastolic_2).color}`, textAlign: 'center', bgcolor: '#fff7ed' }}>
+                    <Typography variant="h5" fontWeight="900" color={getVitalStatus('bp', vitals.systolic_2, vitals.diastolic_2).color} sx={{ mb: 2 }}>
+                      {getVitalStatus('bp', vitals.systolic_2, vitals.diastolic_2).label} (READING 2)
+                    </Typography>
+                    <Stack direction="row" spacing={4} justifyContent="center" alignItems="center">
+                      <TextField 
+                        label="Systolic 2" 
+                        type="number" 
+                        value={isNaN(vitals.systolic_2) ? '' : vitals.systolic_2} 
+                        onChange={(e) => setVitals({...vitals, systolic_2: parseInt(e.target.value)})} 
+                        InputProps={{ sx: { fontSize: '5rem', fontWeight: 900, textAlign: 'center', height: 150 }}} 
+                        InputLabelProps={{ sx: { fontSize: '1.5rem', fontWeight: 700 }}}
+                      />
+                      <Typography variant="h1" sx={{ fontSize: '6rem', fontWeight: 300 }}>/</Typography>
+                      <TextField 
+                        label="Diastolic 2" 
+                        type="number" 
+                        value={isNaN(vitals.diastolic_2) ? '' : vitals.diastolic_2} 
+                        onChange={(e) => setVitals({...vitals, diastolic_2: parseInt(e.target.value)})} 
+                        InputProps={{ sx: { fontSize: '5rem', fontWeight: 900, textAlign: 'center', height: 150 }}} 
+                        InputLabelProps={{ sx: { fontSize: '1.5rem', fontWeight: 700 }}}
+                      />
+                    </Stack>
+                    <Typography variant="caption" sx={{ mt: 2, display: 'block', color: 'text.secondary', fontWeight: 700 }}>
+                      * Machine malfunction check: Please take a second reading if the first is abnormal.
+                    </Typography>
+                  </Box>
+                )}
+
                 <Grid container spacing={4}>
-                  <Grid size={{ xs: 12, md: 6 }}>
+                  <Grid size={{ xs: 12, md: 3 }}>
                     <Box sx={{ p: 3, borderRadius: 4, border: `4px solid ${getVitalStatus('hr', vitals.heartRate).color}`, bgcolor: 'white' }}>
                       <Typography variant="subtitle1" fontWeight="900" color={getVitalStatus('hr', vitals.heartRate).color} sx={{ mb: 1 }}>
                         {getVitalStatus('hr', vitals.heartRate).label}
@@ -537,7 +629,22 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       />
                     </Box>
                   </Grid>
-                  <Grid size={{ xs: 12, md: 6 }}>
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <Box sx={{ p: 3, borderRadius: 4, border: `4px solid ${getVitalStatus('rr', vitals.respiratoryRate).color}`, bgcolor: 'white' }}>
+                      <Typography variant="subtitle1" fontWeight="900" color={getVitalStatus('rr', vitals.respiratoryRate).color} sx={{ mb: 1 }}>
+                        {getVitalStatus('rr', vitals.respiratoryRate).label}
+                      </Typography>
+                      <TextField 
+                        fullWidth 
+                        label="Resp. Rate (bpm)" 
+                        type="number"
+                        value={isNaN(vitals.respiratoryRate) ? '' : vitals.respiratoryRate} 
+                        onChange={(e) => setVitals({...vitals, respiratoryRate: parseInt(e.target.value)})} 
+                        InputProps={{ sx: { height: 100, fontSize: '2.5rem', fontWeight: 800 }}}
+                      />
+                    </Box>
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 3 }}>
                     <Box sx={{ p: 3, borderRadius: 4, border: `4px solid ${getVitalStatus('o2', vitals.oxygenSaturation).color}`, bgcolor: 'white' }}>
                       <Typography variant="subtitle1" fontWeight="900" color={getVitalStatus('o2', vitals.oxygenSaturation).color} sx={{ mb: 1 }}>
                         {getVitalStatus('o2', vitals.oxygenSaturation).label}
@@ -552,118 +659,209 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       />
                     </Box>
                   </Grid>
-                </Grid>
-                <TextField 
-                  fullWidth 
-                  multiline 
-                  rows={3} 
-                  label="Chief Complaint" 
-                  value={vitals.chief_complaint} 
-                  onChange={(e) => setVitals({...vitals, chief_complaint: e.target.value})} 
-                  InputProps={{ sx: { fontSize: '1.5rem', fontWeight: 500 }}}
-                />
-                <Grid container spacing={4}>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <TextField 
-                      fullWidth 
-                      label="Approx Onset Date" 
-                      type="date" 
-                      InputLabelProps={{ shrink: true, sx: { fontWeight: 700 } }} 
-                      value={vitals.onset_date} 
-                      onChange={(e) => setVitals({...vitals, onset_date: e.target.value})} 
-                      InputProps={{ sx: { height: 80, fontSize: '1.5rem' }}}
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Stack direction="row" spacing={2}>
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <Box sx={{ p: 3, borderRadius: 4, border: '4px solid #e2e8f0', bgcolor: 'white' }}>
+                      <Typography variant="subtitle1" fontWeight="900" color="text.secondary" sx={{ mb: 1 }}>
+                        TEMPERATURE
+                      </Typography>
                       <TextField 
                         fullWidth 
-                        label="Duration" 
-                        type="number" 
-                        value={vitals.duration_value} 
-                        onChange={(e) => setVitals({...vitals, duration_value: e.target.value})} 
-                        InputProps={{ sx: { height: 80, fontSize: '1.5rem' }}}
+                        label="Temp (°C)" 
+                        type="number"
+                        value={isNaN(vitals.temperature) ? '' : vitals.temperature} 
+                        onChange={(e) => setVitals({...vitals, temperature: parseFloat(e.target.value)})} 
+                        InputProps={{ sx: { height: 100, fontSize: '2.5rem', fontWeight: 800 }}}
                       />
-                      <Select 
-                        sx={{ width: 150, height: 80, fontSize: '1.2rem', fontWeight: 700 }} 
-                        value={vitals.duration_unit} 
-                        onChange={(e) => setVitals({...vitals, duration_unit: e.target.value})}
-                      >
-                        <MenuItem value="days">Days</MenuItem>
-                        <MenuItem value="weeks">Weeks</MenuItem>
-                        <MenuItem value="months">Months</MenuItem>
-                      </Select>
+                    </Box>
+                  </Grid>
+                </Grid>
+
+                {/* Social History Section */}
+                <Card variant="outlined" sx={{ borderRadius: 4, border: '2px solid #e2e8f0' }}>
+                  <Box sx={{ p: 2, bgcolor: '#4c1d95', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h6" fontWeight="900">Social History</Typography>
+                    <ExpandMoreIcon />
+                  </Box>
+                  <CardContent sx={{ p: 4 }}>
+                    <Stack spacing={3}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="h6" fontWeight="700">Do you take any of the followings?</Typography>
+                        <Switch 
+                          checked={vitals.social_history.take_any} 
+                          onChange={(e) => setVitals({
+                            ...vitals, 
+                            social_history: { ...vitals.social_history, take_any: e.target.checked }
+                          })} 
+                        />
+                      </Box>
+                      
+                      <Divider />
+
+                      {[
+                        { key: 'smoking', label: 'Smoking' },
+                        { key: 'betel_nuts', label: 'Betel Nuts' },
+                        { key: 'chewing_tobacco', label: 'Chewing Tobacco' },
+                        { key: 'recreational_drugs', label: 'Recreational Drug' }
+                      ].map((item) => (
+                        <Box key={item.key} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: vitals.social_history.take_any ? 1 : 0.5 }}>
+                          <Typography variant="body1" fontWeight="600">{item.label}</Typography>
+                          <RadioGroup 
+                            row 
+                            value={vitals.social_history[item.key] ? 'yes' : 'no'} 
+                            onChange={(e) => {
+                              if (!vitals.social_history.take_any) return;
+                              setVitals({
+                                ...vitals, 
+                                social_history: { ...vitals.social_history, [item.key]: e.target.value === 'yes' }
+                              });
+                            }}
+                          >
+                            <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
+                            <FormControlLabel value="yes" control={<Radio size="small" />} label="Yes" />
+                          </RadioGroup>
+                        </Box>
+                      ))}
+
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: vitals.social_history.take_any ? 1 : 0.5 }}>
+                        <Typography variant="body1" fontWeight="600">Alcohol Use</Typography>
+                        <FormControl sx={{ minWidth: 200 }}>
+                          <Select
+                            size="small"
+                            value={vitals.alcohol_use || 'None'}
+                            onChange={(e) => setVitals({ ...vitals, alcohol_use: e.target.value })}
+                            disabled={!vitals.social_history.take_any}
+                          >
+                            <MenuItem value="None">None</MenuItem>
+                            <MenuItem value="Sometimes">Sometimes</MenuItem>
+                            <MenuItem value="Regular">Regular</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body1" fontWeight="600">Housing Mediation</Typography>
+                        <RadioGroup 
+                          row 
+                          value={vitals.social_history.housing} 
+                          onChange={(e) => setVitals({
+                            ...vitals, 
+                            social_history: { ...vitals.social_history, housing: e.target.value }
+                          })}
+                        >
+                          <FormControlLabel value="Catcha" control={<Radio size="small" />} label="Catcha" />
+                          <FormControlLabel value="Paka" control={<Radio size="small" />} label="Paka" />
+                        </RadioGroup>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body1" fontWeight="600">Drinking Water Sources</Typography>
+                        <RadioGroup 
+                          row 
+                          value={vitals.social_history.water_source} 
+                          onChange={(e) => setVitals({
+                            ...vitals, 
+                            social_history: { ...vitals.social_history, water_source: e.target.value }
+                          })}
+                        >
+                          <FormControlLabel value="Safe" control={<Radio size="small" />} label="Safe" />
+                          <FormControlLabel value="Unsafe" control={<Radio size="small" />} label="Unsafe" />
+                        </RadioGroup>
+                      </Box>
                     </Stack>
-                  </Grid>
-                </Grid>
-                <Grid container spacing={4}>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <FormControl fullWidth>
-                      <InputLabel sx={{ fontWeight: 700 }}>Tobacco Use</InputLabel>
-                      <Select 
-                        value={vitals.tobacco_use} 
-                        label="Tobacco Use" 
-                        onChange={(e) => setVitals({...vitals, tobacco_use: e.target.value})}
-                        sx={{ height: 80, fontSize: '1.5rem', fontWeight: 700 }}
-                      >
-                        <MenuItem value="none">None</MenuItem>
-                        <MenuItem value="smoking">Smoking</MenuItem>
-                        <MenuItem value="chewing">Chewing (Gutkha/Pan Masala)</MenuItem>
-                        <MenuItem value="both">Both</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <FormControl fullWidth>
-                      <InputLabel sx={{ fontWeight: 700 }}>Alcohol Consumption</InputLabel>
-                      <Select 
-                        value={vitals.alcohol_consumption} 
-                        label="Alcohol Consumption" 
-                        onChange={(e) => setVitals({...vitals, alcohol_consumption: e.target.value})}
-                        sx={{ height: 80, fontSize: '1.5rem', fontWeight: 700 }}
-                      >
-                        <MenuItem value="none">None</MenuItem>
-                        <MenuItem value="occasional">Occasional</MenuItem>
-                        <MenuItem value="regular">Regular</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                </Grid>
+                  </CardContent>
+                </Card>
               </Stack>
             )}
 
             {mode === 3 && (
               <Stack spacing={6}>
-                <Typography variant="h4" fontWeight="900" color="primary" textAlign="center">LABS & RISK ASSESSMENT</Typography>
-                <Grid container spacing={4}>
-                  <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant="h4" fontWeight="900" color="primary" textAlign="center">GLUCOSE & HEMOGLOBIN</Typography>
+                
+                <Stack spacing={4}>
+                  <Box>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                      <Typography variant="h6" fontWeight="700">RBG</Typography>
+                      {vitals.rbg > 0 && (
+                        <Chip 
+                          label={getVitalStatus('rbg', vitals.rbg).label} 
+                          sx={{ bgcolor: getVitalStatus('rbg', vitals.rbg).color, color: 'white', fontWeight: 900 }} 
+                        />
+                      )}
+                    </Stack>
                     <TextField 
                       fullWidth 
-                      label="Blood Sugar (mg/dL)" 
+                      placeholder="EX: 00.00"
                       type="number"
-                      value={isNaN(vitals.blood_sugar) ? '' : vitals.blood_sugar} 
-                      onChange={(e) => setVitals({...vitals, blood_sugar: parseFloat(e.target.value)})} 
-                      InputProps={{ sx: { height: 100, fontSize: '2.5rem', fontWeight: 800 }}}
+                      value={isNaN(vitals.rbg) || vitals.rbg === 0 ? '' : vitals.rbg} 
+                      onChange={(e) => setVitals({...vitals, rbg: parseFloat(e.target.value)})} 
+                      InputProps={{ 
+                        sx: { 
+                          height: 80, 
+                          fontSize: '2rem', 
+                          fontWeight: 700,
+                          borderLeft: vitals.rbg > 0 ? `10px solid ${getVitalStatus('rbg', vitals.rbg).color}` : 'none'
+                        },
+                        endAdornment: <Typography variant="h6" sx={{ ml: 2, color: 'text.secondary' }}>mmol/L</Typography>
+                      }}
                     />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 6 }}>
+                  </Box>
+
+                  <Box>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                      <Typography variant="h6" fontWeight="700">FBG</Typography>
+                      {vitals.fbg > 0 && (
+                        <Chip 
+                          label={getVitalStatus('fbg', vitals.fbg).label} 
+                          sx={{ bgcolor: getVitalStatus('fbg', vitals.fbg).color, color: 'white', fontWeight: 900 }} 
+                        />
+                      )}
+                    </Stack>
                     <TextField 
                       fullWidth 
-                      label="Hemoglobin (g/dL)" 
+                      placeholder="EX: 00.00"
                       type="number"
-                      value={isNaN(vitals.hemoglobin) ? '' : vitals.hemoglobin} 
+                      value={isNaN(vitals.fbg) || vitals.fbg === 0 ? '' : vitals.fbg} 
+                      onChange={(e) => setVitals({...vitals, fbg: parseFloat(e.target.value)})} 
+                      InputProps={{ 
+                        sx: { 
+                          height: 80, 
+                          fontSize: '2rem', 
+                          fontWeight: 700,
+                          borderLeft: vitals.fbg > 0 ? `10px solid ${getVitalStatus('fbg', vitals.fbg).color}` : 'none'
+                        },
+                        endAdornment: <Typography variant="h6" sx={{ ml: 2, color: 'text.secondary' }}>mmol/L</Typography>
+                      }}
+                    />
+                  </Box>
+
+                  <Box>
+                    <Typography variant="h6" fontWeight="700" sx={{ mb: 1 }}>Hours Since Last Meal</Typography>
+                    <TextField 
+                      fullWidth 
+                      placeholder="Ex : 3"
+                      type="number"
+                      value={isNaN(vitals.hours_since_meal) || vitals.hours_since_meal === 0 ? '' : vitals.hours_since_meal} 
+                      onChange={(e) => setVitals({...vitals, hours_since_meal: parseFloat(e.target.value)})} 
+                      InputProps={{ sx: { height: 80, fontSize: '2rem', fontWeight: 700 }}}
+                    />
+                  </Box>
+
+                  <Box>
+                    <Typography variant="h6" fontWeight="700" sx={{ mb: 1 }}>Hemoglobin</Typography>
+                    <TextField 
+                      fullWidth 
+                      placeholder="Ex : 13.8"
+                      type="number"
+                      value={isNaN(vitals.hemoglobin) || vitals.hemoglobin === 0 ? '' : vitals.hemoglobin} 
                       onChange={(e) => setVitals({...vitals, hemoglobin: parseFloat(e.target.value)})} 
-                      InputProps={{ sx: { height: 100, fontSize: '2.5rem', fontWeight: 800 }}}
+                      InputProps={{ 
+                        sx: { height: 80, fontSize: '2rem', fontWeight: 700 },
+                        endAdornment: <Typography variant="h6" sx={{ ml: 2, color: 'text.secondary' }}>mmol/L</Typography>
+                      }}
                     />
-                  </Grid>
-                </Grid>
-                <Autocomplete 
-                  multiple 
-                  options={['Diabetes', 'Hypertension', 'Asthma', 'Heart Disease']} 
-                  value={vitals.chronic_conditions} 
-                  onChange={(_, v) => setVitals({...vitals, chronic_conditions: v})} 
-                  renderInput={(p) => <TextField {...p} label="Chronic Conditions" InputProps={{ ...p.InputProps, sx: { fontSize: '1.5rem', minHeight: 100 }}} />} 
-                />
+                  </Box>
+                </Stack>
+
                 <TextField 
                   fullWidth 
                   multiline 
@@ -677,16 +875,15 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                 <Divider sx={{ my: 4 }} />
                 
                 <Box sx={{ p: 5, bgcolor: '#f0f9ff', borderRadius: 5, border: '2px solid #bae6fd' }}>
-                  <Typography variant="h5" color="primary" fontWeight="900" gutterBottom>
-                    SYSTEM SUGGESTION: <span style={{ color: '#0369a1' }}>{systemTriage.triage_level.toUpperCase()}</span>
+                  <Typography variant="h5" sx={{ color: '#0369a1', fontWeight: 900, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    SYSTEM SUGGESTION: <span style={{ textTransform: 'uppercase' }}>{systemTriage.triage_level}</span>
                   </Typography>
                   <FormControl fullWidth sx={{ mt: 4 }}>
-                    <InputLabel sx={{ fontWeight: 800, fontSize: '1.2rem' }}>NURSE OVERRIDE</InputLabel>
+                    <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.secondary', mb: 1, textTransform: 'uppercase' }}>Nurse Override</Typography>
                     <Select 
                       value={vitals.nurse_priority} 
-                      label="NURSE OVERRIDE" 
                       onChange={(e) => setVitals({...vitals, nurse_priority: e.target.value})} 
-                      sx={{ height: 100, fontWeight: 900, fontSize: '2rem', bgcolor: 'white' }}
+                      sx={{ height: 100, fontWeight: 900, fontSize: '2rem', bgcolor: 'white', borderRadius: 3 }}
                     >
                       <MenuItem value=""><em>Follow System</em></MenuItem>
                       <MenuItem value="emergency" sx={{ color: 'error.main', fontWeight: 900, fontSize: '1.5rem' }}>EMERGENCY (Red)</MenuItem>
