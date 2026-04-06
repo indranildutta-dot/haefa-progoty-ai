@@ -14,7 +14,8 @@ import {
   Select,
   MenuItem,
   Stack,
-  IconButton
+  IconButton,
+  Menu
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -54,6 +55,7 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
   
   const [scope, setScope] = useState<Scope>('current_clinic');
   const [selectedScopeId, setSelectedScopeId] = useState<string>('');
+  const [vitalsMenuAnchor, setVitalsMenuAnchor] = useState<null | HTMLElement>(null);
   
   const today = new Date().toISOString().split('T')[0];
   
@@ -385,11 +387,16 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
         if (q.status === 'WAITING_FOR_VITALS') station = 'Vitals';
         else if (q.status === 'READY_FOR_DOCTOR' || q.status === 'IN_CONSULTATION') station = 'Doctor';
         else if (q.status === 'WAITING_FOR_PHARMACY') station = 'Pharmacy';
-        return { name: `Patient ${q.patient_id.substring(0,4)}`, station, wait };
+        
+        // Find actual patient name from patientsData
+        const patient = patientsData.find(p => p.id === q.patient_id);
+        const name = patient ? `${patient.given_name} ${patient.family_name}` : `Patient ${q.patient_id.substring(0,4)}`;
+        
+        return { name, station, wait };
       })
       .sort((a, b) => b.wait - a.wait)
       .slice(0, 3);
-  }, [queueData]);
+  }, [queueData, patientsData]);
 
   const trendData = useMemo(() => {
     // Simple mock trend based on current average wait for demonstration
@@ -640,9 +647,6 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
           <Typography variant="h6" fontWeight="800">
             Quick Actions
           </Typography>
-          <Button size="small" variant="text" onClick={handleSeedMedications}>
-            Seed
-          </Button>
         </Box>
         <Divider sx={{ mb: 3 }} />
         <Grid container spacing={2}>
@@ -652,9 +656,30 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
             </Button>
           </Grid>
           <Grid size={{ xs: 6, sm: 6, md: 3 }}>
-            <Button fullWidth variant="outlined" component={Link} to="/vitals" sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+            <Button 
+              fullWidth 
+              variant="outlined" 
+              onClick={(e) => setVitalsMenuAnchor(e.currentTarget)}
+              sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}
+            >
               Vitals
             </Button>
+            <Menu
+              anchorEl={vitalsMenuAnchor}
+              open={Boolean(vitalsMenuAnchor)}
+              onClose={() => setVitalsMenuAnchor(null)}
+              PaperProps={{ sx: { borderRadius: 3, mt: 1, minWidth: 200 } }}
+            >
+              <MenuItem component={Link} to="/vitals-1" onClick={() => setVitalsMenuAnchor(null)} sx={{ py: 1.5, fontWeight: 700 }}>
+                1. Body Measures
+              </MenuItem>
+              <MenuItem component={Link} to="/vitals-2" onClick={() => setVitalsMenuAnchor(null)} sx={{ py: 1.5, fontWeight: 700 }}>
+                2. Vital Signs
+              </MenuItem>
+              <MenuItem component={Link} to="/labs-and-risk" onClick={() => setVitalsMenuAnchor(null)} sx={{ py: 1.5, fontWeight: 700 }}>
+                3. Labs & Risks
+              </MenuItem>
+            </Menu>
           </Grid>
           <Grid size={{ xs: 6, sm: 6, md: 3 }}>
             <Button fullWidth variant="outlined" component={Link} to="/doctor" sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>

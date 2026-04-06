@@ -31,6 +31,7 @@ interface StationLayoutProps {
   title?: string;
   stationName?: string;
   actions?: React.ReactNode;
+  maxWidth?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | false;
 }
 
 const StationLayout: React.FC<StationLayoutProps> = ({ 
@@ -39,7 +40,8 @@ const StationLayout: React.FC<StationLayoutProps> = ({
   hideSidebar = false,
   title,
   stationName,
-  actions
+  actions,
+  maxWidth = "xl"
 }) => {
   const { isMobile, isTablet, isDesktop } = useResponsiveLayout();
   const navigate = useNavigate();
@@ -80,7 +82,7 @@ const StationLayout: React.FC<StationLayoutProps> = ({
       {showPatientContext && <PatientContextBar />}
       
       <Box component="main" sx={{ flexGrow: 1, pb: isMobile ? 14 : 10 }}>
-        <Container maxWidth="xl" sx={{ mt: isMobile ? 2 : 4 }}>
+        <Container maxWidth={maxWidth} sx={{ mt: isMobile ? 2 : 4, px: isMobile ? 2 : 4 }}>
           {(title || stationName) && (
             <Box sx={{ 
               mb: isMobile ? 3 : 5, 

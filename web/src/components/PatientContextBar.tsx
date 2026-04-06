@@ -133,6 +133,11 @@ const PatientContextBar: React.FC = () => {
       if (vitals.bmi_class === 'Obese' || vitals.bmi_class === 'Underweight') updatePriority(colors.RED);
       else if (vitals.bmi > 0) updatePriority(colors.GREEN);
 
+      // Factor: MUAC
+      if (vitals.muac_class === 'Severely Malnourished') updatePriority(colors.RED);
+      else if (vitals.muac_class === 'Moderately Malnourished') updatePriority(colors.YELLOW);
+      else if (vitals.muac > 0) updatePriority(colors.GREEN);
+
       // Factor: Glucose (FBG/RBG)
       if (vitals.fbg >= 126 || vitals.rbg >= 200) updatePriority(colors.RED);
       else if (vitals.fbg >= 100 || vitals.rbg >= 140) updatePriority(colors.YELLOW);
@@ -296,6 +301,15 @@ const PatientContextBar: React.FC = () => {
           />
         )}
 
+        {/* MUAC Alert */}
+        {!!vitals?.muac_class && (vitals.muac_class === 'Severely Malnourished' || vitals.muac_class === 'Moderately Malnourished') && (
+          <Chip 
+            icon={<SpeedIcon style={{ color: 'white', fontSize: 16 }} />}
+            label={vitals.muac_class.toUpperCase()}
+            sx={{ bgcolor: vitals.muac_class === 'Severely Malnourished' ? '#ef4444' : '#f59e0b', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
+          />
+        )}
+
         {/* BP Alert - Hypertension if second reading is also abnormal (>= 130/80) */}
         {((vitals?.systolic_2 >= 130 || vitals?.diastolic_2 >= 80) || 
           (vitals?.systolic_2 === undefined && (vitals?.systolic >= 130 || vitals?.diastolic >= 80))) && (
@@ -325,16 +339,6 @@ const PatientContextBar: React.FC = () => {
       </Stack>
 
       <Box sx={{ flexGrow: 1 }} />
-
-      {/* SECTION: Meta Information */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', pr: 1 }}>
-        <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.6rem' }}>
-          Finalized Station
-        </Typography>
-        <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 900, fontSize: '0.75rem' }}>
-          {vitals?.created_by ? `STN: ${vitals.created_by.substring(0, 5)}` : 'AWAITING TRIAGE'}
-        </Typography>
-      </Box>
 
       <LocalHospitalIcon sx={{ color: triage.bg, opacity: 0.9, fontSize: 24 }} />
     </Paper>

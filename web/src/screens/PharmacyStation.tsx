@@ -1,19 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Typography, Box, Paper, Table, TableBody, TableCell, TableContainer, 
-  TableHead, TableRow, Button, Chip, Stack, Card, CardContent, Container, Alert, Divider, Grid 
+  TableHead, TableRow, Button, Chip, Stack, Card, CardContent, Container, Alert, Divider, Grid,
+  IconButton, Tooltip
 } from '@mui/material';
 import WarningIcon from '@mui/icons-material/Warning';
 import ErrorIcon from '@mui/icons-material/Error';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { subscribeToQueue, updateQueueStatus } from '../services/queueService';
+import { subscribeToQueue, updateQueueStatus, cancelQueueItem } from '../services/queueService';
 import { getPatientById } from '../services/patientService';
 import { getVitalsByEncounter } from '../services/encounterService';
 import { useAppStore } from '../store/useAppStore';
 import StationLayout from '../components/StationLayout';
 import PatientContextBar from '../components/PatientContextBar'; 
+import CancelQueueDialog from '../components/CancelQueueDialog';
 
 const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const { notify, selectedClinic, setSelectedPatient } = useAppStore();
@@ -23,6 +26,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const [patientVitals, setPatientVitals] = useState<any>(null);
   const [checklist, setChecklist] = useState<Record<string, boolean>>({});
   const [isFinalizing, setIsFinalizing] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<any>(null);
 
   useEffect(() => {
     if (!selectedClinic) return;
@@ -74,6 +78,18 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     }
   };
 
+  const handleCancelQueueItem = async (reason: string) => {
+    if (!cancelTarget) return;
+    try {
+      await cancelQueueItem(cancelTarget.id!, reason);
+      notify(`Visit cancelled for ${cancelTarget.patient_name}`, 'info');
+      setCancelTarget(null);
+    } catch (err) {
+      console.error("Cancel Error:", err);
+      notify("Failed to cancel visit", "error");
+    }
+  };
+
   const toggleCheck = (id: string) => {
     setChecklist(prev => ({ ...prev, [id]: !prev[id] }));
   };
@@ -96,7 +112,21 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                   <TableCell>{formatWaitTime(item.created_at)}</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>{item.patient_name}</TableCell>
                   <TableCell align="right">
-                    <Button variant="contained" onClick={() => handleSelectPatient(item)}>Dispense Meds</Button>
+                    <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
+                      <Tooltip title="Cancel Visit">
+                        <IconButton 
+                          color="error" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCancelTarget(item);
+                          }}
+                          sx={{ mr: 1 }}
+                        >
+                          <CancelIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Button variant="contained" onClick={() => handleSelectPatient(item)}>Dispense Meds</Button>
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))}
@@ -174,7 +204,12 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                 size="large" 
                 variant="contained" 
                 color="success" 
-                sx={{ height: 80, fontWeight: 900, borderRadius: 4, fontSize: '1.2rem' }} 
+                sx={{ 
+                  height: { xs: 60, sm: 80 }, 
+                  fontWeight: 900, 
+                  borderRadius: 4, 
+                  fontSize: { xs: '1rem', sm: '1.2rem' } 
+                }} 
                 disabled={isFinalizing}
                 onClick={handleFinalize}
               >
@@ -184,6 +219,12 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
           </Container>
         </Box>
       )}
+      <CancelQueueDialog 
+        open={!!cancelTarget}
+        onClose={() => setCancelTarget(null)}
+        onConfirm={handleCancelQueueItem}
+        patientName={cancelTarget?.patient_name || ''}
+      />
     </StationLayout>
   );
 };

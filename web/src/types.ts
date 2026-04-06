@@ -22,7 +22,8 @@ export type EncounterStatus =
   | 'READY_FOR_DOCTOR' 
   | 'IN_CONSULTATION' 
   | 'WAITING_FOR_PHARMACY' 
-  | 'COMPLETED';
+  | 'COMPLETED'
+  | 'CANCELLED';
 
 export type TriageLevel = 'emergency' | 'urgent' | 'standard' | 'low';
 
@@ -286,6 +287,7 @@ export interface AuditLog {
   user_id: string;
   country_id: string;
   clinic_id: string;
+  metadata?: any;
   created_at: Timestamp;
 }
 

@@ -37,15 +37,17 @@ const LandingPage: React.FC = () => {
     }}>
       {/* LEFT SIDE: Branding & Hero */}
       <Box sx={{ 
-        flex: { xs: 'none', md: 1 }, 
+        flex: { xs: 'none', md: 0.7 }, 
         background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`, 
         color: 'white',
-        p: { xs: 4, md: 8, lg: 12 },
+        p: { xs: 4, md: 6, lg: 10 },
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
         position: 'relative',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        borderRight: '1px solid',
+        borderColor: alpha('#fff', 0.1)
       }}>
         {/* Decorative background element */}
         <Box sx={{ 
@@ -55,7 +57,7 @@ const LandingPage: React.FC = () => {
           width: 400, 
           height: 400, 
           borderRadius: '50%', 
-          bgcolor: alpha(theme.palette.secondary.main, 0.1),
+          bgcolor: alpha('#4fd1c5', 0.15),
           filter: 'blur(80px)'
         }} />
 
@@ -72,7 +74,7 @@ const LandingPage: React.FC = () => {
               color: '#4fd1c5', 
               mb: 1,
               display: 'block',
-              fontSize: '1rem'
+              fontSize: '0.9rem'
             }}
           >
             GLOBAL HEALTH PORTAL
@@ -81,25 +83,33 @@ const LandingPage: React.FC = () => {
             variant="h1" 
             sx={{ 
               fontWeight: 900, 
-              fontSize: { xs: '3.5rem', md: '5rem', lg: '6rem' },
-              lineHeight: 0.85,
-              mb: 4,
-              letterSpacing: '-0.05em',
-              textShadow: '0 10px 30px rgba(0,0,0,0.2)'
+              fontSize: { xs: '3rem', md: '4.5rem', lg: '5.5rem' },
+              lineHeight: 1.1,
+              mb: 3,
+              letterSpacing: '-0.04em',
+              textShadow: '0 10px 30px rgba(0,0,0,0.2)',
+              display: 'flex',
+              flexDirection: 'column'
             }}
           >
-            HAEFA <br />
-            <Box component="span" sx={{ color: 'secondary.main' }}>PROGOTY</Box>
+            <Box component="span">HAEFA</Box>
+            <Box component="span" sx={{ 
+              color: '#4fd1c5',
+              mt: -1,
+              filter: 'drop-shadow(0 0 20px rgba(79, 209, 197, 0.3))'
+            }}>
+              PROGOTY
+            </Box>
           </Typography>
           <Typography 
             variant="h6" 
             sx={{ 
               fontWeight: 400, 
               opacity: 0.9, 
-              maxWidth: 520,
-              lineHeight: 1.5,
-              mb: 8,
-              fontSize: '1.25rem'
+              maxWidth: 480,
+              lineHeight: 1.6,
+              mb: 6,
+              fontSize: '1.1rem'
             }}
           >
             A unified clinical operating system for high-impact healthcare delivery across borders. Select your region to begin.
@@ -107,11 +117,11 @@ const LandingPage: React.FC = () => {
 
           <Stack direction="row" spacing={6}>
             <Box>
-              <Typography variant="h3" fontWeight="900" sx={{ color: 'secondary.main' }}>3</Typography>
+              <Typography variant="h3" fontWeight="900" sx={{ color: '#4fd1c5' }}>3</Typography>
               <Typography variant="overline" sx={{ opacity: 0.7, fontWeight: 800, letterSpacing: 2 }}>Countries</Typography>
             </Box>
             <Box>
-              <Typography variant="h3" fontWeight="900" sx={{ color: 'secondary.main' }}>250K+</Typography>
+              <Typography variant="h3" fontWeight="900" sx={{ color: '#4fd1c5' }}>250K+</Typography>
               <Typography variant="overline" sx={{ opacity: 0.7, fontWeight: 800, letterSpacing: 2 }}>Patients</Typography>
             </Box>
           </Stack>
@@ -120,8 +130,8 @@ const LandingPage: React.FC = () => {
 
       {/* RIGHT SIDE: Country Selection */}
       <Box sx={{ 
-        flex: { xs: 'none', md: 1.2 }, 
-        p: { xs: 4, md: 8, lg: 10 },
+        flex: { xs: 'none', md: 1.3 }, 
+        p: { xs: 4, md: 6, lg: 8 },
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
@@ -156,58 +166,65 @@ const LandingPage: React.FC = () => {
 
           <Grid container spacing={3}>
             {countries.map((country, index) => (
-              <Grid size={{ xs: 12, sm: 6 }} key={country.id}>
+              <Grid size={{ xs: 12 }} key={country.id}>
                 <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 + (index * 0.1) }}
                 >
                   <Card 
                     sx={{ 
-                      borderRadius: 5, 
+                      borderRadius: 4, 
                       border: '1px solid',
-                      borderColor: 'rgba(255, 255, 255, 0.4)',
-                      background: 'rgba(255, 255, 255, 0.7)',
-                      backdropFilter: 'blur(10px)',
-                      boxShadow: '0 8px 32px rgba(0,0,0,0.05)',
-                      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                      borderColor: '#e2e8f0',
+                      background: '#fff',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                      transition: 'all 0.3s ease',
                       overflow: 'hidden',
                       '&:hover': {
-                        borderColor: 'secondary.main',
-                        background: '#fff',
-                        transform: 'translateY(-8px)',
-                        boxShadow: '0 20px 40px rgba(245, 158, 11, 0.15)',
+                        borderColor: 'primary.main',
+                        boxShadow: '0 12px 24px rgba(0,0,0,0.08)',
                         '& .arrow-icon': {
                           transform: 'translateX(8px)',
-                          color: 'secondary.main'
+                          color: 'primary.main'
                         }
                       }
                     }}
                   >
                     <CardActionArea 
                       onClick={() => handleSelect(country)} 
-                      sx={{ p: 4 }}
+                      sx={{ p: { xs: 3, md: 4 } }}
                     >
-                      <Stack direction="row" alignItems="center" justifyContent="space-between">
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={4}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 3, md: 5 }, flexGrow: 1, minWidth: 0 }}>
                           <Box sx={{ 
-                            fontSize: '4rem', 
+                            fontSize: { xs: '2.5rem', md: '3.5rem' }, 
                             lineHeight: 1,
-                            filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))'
+                            flexShrink: 0
                           }}>
                             {country.flag}
                           </Box>
-                          <Box>
-                            <Typography variant="h5" fontWeight="900" color="primary">
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography 
+                              variant="h5" 
+                              fontWeight="900" 
+                              color="primary"
+                              sx={{ 
+                                fontSize: { xs: '1.25rem', md: '1.75rem' },
+                                lineHeight: 1.2,
+                                mb: 0.5
+                              }}
+                            >
                               {country.name}
                             </Typography>
-                            <Typography variant="caption" sx={{ 
+                            <Typography variant="body2" sx={{ 
                               color: 'text.secondary', 
-                              fontWeight: 700,
+                              fontWeight: 600,
                               textTransform: 'uppercase',
-                              letterSpacing: 1
+                              letterSpacing: 1.5,
+                              fontSize: '0.75rem'
                             }}>
                               {country.language} • {country.currency}
                             </Typography>
@@ -218,7 +235,8 @@ const LandingPage: React.FC = () => {
                           sx={{ 
                             transition: 'all 0.3s ease', 
                             color: 'divider',
-                            fontSize: 32
+                            fontSize: 32,
+                            flexShrink: 0
                           }} 
                         />
                       </Stack>

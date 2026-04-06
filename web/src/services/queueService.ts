@@ -189,6 +189,44 @@ export const getQueueByStatus = async (status: EncounterStatus) => {
     });
 };
 
+export const cancelQueueItem = async (queueId: string, reason: string) => {
+  const docRef = doc(db, QUEUE_ACTIVE_COLLECTION, queueId);
+  const docSnap = await getDoc(docRef);
+  
+  if (docSnap.exists()) {
+    const data = docSnap.data();
+    
+    // Move to archive with CANCELLED status
+    const archiveRef = doc(db, QUEUE_ARCHIVE_COLLECTION, queueId);
+    await setDoc(archiveRef, {
+      ...data,
+      status: 'CANCELLED',
+      cancel_reason: reason,
+      cancelled_at: serverTimestamp(),
+      updated_at: serverTimestamp()
+    });
+    
+    await deleteDoc(docRef);
+
+    await logAction({
+      action: 'ENCOUNTER_CANCELLED',
+      encounter_id: data.encounter_id,
+      patient_id: data.patient_id,
+      metadata: { reason }
+    });
+
+    await updateMetrics(data.clinic_id, data.country_id, {
+      active_queue: -1
+    });
+    
+    if (data.status === 'IN_CONSULTATION') {
+      await updateMetrics(data.clinic_id, data.country_id, {
+        in_consultation: -1
+      });
+    }
+  }
+};
+
 export const subscribeToQueue = (
   status: EncounterStatus | EncounterStatus[], 
   callback: (items: QueueItem[]) => void,

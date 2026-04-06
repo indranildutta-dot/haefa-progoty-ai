@@ -118,6 +118,24 @@ export const evaluateTriage = (vitals: Partial<Vitals>, age_years: number = 25, 
     }
   }
 
+  // BMI Checks
+  if (vitals.bmi_class === 'Obese') {
+    reasons.push(`BMI Class: Obese`);
+    urgentCount++;
+  } else if (vitals.bmi_class === 'Underweight') {
+    reasons.push(`BMI Class: Underweight`);
+    urgentCount++;
+  }
+
+  // MUAC Checks
+  if (vitals.muac_class === 'Severely Malnourished') {
+    reasons.push(`MUAC: Severely Malnourished`);
+    isCritical = true;
+  } else if (vitals.muac_class === 'Moderately Malnourished') {
+    reasons.push(`MUAC: Moderately Malnourished`);
+    urgentCount++;
+  }
+
   let triage_level: TriageLevel = 'standard';
   let priority_score = 50;
 

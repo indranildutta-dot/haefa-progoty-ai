@@ -3,7 +3,7 @@ import {
   Typography, Box, Paper, Grid, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
   Button, Chip, TextField, Divider, Card, CardContent, MenuItem, Select, FormControl, 
   InputLabel, Stepper, Step, StepLabel, Stack, RadioGroup, FormControlLabel, Radio, Autocomplete,
-  ToggleButton, ToggleButtonGroup, Switch
+  ToggleButton, ToggleButtonGroup, Switch, IconButton, Tooltip
 } from '@mui/material';
 import { EncounterStatus } from '../types';
 import { 
@@ -18,10 +18,11 @@ import {
   Save as SaveIcon,
   Timer as TimerIcon,
   Opacity as OpacityIcon,
-  ExpandMore as ExpandMoreIcon
+  ExpandMore as ExpandMoreIcon,
+  Cancel as CancelIcon
 } from '@mui/icons-material';
 
-import { subscribeToQueue, updateQueueStatus, updateQueueTriage } from '../services/queueService';
+import { subscribeToQueue, updateQueueStatus, updateQueueTriage, cancelQueueItem } from '../services/queueService';
 import { saveVitals, getVitalsByEncounter } from '../services/encounterService';
 import { QueueItem, Vitals, TriageLevel, VitalsRecord } from '../types';
 import { getPatientById } from '../services/patientService';
@@ -30,6 +31,7 @@ import { useAppStore } from '../store/useAppStore';
 import { evaluateTriage, TriageResult } from '../utils/triage';
 import StationLayout from '../components/StationLayout';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import CancelQueueDialog from '../components/CancelQueueDialog';
 
 interface VitalsStationProps {
   countryId: string;
@@ -42,6 +44,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
   const [waitingList, setWaitingList] = useState<QueueItem[]>([]);
   const [selectedQueueItem, setSelectedQueueItem] = useState<QueueItem | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<QueueItem | null>(null);
 
   const { isMobile, isTablet } = useResponsiveLayout();
 
@@ -60,28 +63,28 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
 
   // GLOBAL CLINICAL STATE - Standards applied for all clinics
   const initialVitals = {
-    systolic: 120,
-    diastolic: 80,
+    systolic: NaN,
+    diastolic: NaN,
     systolic_2: NaN,
     diastolic_2: NaN,
-    heartRate: 72,
-    respiratoryRate: 16,
-    temperature: 36.5,
-    weight: 70,
-    height: 170,
-    bmi: 24.2,
-    bmi_class: 'Healthy Weight',
-    muac: '',
+    heartRate: NaN,
+    respiratoryRate: NaN,
+    temperature: NaN,
+    weight: NaN,
+    height: NaN,
+    bmi: NaN,
+    bmi_class: '',
+    muac: NaN,
     muac_class: '',
     blood_group: '',
-    oxygenSaturation: 98,
-    blood_sugar: 0,
-    rbg: 0,
-    fbg: 0,
-    hours_since_meal: 0,
-    hemoglobin: 0, 
+    oxygenSaturation: NaN,
+    blood_sugar: NaN,
+    rbg: NaN,
+    fbg: NaN,
+    hours_since_meal: NaN,
+    hemoglobin: NaN, 
     is_pregnant: false,
-    pregnancy_months: 0,
+    pregnancy_months: NaN,
     social_history: {
       take_any: false,
       smoking: false,
@@ -222,7 +225,10 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
   const isUnderFive = getAgeYears(selectedPatient) < 5;
 
   const getVitalStatus = (type: 'bp' | 'hr' | 'o2' | 'rr' | 'fbg' | 'rbg', val1: number, val2?: number) => {
+    if (isNaN(val1)) return { color: '#e2e8f0', label: 'PENDING' };
+    
     if (type === 'bp') {
+      if (isNaN(val1) || (val2 !== undefined && isNaN(val2))) return { color: '#e2e8f0', label: 'PENDING' };
       if (val1 >= 180 || (val2 && val2 >= 120)) return { color: '#ef4444', label: 'CRITICAL' };
       if (val1 >= 130 || (val2 && val2 >= 80)) return { color: '#f59e0b', label: 'WARNING' };
       return { color: '#10b981', label: 'NORMAL' };
@@ -290,24 +296,29 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
     return { color: '#e2e8f0', label: '' };
   };
 
+  const handleCancelQueueItem = async (reason: string) => {
+    if (!cancelTarget) return;
+    try {
+      await cancelQueueItem(cancelTarget.id!, reason);
+      notify(`Visit cancelled for ${cancelTarget.patient_name}`, 'info');
+      setCancelTarget(null);
+    } catch (err) {
+      console.error("Cancel Error:", err);
+      notify("Failed to cancel visit", "error");
+    }
+  };
+
   const handleSelectPatient = async (item: QueueItem) => {
     const patient = await getPatientById(item.patient_id);
     if (patient) {
       setSelectedPatient(patient);
       setSelectedQueueItem(item);
       
-      // Fetch existing vitals for this encounter
-      const existingVitals = await getVitalsByEncounter(item.encounter_id);
-      if (existingVitals) {
-        setVitals({
-          ...initialVitals,
-          ...existingVitals,
-          // Ensure is_pregnant is false for non-female patients
-          is_pregnant: patient.gender?.toLowerCase() === 'female' ? existingVitals.is_pregnant : false
-        });
-      } else {
-        setVitals(initialVitals);
-      }
+      // ALWAYS start with blank vitals for a new station session as requested
+      setVitals(initialVitals);
+      
+      // We can fetch existing vitals for reference if needed, but the form 
+      // should be blank for a new reading at this station.
     }
   };
 
@@ -377,16 +388,36 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       </Stack>
                     </TableCell>
                     <TableCell sx={{ fontWeight: 'bold', py: 3 }}>{item.patient_name}</TableCell>
-                    <TableCell align="right">
+                  <TableCell align="right">
+                    <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
+                      <Tooltip title="Cancel Visit">
+                        <IconButton 
+                          color="error" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCancelTarget(item);
+                          }}
+                          sx={{ mr: 4 }}
+                        >
+                          <CancelIcon />
+                        </IconButton>
+                      </Tooltip>
                       <Button 
                         variant="contained" 
                         size="large" 
                         onClick={() => handleSelectPatient(item)}
-                        sx={{ height: 60, borderRadius: 3, px: 4, fontWeight: 900 }}
+                        sx={{ 
+                          height: { xs: 50, sm: 60 }, 
+                          borderRadius: 3, 
+                          px: { xs: 2, sm: 4 }, 
+                          fontWeight: 900,
+                          fontSize: { xs: '0.8rem', sm: '0.9rem', md: '1rem' }
+                        }}
                       >
                         Start Triage
                       </Button>
-                    </TableCell>
+                    </Stack>
+                  </TableCell>
                   </TableRow>
                 ))}
                 {waitingList.length === 0 && <TableRow><TableCell colSpan={3} align="center" sx={{ py: 10 }}>No patients waiting in queue.</TableCell></TableRow>}
@@ -408,7 +439,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       type="number" 
                       value={isNaN(vitals.weight) ? '' : vitals.weight} 
                       onChange={(e) => setVitals({...vitals, weight: parseFloat(e.target.value)})} 
-                      InputProps={{ sx: { height: 100, fontSize: '2rem', fontWeight: 800 }}} 
+                      InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 800 }}} 
                       InputLabelProps={{ sx: { fontWeight: 700 }}}
                     />
                   </Grid>
@@ -419,7 +450,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       type="number" 
                       value={isNaN(vitals.height) ? '' : vitals.height} 
                       onChange={(e) => setVitals({...vitals, height: parseFloat(e.target.value)})} 
-                      InputProps={{ sx: { height: 100, fontSize: '2rem', fontWeight: 800 }}} 
+                      InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 800 }}} 
                       InputLabelProps={{ sx: { fontWeight: 700 }}}
                     />
                   </Grid>
@@ -431,8 +462,8 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       value={vitals.bmi || ''} 
                       InputProps={{ 
                         sx: { 
-                          height: 100, 
-                          fontSize: '2rem', 
+                          height: 80, 
+                          fontSize: '1.5rem', 
                           fontWeight: 800, 
                           bgcolor: '#f8fafc',
                           border: vitals.bmi_class === 'Obese' ? '4px solid #ef4444' : 
@@ -453,8 +484,8 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       value={vitals.bmi_class || ''} 
                       InputProps={{ 
                         sx: { 
-                          height: 100, 
-                          fontSize: '1.5rem', 
+                          height: 80, 
+                          fontSize: '1.25rem', 
                           fontWeight: 800, 
                           bgcolor: '#f8fafc', 
                           color: vitals.bmi_class === 'Obese' ? '#ef4444' : 
@@ -481,8 +512,8 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                           onChange={(e) => setVitals({...vitals, muac: parseFloat(e.target.value)})} 
                           InputProps={{ 
                             sx: { 
-                              height: 100, 
-                              fontSize: '2rem', 
+                              height: 80, 
+                              fontSize: '1.5rem', 
                               fontWeight: 800,
                               border: vitals.muac ? (vitals.muac < 11.5 ? '4px solid #ef4444' : vitals.muac < 12.5 ? '4px solid #f59e0b' : '4px solid #10b981') : 'none',
                               boxShadow: vitals.muac ? (vitals.muac < 11.5 ? '0 0 15px #ef444444' : vitals.muac < 12.5 ? '0 0 15px #f59e0b44' : '0 0 15px #10b98144') : 'none',
@@ -499,8 +530,8 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                           value={vitals.muac_class || ''} 
                           InputProps={{ 
                             sx: { 
-                              height: 100, 
-                              fontSize: '1.5rem', 
+                              height: 80, 
+                              fontSize: '1.25rem', 
                               fontWeight: 800, 
                               bgcolor: '#f8fafc', 
                               color: vitals.muac_class === 'Severely Malnourished' ? '#ef4444' : vitals.muac_class === 'Moderately Malnourished' ? '#f59e0b' : '#10b981'
@@ -530,7 +561,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                   </Grid>
                 </Grid>
                 
-                {selectedPatient?.gender?.toLowerCase() === 'female' && (
+                {selectedPatient?.gender?.toLowerCase() === 'female' && getAgeYears(selectedPatient) >= 12 && (
                   <Card variant="outlined" sx={{ p: 4, borderRadius: 4, bgcolor: '#fff1f2', border: '1px solid #fecdd3' }}>
                     <Typography variant="h5" fontWeight="900" color="error.main" gutterBottom>Pregnancy Screening</Typography>
                     <RadioGroup row value={vitals.is_pregnant ? 'yes' : 'no'} onChange={(e) => setVitals({...vitals, is_pregnant: e.target.value === 'yes'})}>
@@ -542,9 +573,9 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                         label="How many months?" 
                         fullWidth 
                         sx={{ mt: 3, bgcolor: 'white' }} 
-                        value={vitals.pregnancy_months} 
-                        onChange={(e) => setVitals({...vitals, pregnancy_months: e.target.value})} 
-                        InputProps={{ sx: { height: 80, fontSize: '2rem', fontWeight: 700 }}}
+                        value={isNaN(vitals.pregnancy_months) ? '' : vitals.pregnancy_months} 
+                        onChange={(e) => setVitals({...vitals, pregnancy_months: parseInt(e.target.value)})} 
+                        InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}}
                       />
                     )}
                   </Card>
@@ -559,7 +590,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                 {/* First BP Reading */}
                 <Box sx={{ p: 5, borderRadius: 5, border: `10px solid ${getVitalStatus('bp', vitals.systolic, vitals.diastolic).color}`, textAlign: 'center', bgcolor: 'white' }}>
                   <Typography variant="h5" fontWeight="900" color={getVitalStatus('bp', vitals.systolic, vitals.diastolic).color} sx={{ mb: 2 }}>
-                    {getVitalStatus('bp', vitals.systolic, vitals.diastolic).label} (READING 1)
+                    {getVitalStatus('bp', vitals.systolic, vitals.diastolic).label === 'PENDING' ? 'BLOOD PRESSURE' : `${getVitalStatus('bp', vitals.systolic, vitals.diastolic).label} (BLOOD PRESSURE)`}
                   </Typography>
                   <Stack direction="row" spacing={4} justifyContent="center" alignItems="center">
                     <TextField 
@@ -567,26 +598,26 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       type="number" 
                       value={isNaN(vitals.systolic) ? '' : vitals.systolic} 
                       onChange={(e) => setVitals({...vitals, systolic: parseInt(e.target.value)})} 
-                      InputProps={{ sx: { fontSize: '5rem', fontWeight: 900, textAlign: 'center', height: 150 }}} 
+                      InputProps={{ sx: { fontSize: '3rem', fontWeight: 900, textAlign: 'center', height: 100 }}} 
                       InputLabelProps={{ sx: { fontSize: '1.5rem', fontWeight: 700 }}}
                     />
-                    <Typography variant="h1" sx={{ fontSize: '6rem', fontWeight: 300 }}>/</Typography>
+                    <Typography variant="h1" sx={{ fontSize: '4rem', fontWeight: 300 }}>/</Typography>
                     <TextField 
                       label="Diastolic" 
                       type="number" 
                       value={isNaN(vitals.diastolic) ? '' : vitals.diastolic} 
                       onChange={(e) => setVitals({...vitals, diastolic: parseInt(e.target.value)})} 
-                      InputProps={{ sx: { fontSize: '5rem', fontWeight: 900, textAlign: 'center', height: 150 }}} 
+                      InputProps={{ sx: { fontSize: '3rem', fontWeight: 900, textAlign: 'center', height: 100 }}} 
                       InputLabelProps={{ sx: { fontSize: '1.5rem', fontWeight: 700 }}}
                     />
                   </Stack>
                 </Box>
 
                 {/* Second BP Reading - Only if first is abnormal */}
-                {isBPAbnormal(vitals.systolic, vitals.diastolic) && (
+                {!isNaN(vitals.systolic) && !isNaN(vitals.diastolic) && isBPAbnormal(vitals.systolic, vitals.diastolic) && (
                   <Box sx={{ p: 5, borderRadius: 5, border: `10px solid ${getVitalStatus('bp', vitals.systolic_2, vitals.diastolic_2).color}`, textAlign: 'center', bgcolor: '#fff7ed' }}>
                     <Typography variant="h5" fontWeight="900" color={getVitalStatus('bp', vitals.systolic_2, vitals.diastolic_2).color} sx={{ mb: 2 }}>
-                      {getVitalStatus('bp', vitals.systolic_2, vitals.diastolic_2).label} (READING 2)
+                      {getVitalStatus('bp', vitals.systolic_2, vitals.diastolic_2).label === 'PENDING' ? 'BLOOD PRESSURE (READING 2)' : `${getVitalStatus('bp', vitals.systolic_2, vitals.diastolic_2).label} (BLOOD PRESSURE READING 2)`}
                     </Typography>
                     <Stack direction="row" spacing={4} justifyContent="center" alignItems="center">
                       <TextField 
@@ -594,16 +625,16 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                         type="number" 
                         value={isNaN(vitals.systolic_2) ? '' : vitals.systolic_2} 
                         onChange={(e) => setVitals({...vitals, systolic_2: parseInt(e.target.value)})} 
-                        InputProps={{ sx: { fontSize: '5rem', fontWeight: 900, textAlign: 'center', height: 150 }}} 
+                        InputProps={{ sx: { fontSize: '3rem', fontWeight: 900, textAlign: 'center', height: 100 }}} 
                         InputLabelProps={{ sx: { fontSize: '1.5rem', fontWeight: 700 }}}
                       />
-                      <Typography variant="h1" sx={{ fontSize: '6rem', fontWeight: 300 }}>/</Typography>
+                      <Typography variant="h1" sx={{ fontSize: '4rem', fontWeight: 300 }}>/</Typography>
                       <TextField 
                         label="Diastolic 2" 
                         type="number" 
                         value={isNaN(vitals.diastolic_2) ? '' : vitals.diastolic_2} 
                         onChange={(e) => setVitals({...vitals, diastolic_2: parseInt(e.target.value)})} 
-                        InputProps={{ sx: { fontSize: '5rem', fontWeight: 900, textAlign: 'center', height: 150 }}} 
+                        InputProps={{ sx: { fontSize: '3rem', fontWeight: 900, textAlign: 'center', height: 100 }}} 
                         InputLabelProps={{ sx: { fontSize: '1.5rem', fontWeight: 700 }}}
                       />
                     </Stack>
@@ -614,7 +645,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                 )}
 
                 <Grid container spacing={4}>
-                  <Grid size={{ xs: 12, md: 3 }}>
+                  <Grid size={{ xs: 12, md: 6 }}>
                     <Box sx={{ p: 3, borderRadius: 4, border: `4px solid ${getVitalStatus('hr', vitals.heartRate).color}`, bgcolor: 'white' }}>
                       <Typography variant="subtitle1" fontWeight="900" color={getVitalStatus('hr', vitals.heartRate).color} sx={{ mb: 1 }}>
                         {getVitalStatus('hr', vitals.heartRate).label}
@@ -625,11 +656,11 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                         type="number"
                         value={isNaN(vitals.heartRate) ? '' : vitals.heartRate} 
                         onChange={(e) => setVitals({...vitals, heartRate: parseInt(e.target.value)})} 
-                        InputProps={{ sx: { height: 100, fontSize: '2.5rem', fontWeight: 800 }}}
+                        InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 800 }}}
                       />
                     </Box>
                   </Grid>
-                  <Grid size={{ xs: 12, md: 3 }}>
+                  <Grid size={{ xs: 12, md: 6 }}>
                     <Box sx={{ p: 3, borderRadius: 4, border: `4px solid ${getVitalStatus('rr', vitals.respiratoryRate).color}`, bgcolor: 'white' }}>
                       <Typography variant="subtitle1" fontWeight="900" color={getVitalStatus('rr', vitals.respiratoryRate).color} sx={{ mb: 1 }}>
                         {getVitalStatus('rr', vitals.respiratoryRate).label}
@@ -640,11 +671,11 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                         type="number"
                         value={isNaN(vitals.respiratoryRate) ? '' : vitals.respiratoryRate} 
                         onChange={(e) => setVitals({...vitals, respiratoryRate: parseInt(e.target.value)})} 
-                        InputProps={{ sx: { height: 100, fontSize: '2.5rem', fontWeight: 800 }}}
+                        InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 800 }}}
                       />
                     </Box>
                   </Grid>
-                  <Grid size={{ xs: 12, md: 3 }}>
+                  <Grid size={{ xs: 12, md: 6 }}>
                     <Box sx={{ p: 3, borderRadius: 4, border: `4px solid ${getVitalStatus('o2', vitals.oxygenSaturation).color}`, bgcolor: 'white' }}>
                       <Typography variant="subtitle1" fontWeight="900" color={getVitalStatus('o2', vitals.oxygenSaturation).color} sx={{ mb: 1 }}>
                         {getVitalStatus('o2', vitals.oxygenSaturation).label}
@@ -655,11 +686,11 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                         type="number"
                         value={isNaN(vitals.oxygenSaturation) ? '' : vitals.oxygenSaturation} 
                         onChange={(e) => setVitals({...vitals, oxygenSaturation: parseInt(e.target.value)})} 
-                        InputProps={{ sx: { height: 100, fontSize: '2.5rem', fontWeight: 800 }}}
+                        InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 800 }}}
                       />
                     </Box>
                   </Grid>
-                  <Grid size={{ xs: 12, md: 3 }}>
+                  <Grid size={{ xs: 12, md: 6 }}>
                     <Box sx={{ p: 3, borderRadius: 4, border: '4px solid #e2e8f0', bgcolor: 'white' }}>
                       <Typography variant="subtitle1" fontWeight="900" color="text.secondary" sx={{ mb: 1 }}>
                         TEMPERATURE
@@ -670,7 +701,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                         type="number"
                         value={isNaN(vitals.temperature) ? '' : vitals.temperature} 
                         onChange={(e) => setVitals({...vitals, temperature: parseFloat(e.target.value)})} 
-                        InputProps={{ sx: { height: 100, fontSize: '2.5rem', fontWeight: 800 }}}
+                        InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 800 }}}
                       />
                     </Box>
                   </Grid>
@@ -797,7 +828,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       InputProps={{ 
                         sx: { 
                           height: 80, 
-                          fontSize: '2rem', 
+                          fontSize: '1.5rem', 
                           fontWeight: 700,
                           borderLeft: vitals.rbg > 0 ? `10px solid ${getVitalStatus('rbg', vitals.rbg).color}` : 'none'
                         },
@@ -825,7 +856,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       InputProps={{ 
                         sx: { 
                           height: 80, 
-                          fontSize: '2rem', 
+                          fontSize: '1.5rem', 
                           fontWeight: 700,
                           borderLeft: vitals.fbg > 0 ? `10px solid ${getVitalStatus('fbg', vitals.fbg).color}` : 'none'
                         },
@@ -842,7 +873,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       type="number"
                       value={isNaN(vitals.hours_since_meal) || vitals.hours_since_meal === 0 ? '' : vitals.hours_since_meal} 
                       onChange={(e) => setVitals({...vitals, hours_since_meal: parseFloat(e.target.value)})} 
-                      InputProps={{ sx: { height: 80, fontSize: '2rem', fontWeight: 700 }}}
+                      InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}}
                     />
                   </Box>
 
@@ -855,7 +886,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       value={isNaN(vitals.hemoglobin) || vitals.hemoglobin === 0 ? '' : vitals.hemoglobin} 
                       onChange={(e) => setVitals({...vitals, hemoglobin: parseFloat(e.target.value)})} 
                       InputProps={{ 
-                        sx: { height: 80, fontSize: '2rem', fontWeight: 700 },
+                        sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 },
                         endAdornment: <Typography variant="h6" sx={{ ml: 2, color: 'text.secondary' }}>mmol/L</Typography>
                       }}
                     />
@@ -883,7 +914,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                     <Select 
                       value={vitals.nurse_priority} 
                       onChange={(e) => setVitals({...vitals, nurse_priority: e.target.value})} 
-                      sx={{ height: 100, fontWeight: 900, fontSize: '2rem', bgcolor: 'white', borderRadius: 3 }}
+                      sx={{ height: 80, fontWeight: 900, fontSize: '1.5rem', bgcolor: 'white', borderRadius: 3 }}
                     >
                       <MenuItem value=""><em>Follow System</em></MenuItem>
                       <MenuItem value="emergency" sx={{ color: 'error.main', fontWeight: 900, fontSize: '1.5rem' }}>EMERGENCY (Red)</MenuItem>
@@ -900,7 +931,13 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                 fullWidth 
                 size="large" 
                 variant="outlined" 
-                sx={{ height: 100, fontWeight: 900, fontSize: '1.5rem', borderRadius: 4, border: '3px solid' }} 
+                sx={{ 
+                  height: { xs: 60, sm: 80 }, 
+                  fontWeight: 900, 
+                  fontSize: { xs: '1rem', sm: '1.25rem', md: '1.5rem' }, 
+                  borderRadius: 4, 
+                  border: '3px solid' 
+                }} 
                 onClick={() => setSelectedPatient(null)}
               >
                 Cancel
@@ -909,7 +946,12 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                 fullWidth 
                 size="large" 
                 variant="contained" 
-                sx={{ height: 100, fontWeight: 900, fontSize: '1.5rem', borderRadius: 4 }} 
+                sx={{ 
+                  height: { xs: 60, sm: 80 }, 
+                  fontWeight: 900, 
+                  fontSize: { xs: '1rem', sm: '1.25rem', md: '1.5rem' }, 
+                  borderRadius: 4 
+                }} 
                 onClick={() => {
                   let nextStatus: EncounterStatus = 'READY_FOR_DOCTOR';
                   if (mode === 1) nextStatus = 'WAITING_FOR_VITALS_2';
@@ -925,6 +967,12 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
           </Paper>
         </Box>
       )}
+      <CancelQueueDialog 
+        open={!!cancelTarget}
+        onClose={() => setCancelTarget(null)}
+        onConfirm={handleCancelQueueItem}
+        patientName={cancelTarget?.patient_name || ''}
+      />
     </StationLayout>
   );
 };

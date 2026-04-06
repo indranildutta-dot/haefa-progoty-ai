@@ -19,6 +19,7 @@ export const logAction = async (params: {
   action: AuditLog['action'];
   patient_id?: string;
   encounter_id?: string;
+  metadata?: any;
 }) => {
   try {
     const { selectedCountry, selectedClinic, userProfile } = useAppStore.getState();
@@ -45,6 +46,7 @@ export const logAction = async (params: {
     
     if (params.patient_id) logEntry.patient_id = params.patient_id;
     if (params.encounter_id) logEntry.encounter_id = params.encounter_id;
+    if (params.metadata) logEntry.metadata = params.metadata;
 
     await addDoc(collection(db, AUDIT_LOGS_COLLECTION), logEntry);
   } catch (error) {

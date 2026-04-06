@@ -124,13 +124,24 @@ const TopNavigation: React.FC = () => {
         <Toolbar disableGutters sx={{ minHeight: 64 }}>
           {(isMobile || isTablet) && (
             <IconButton
-              color="inherit"
+              color="primary"
               aria-label="open drawer"
               edge="start"
               onClick={toggleDrawer(true)}
-              sx={{ mr: 2, p: 1.5 }}
+              sx={{ 
+                mr: 2, 
+                p: 1.5,
+                bgcolor: 'primary.main',
+                color: 'white',
+                boxShadow: '0 4px 12px rgba(15, 23, 42, 0.2)',
+                '&:hover': {
+                  bgcolor: 'primary.dark',
+                  transform: 'scale(1.05)'
+                },
+                transition: 'all 0.2s ease'
+              }}
             >
-              <MenuIcon />
+              <MenuIcon sx={{ fontSize: '2.2rem' }} />
             </IconButton>
           )}
 
@@ -197,8 +208,8 @@ const TopNavigation: React.FC = () => {
 
           <Box sx={{ flexGrow: 0, display: 'flex', alignItems: 'center', gap: 1 }}>
             <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ p: 0.5 }}>
-              <Avatar sx={{ bgcolor: 'primary.main', width: 36, height: 36 }}>
-                <AccountCircle />
+              <Avatar sx={{ bgcolor: 'primary.main', width: 44, height: 44, border: '2px solid white', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                <AccountCircle sx={{ fontSize: 32 }} />
               </Avatar>
             </IconButton>
             <Menu

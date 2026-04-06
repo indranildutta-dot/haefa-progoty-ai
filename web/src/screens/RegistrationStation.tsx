@@ -90,7 +90,8 @@ const PatientSearchResultItem: React.FC<{
   onEdit: (p: Patient) => void; 
   onStart: (id: string, name: string, triage?: string) => void;
   onReprint: (p: Patient) => void;
-}> = ({ patient, onEdit, onStart, onReprint }) => {
+  onCancel: () => void;
+}> = ({ patient, onEdit, onStart, onReprint, onCancel }) => {
   const lastVisit = patient.last_visit_date 
     ? patient.last_visit_date.toDate().toLocaleDateString() 
     : 'Never';
@@ -146,6 +147,11 @@ const PatientSearchResultItem: React.FC<{
             LAST VISIT: {lastVisit}
           </Typography>
         </Box>
+        <Tooltip title="Cancel Selection">
+          <IconButton onClick={onCancel} size="small" sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
+            <Box component="span" sx={{ fontSize: '1.5rem', fontWeight: 900 }}>×</Box>
+          </IconButton>
+        </Tooltip>
       </Box>
 
       <Grid container spacing={1}>
@@ -542,19 +548,23 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
           clinicName: selectedClinic.name
         });
         setShowBadgeModal(true);
+
+        // Only add to queue if it's a NEW registration
+        const encounterId = await createEncounter(currentPatientId);
+        await addToQueue({
+          patient_id: currentPatientId,
+          patient_name: `${newPatient.given_name} ${newPatient.family_name}`,
+          encounter_id: encounterId,
+          status: 'WAITING_FOR_VITALS',
+          station: 'vitals',
+          triage_level: newPatient.triage_level
+        });
+        setSuccessMsg("Success: Record finalized and patient queued.");
       } else {
         await updatePatient(editingPatientId, patientData);
+        setSuccessMsg("Success: Patient record updated.");
       }
-      const encounterId = await createEncounter(currentPatientId);
-      await addToQueue({
-        patient_id: currentPatientId,
-        patient_name: `${newPatient.given_name} ${newPatient.family_name}`,
-        encounter_id: encounterId,
-        status: 'WAITING_FOR_VITALS',
-        station: 'vitals',
-        triage_level: newPatient.triage_level
-      });
-      setSuccessMsg("Success: Record finalized and patient queued.");
+      
       setNewPatient(initialPatientState);
       setPatientPhotoUrl(undefined);
       setCurrentPatientId(doc(collection(db, 'patients')).id);
@@ -1028,7 +1038,14 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
                     color="primary" 
                     onClick={handleSearch} 
                     disabled={searching} 
-                    sx={{ height: 70, fontWeight: 900, borderRadius: 3, fontSize: '1.3rem', boxShadow: 4, mt: 1 }}
+                    sx={{ 
+                      height: { xs: 60, md: 70 }, 
+                      fontWeight: 900, 
+                      borderRadius: 3, 
+                      fontSize: { xs: '1rem', sm: '1.1rem', md: '1.3rem' }, 
+                      boxShadow: 4, 
+                      mt: 1 
+                    }}
                   >
                     {searching ? <CircularProgress size={28} color="inherit" /> : "EXECUTE QUERY"}
                   </Button>
@@ -1040,7 +1057,28 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
                   <Divider sx={{ my: 2 }} />
                   {searchResults.length === 0 ? (<Typography variant="body1" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>No matching records found.</Typography>) : (
                     searchResults.map((p) => (
-                      <PatientSearchResultItem key={p.id} patient={p} onEdit={handleEditPatient} onStart={startEncounter} onReprint={handleReprint} />
+                      <PatientSearchResultItem 
+                        key={p.id} 
+                        patient={p} 
+                        onEdit={handleEditPatient} 
+                        onStart={startEncounter} 
+                        onReprint={handleReprint} 
+                        onCancel={() => {
+                          setSearchResults([]);
+                          setSearchPerformed(false);
+                          setSearchParams({ 
+                            given_name: '', 
+                            family_name: '', 
+                            phone: '',
+                            national_id: '',
+                            rohingya_number: '',
+                            fcn_number: '',
+                            bhutanese_refugee_number: '',
+                            patient_type: '',
+                            nepal_id: ''
+                          });
+                        }}
+                      />
                     ))
                   )}
                 </Box>
@@ -1056,7 +1094,63 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
                 {steps.map((label, index) => (
                   <Step key={label}>
                     <StepLabel><Typography variant="h6" fontWeight="900" color={activeStep === index ? 'primary' : 'text.secondary'}>{label}</Typography></StepLabel>
-                    <StepContent><Box sx={{ py: 6 }}>{renderStepContent(index)}</Box><Stack direction="row" spacing={3} sx={{ mt: 4 }}><Button variant="contained" color="primary" onClick={handleNext} disabled={loading} sx={{ height: 80, px: 8, fontWeight: 900, borderRadius: 3, fontSize: '1.5rem', boxShadow: 4 }}>{loading ? <CircularProgress size={32} color="inherit" /> : (activeStep === steps.length - 1 ? 'FINALIZE RECORD' : 'CONTINUE')}</Button><Button disabled={activeStep === 0 || loading} onClick={() => setActiveStep(prev => prev - 1)} sx={{ height: 80, px: 4, fontWeight: 800, fontSize: '1.2rem' }}>BACK</Button></Stack></StepContent>
+                    <StepContent>
+                      <Box sx={{ py: 6 }}>{renderStepContent(index)}</Box>
+                      <Stack direction="row" spacing={3} sx={{ mt: 4 }}>
+                        <Button 
+                          variant="contained" 
+                          color="primary" 
+                          onClick={handleNext} 
+                          disabled={loading} 
+                          sx={{ 
+                            height: { xs: 60, sm: 80 }, 
+                            px: { xs: 4, sm: 8 }, 
+                            fontWeight: 900, 
+                            borderRadius: 3, 
+                            fontSize: { xs: '1rem', sm: '1.25rem', md: '1.5rem' }, 
+                            boxShadow: 4 
+                          }}
+                        >
+                          {loading ? <CircularProgress size={32} color="inherit" /> : (activeStep === steps.length - 1 ? 'FINALIZE RECORD' : 'CONTINUE')}
+                        </Button>
+                        {editingPatientId && (
+                          <Button 
+                            variant="outlined"
+                            color="error"
+                            onClick={() => {
+                              setEditingPatientId(null);
+                              setNewPatient(initialPatientState);
+                              setPatientPhotoUrl(undefined);
+                              setCurrentPatientId(doc(collection(db, 'patients')).id);
+                              setActiveStep(0);
+                              setSuccessMsg('');
+                            }}
+                            sx={{ 
+                              height: { xs: 60, sm: 80 }, 
+                              px: 4, 
+                              fontWeight: 800, 
+                              fontSize: { xs: '0.9rem', sm: '1.1rem', md: '1.2rem' },
+                              borderWidth: 3,
+                              '&:hover': { borderWidth: 3 }
+                            }}
+                          >
+                            CANCEL EDIT
+                          </Button>
+                        )}
+                        <Button 
+                          disabled={activeStep === 0 || loading} 
+                          onClick={() => setActiveStep(prev => prev - 1)} 
+                          sx={{ 
+                            height: { xs: 60, sm: 80 }, 
+                            px: 4, 
+                            fontWeight: 800, 
+                            fontSize: { xs: '0.9rem', sm: '1.1rem', md: '1.2rem' } 
+                          }}
+                        >
+                          BACK
+                        </Button>
+                      </Stack>
+                    </StepContent>
                   </Step>
                 ))}
               </Stepper>
@@ -1068,7 +1162,36 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
         <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', bgcolor: 'white', p: 6, borderRadius: 8, width: 550, textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
           <Typography variant="h4" fontWeight="900" color="primary" gutterBottom sx={{ mb: 4 }}>HEALTH CARD GENERATED</Typography>
           {badgeData && (<Box sx={{ p: 3, border: '2px solid #004d40', borderRadius: 4, bgcolor: 'white', mb: 6, textAlign: 'center', position: 'relative', boxShadow: 3, minHeight: 250, display: 'flex', flexDirection: 'column' }}><Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ mb: 1, borderBottom: '2px solid #004d40', pb: 1, textAlign: 'center' }}><Typography variant="h6" fontWeight="900" sx={{ fontSize: '1.1rem', color: '#333', lineHeight: 1.2, textAlign: 'center', width: '100%' }}>HEALTH AND EDUCATION FOR ALL, USA</Typography></Stack><Typography variant="h5" fontWeight="900" sx={{ color: '#00796b', mb: 2, letterSpacing: 1 }}>Health Card</Typography><Stack direction="row" spacing={3} sx={{ flex: 1, alignItems: 'center' }}><Box sx={{ width: 120, height: 150, border: '2px solid #004d40', borderRadius: 2, overflow: 'hidden', bgcolor: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{badgeData.photoUrl ? (<Box component="img" src={badgeData.photoUrl} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />) : (<Typography variant="caption" color="text.secondary">NO PHOTO</Typography>)}</Box><Box sx={{ textAlign: 'left', flex: 1 }}><Typography variant="h6" fontWeight="800" sx={{ mb: 0.5, color: '#333', fontSize: '1rem' }}>{badgeData.clinicName}</Typography><Typography variant="h5" fontWeight="900" sx={{ mb: 0.5, fontSize: '1.4rem', color: '#1a237e' }}>{badgeData.name}</Typography><Typography variant="h6" color="text.secondary" fontWeight="800" sx={{ mb: 2, fontSize: '1.1rem' }}>ID: {badgeData.patientId.slice(0, 12).toUpperCase()}</Typography></Box><Box sx={{ textAlign: 'center' }}><Box component="img" src={badgeData.qrCode} sx={{ width: 80, height: 80, p: 0.5, bgcolor: 'white', border: '1px solid #eee' }} /><Typography variant="caption" display="block" sx={{ mt: 0.5, fontWeight: 700, fontSize: '0.6rem' }}>SCAN TO VERIFY</Typography></Box></Stack></Box>)}
-          <Stack spacing={2}><Button fullWidth variant="contained" color="success" size="large" onClick={handlePrint} sx={{ height: 80, fontWeight: 900, borderRadius: 4, fontSize: '1.5rem' }}>PRINT IDENTIFICATION</Button><Button fullWidth variant="outlined" onClick={() => setShowBadgeModal(false)} sx={{ height: 60, fontWeight: 800, borderRadius: 3 }}>CLOSE</Button></Stack>
+          <Stack spacing={2}>
+            <Button 
+              fullWidth 
+              variant="contained" 
+              color="success" 
+              size="large" 
+              onClick={handlePrint} 
+              sx={{ 
+                height: { xs: 60, sm: 80 }, 
+                fontWeight: 900, 
+                borderRadius: 4, 
+                fontSize: { xs: '1.1rem', sm: '1.3rem', md: '1.5rem' } 
+              }}
+            >
+              PRINT IDENTIFICATION
+            </Button>
+            <Button 
+              fullWidth 
+              variant="outlined" 
+              onClick={() => setShowBadgeModal(false)} 
+              sx={{ 
+                height: { xs: 50, sm: 60 }, 
+                fontWeight: 800, 
+                borderRadius: 3,
+                fontSize: { xs: '0.9rem', sm: '1rem' }
+              }}
+            >
+              CLOSE
+            </Button>
+          </Stack>
         </Box>
       </Modal>
     </StationLayout>

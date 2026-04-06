@@ -61,13 +61,13 @@ const ClinicalSidebar: React.FC = () => {
 
   const v = selectedPatient.currentVitals;
 
-  const DataRow = ({ icon, label, value, unit, color, isObese, isOverweight }: any) => (
+  const DataRow = ({ icon, label, value, unit, color, isEmergency, isWarning }: any) => (
     <Box sx={{ 
       mb: 2,
-      p: (isObese || isOverweight) ? 1 : 0,
+      p: (isEmergency || isWarning) ? 1 : 0,
       borderRadius: 2,
-      border: isObese ? '4px solid #ef4444' : isOverweight ? '4px solid #f59e0b' : 'none',
-      boxShadow: isObese ? '0 0 15px rgba(239, 68, 68, 0.3)' : isOverweight ? '0 0 15px rgba(245, 158, 11, 0.3)' : 'none'
+      border: isEmergency ? '4px solid #ef4444' : isWarning ? '4px solid #f59e0b' : 'none',
+      boxShadow: isEmergency ? '0 0 15px rgba(239, 68, 68, 0.3)' : isWarning ? '0 0 15px rgba(245, 158, 11, 0.3)' : 'none'
     }}>
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
         {icon && React.cloneElement(icon, { sx: { fontSize: 16, color: color || 'text.secondary' } })}
@@ -75,7 +75,7 @@ const ClinicalSidebar: React.FC = () => {
           {label}
         </Typography>
       </Stack>
-      <Typography variant="body1" fontWeight="900" color={isObese ? '#ef4444' : isOverweight ? '#f59e0b' : '#1e293b'}>
+      <Typography variant="body1" fontWeight="900" color={isEmergency ? '#ef4444' : isWarning ? '#f59e0b' : '#1e293b'}>
         {value || '--'} <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>{unit}</span>
       </Typography>
     </Box>
@@ -112,31 +112,69 @@ const ClinicalSidebar: React.FC = () => {
         {/* Current Visit Data */}
         {v && (
           <>
-            {!isAnthropometryPage && (
-              <Box>
-                <Typography variant="overline" fontWeight="900" color="text.disabled">Anthropometry</Typography>
-                <Divider sx={{ mb: 2 }} />
-                <DataRow icon={<HeightIcon />} label="Height" value={v.height} unit="cm" />
-                <DataRow icon={<WeightIcon />} label="Weight" value={v.weight} unit="kg" />
+            <Box>
+              <Typography variant="overline" fontWeight="900" color="text.disabled">Anthropometry</Typography>
+              <Divider sx={{ mb: 2 }} />
+              <DataRow icon={<HeightIcon />} label="Height" value={v.height} unit="cm" />
+              <DataRow icon={<WeightIcon />} label="Weight" value={v.weight} unit="kg" />
+              <DataRow 
+                icon={<WeightIcon />} 
+                label="BMI" 
+                value={v.bmi} 
+                unit={v.bmi_class} 
+                color={v.bmi_class === 'Obese' ? '#ef4444' : v.bmi_class === 'Overweight' ? '#f59e0b' : 'primary.main'}
+                isEmergency={v.bmi_class === 'Obese'}
+                isWarning={v.bmi_class === 'Overweight'}
+              />
+              {v.muac && (
                 <DataRow 
                   icon={<WeightIcon />} 
-                  label="BMI" 
-                  value={v.bmi} 
-                  unit={v.bmi_class} 
-                  color="primary.main"
+                  label="MUAC" 
+                  value={v.muac} 
+                  unit={v.muac_class} 
+                  color={v.muac_class === 'Severely Malnourished' ? '#ef4444' : v.muac_class === 'Moderately Malnourished' ? '#f59e0b' : 'primary.main'}
+                  isEmergency={v.muac_class === 'Severely Malnourished'}
+                  isWarning={v.muac_class === 'Moderately Malnourished'}
                 />
-                {v.muac && <DataRow icon={<WeightIcon />} label="MUAC" value={v.muac} unit={v.muac_class} />}
-                {v.blood_group && <DataRow icon={<OpacityIcon />} label="Blood Group" value={v.blood_group} color="error.main" />}
-              </Box>
-            )}
+              )}
+              {v.blood_group && <DataRow icon={<OpacityIcon />} label="Blood Group" value={v.blood_group} color="error.main" />}
+            </Box>
 
             <Box>
               <Typography variant="overline" fontWeight="900" color="text.disabled">Vital Signs</Typography>
               <Divider sx={{ mb: 2 }} />
-              <DataRow icon={<HeartIcon />} label="Blood Pressure" value={`${v.systolic}/${v.diastolic}`} unit="mmHg" />
-              <DataRow icon={<HeartIcon />} label="Heart Rate" value={v.heartRate} unit="bpm" />
-              <DataRow icon={<OpacityIcon />} label="SpO2" value={v.oxygenSaturation} unit="%" />
-              <DataRow icon={<TempIcon />} label="Temperature" value={v.temperature} unit="°C" />
+              <DataRow 
+                icon={<HeartIcon />} 
+                label="Blood Pressure" 
+                value={(!isNaN(v.systolic) && !isNaN(v.diastolic)) ? `${v.systolic}/${v.diastolic}` : '--'} 
+                unit="mmHg" 
+                isEmergency={v.systolic >= 180 || v.diastolic >= 120}
+                isWarning={(v.systolic >= 130 && v.systolic < 180) || (v.diastolic >= 80 && v.diastolic < 120)}
+              />
+              <DataRow 
+                icon={<HeartIcon />} 
+                label="Heart Rate" 
+                value={v.heartRate} 
+                unit="bpm" 
+                isEmergency={v.heartRate > 120 || (v.heartRate > 0 && v.heartRate < 50)}
+                isWarning={(v.heartRate > 100 && v.heartRate <= 120) || (v.heartRate > 50 && v.heartRate < 60)}
+              />
+              <DataRow 
+                icon={<OpacityIcon />} 
+                label="SpO2" 
+                value={v.oxygenSaturation} 
+                unit="%" 
+                isEmergency={v.oxygenSaturation > 0 && v.oxygenSaturation < 90}
+                isWarning={v.oxygenSaturation >= 90 && v.oxygenSaturation <= 92}
+              />
+              <DataRow 
+                icon={<TempIcon />} 
+                label="Temperature" 
+                value={v.temperature} 
+                unit="°C" 
+                isEmergency={v.temperature >= 39 || (v.temperature > 0 && v.temperature < 35)}
+                isWarning={(v.temperature >= 38 && v.temperature < 39) || (v.temperature >= 35 && v.temperature < 36)}
+              />
             </Box>
           </>
         )}
@@ -164,8 +202,8 @@ const ClinicalSidebar: React.FC = () => {
                     label="BMI" 
                     value={lastVitals.bmi} 
                     unit={lastVitals.bmi_class}
-                    isObese={lastVitals.bmi_class === 'Obese'}
-                    isOverweight={lastVitals.bmi_class === 'Overweight'}
+                    isEmergency={lastVitals.bmi_class === 'Obese'}
+                    isWarning={lastVitals.bmi_class === 'Overweight'}
                   />
                 </AccordionDetails>
               </Accordion>

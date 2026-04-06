@@ -59,6 +59,7 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
   const [loadingFull, setLoadingFull] = useState(false);
   const [openFullHistory, setOpenFullHistory] = useState(false);
   const [printItem, setPrintItem] = useState<HistoryItem | null>(null);
+  const [selectedVisitIndex, setSelectedVisitIndex] = useState<number>(0);
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -73,7 +74,8 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
         
         const completedEncounters = encounters.filter(e => e.encounter_status === 'COMPLETED');
         
-        const items = await Promise.all(completedEncounters.slice(0, 5).map(async (encounter) => {
+        // Only fetch the last 2 visits
+        const items = await Promise.all(completedEncounters.slice(0, 2).map(async (encounter) => {
           const [vitals, diagnosis, prescription, triage] = await Promise.all([
             getVitalsByEncounter(encounter.id!),
             getDiagnosisByEncounter(encounter.id!),
@@ -161,43 +163,120 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress size={24} /></Box>;
 
+  if (historyItems.length === 0) {
+    return (
+      <Paper 
+        variant="outlined" 
+        sx={{ 
+          p: 2, 
+          textAlign: 'center', 
+          borderRadius: 4, 
+          bgcolor: '#f8fafc',
+          border: '1px dashed #cbd5e1',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '120px'
+        }}
+      >
+        <HistoryIcon sx={{ fontSize: 28, color: 'text.disabled', mb: 1, opacity: 0.5 }} />
+        <Typography 
+          variant="caption" 
+          fontWeight="800" 
+          color="text.disabled"
+          sx={{ 
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            px: 1,
+            lineHeight: 1.2
+          }}
+        >
+          No Previous visit
+        </Typography>
+      </Paper>
+    );
+  }
+
+  const currentItem = historyItems[selectedVisitIndex];
+
   return (
     <Box>
       <Typography variant="subtitle2" color="primary" fontWeight="900" sx={{ textTransform: 'uppercase', letterSpacing: '0.1em', mb: 2, display: 'flex', alignItems: 'center' }}>
-        <HistoryIcon sx={{ mr: 1, fontSize: 18 }} /> Clinical Timeline
+        <HistoryIcon sx={{ mr: 1, fontSize: 18 }} /> Historical Visits
       </Typography>
-      
-      {historyItems.map((item) => (
-        <Card key={item.encounter.id} sx={{ mb: 2, borderRadius: 3, border: '1px solid #e2e8f0', transition: '0.2s', '&:hover': { borderColor: 'primary.main', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' } }}>
-          <CardContent sx={{ p: 2 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
-              <Typography variant="subtitle2" fontWeight="900" color="text.secondary">
-                {item.encounter.created_at?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </Typography>
-              <IconButton size="small" onClick={() => handlePrint(item)} sx={{ bgcolor: '#f1f5f9' }}>
-                <LocalPrintshopIcon fontSize="small" />
-              </IconButton>
-            </Box>
-            
-            <Typography variant="body2" sx={{ fontWeight: 800, color: '#1e293b', mb: 0.5 }}>
-              Diagnosis: {item.diagnosis?.diagnosis || 'General Consultation'}
-            </Typography>
-            
-            {renderRiskChips(item.vitals)}
-            
-            <Box sx={{ mt: 1.5, display: 'flex', gap: 2 }}>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                BP: <strong>{item.vitals?.systolic}/{item.vitals?.diastolic}</strong>
-              </Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                BMI: <strong>{item.vitals?.bmi || '--'}</strong>
-              </Typography>
-            </Box>
-          </CardContent>
-        </Card>
-      ))}
 
-      <Button variant="outlined" fullWidth onClick={handleViewFullHistory} sx={{ mt: 1, borderRadius: 2, fontWeight: 900, py: 1.5, borderWidth: 2, borderColor: 'primary.main' }}>
+      <Stack direction="row" spacing={1} sx={{ mb: 3 }}>
+        <Button 
+          variant={selectedVisitIndex === 0 ? "contained" : "outlined"} 
+          size="small"
+          fullWidth
+          onClick={() => setSelectedVisitIndex(0)}
+          sx={{ fontWeight: 900, borderRadius: 2 }}
+        >
+          Last Visit
+        </Button>
+        {historyItems.length > 1 && (
+          <Button 
+            variant={selectedVisitIndex === 1 ? "contained" : "outlined"} 
+            size="small"
+            fullWidth
+            onClick={() => setSelectedVisitIndex(1)}
+            sx={{ fontWeight: 900, borderRadius: 2 }}
+          >
+            2nd Last Visit
+          </Button>
+        )}
+      </Stack>
+      
+      <Card sx={{ mb: 2, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: 'white' }}>
+        <CardContent sx={{ p: 2 }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
+            <Typography variant="subtitle2" fontWeight="900" color="primary">
+              {currentItem.encounter.created_at?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </Typography>
+            <IconButton size="small" onClick={() => handlePrint(currentItem)} sx={{ bgcolor: '#f1f5f9' }}>
+              <LocalPrintshopIcon fontSize="small" />
+            </IconButton>
+          </Box>
+          
+          <Typography variant="body2" sx={{ fontWeight: 800, color: '#1e293b', mb: 1 }}>
+            Diagnosis: {currentItem.diagnosis?.diagnosis || 'General Consultation'}
+          </Typography>
+
+          <Divider sx={{ my: 1.5 }} />
+
+          <Grid container spacing={1}>
+            <Grid size={6}>
+              <Typography variant="caption" color="text.secondary" display="block">BP</Typography>
+              <Typography variant="body2" fontWeight="bold">{currentItem.vitals?.systolic}/{currentItem.vitals?.diastolic}</Typography>
+            </Grid>
+            <Grid size={6}>
+              <Typography variant="caption" color="text.secondary" display="block">BMI</Typography>
+              <Typography variant="body2" fontWeight="bold">{currentItem.vitals?.bmi || '--'}</Typography>
+            </Grid>
+            <Grid size={6}>
+              <Typography variant="caption" color="text.secondary" display="block">HR</Typography>
+              <Typography variant="body2" fontWeight="bold">{currentItem.vitals?.heartRate || '--'}</Typography>
+            </Grid>
+            <Grid size={6}>
+              <Typography variant="caption" color="text.secondary" display="block">Temp</Typography>
+              <Typography variant="body2" fontWeight="bold">{currentItem.vitals?.temperature || '--'}°C</Typography>
+            </Grid>
+          </Grid>
+          
+          {renderRiskChips(currentItem.vitals)}
+
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="caption" fontWeight="bold" color="text.secondary">Notes:</Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary', fontStyle: 'italic', fontSize: '0.75rem' }}>
+              {currentItem.diagnosis?.notes || 'No notes recorded.'}
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
+
+      <Button variant="outlined" fullWidth onClick={handleViewFullHistory} sx={{ mt: 1, borderRadius: 2, fontWeight: 900, py: 1, borderWidth: 2, borderColor: 'primary.main', fontSize: '0.75rem' }}>
         View Full Medical History
       </Button>
 
