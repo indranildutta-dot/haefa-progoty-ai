@@ -12,6 +12,9 @@ export interface UserProfile {
   assignedClinics?: string[];
   isApproved: boolean;
   lastUpdated?: Timestamp;
+  professional_reg_no?: string;
+  professional_body?: string;
+  designation?: string;
 }
 
 export type EncounterStatus = 
@@ -237,6 +240,10 @@ export interface DiagnosisRecord {
   labInvestigations?: string[];
   referrals?: string[];
   assessment?: any; // Using any to accommodate ClinicalAssessmentData without circular imports or complex nesting
+  prescriber_name?: string;
+  prescriber_reg_no?: string;
+  prescriber_body?: string;
+  prescriber_designation?: string;
   created_at: Timestamp;
 }
 
@@ -248,7 +255,12 @@ export interface PrescriptionRecord {
   country_id: string;
   prescriptions: Prescription[];
   status: 'PENDING' | 'DISPENSED';
+  dispenser_name?: string;
+  dispenser_reg_no?: string;
+  dispenser_body?: string;
+  dispensation_details?: any[];
   created_at: Timestamp;
+  updated_at?: Timestamp;
 }
 
 export interface TriageAssessment {
@@ -299,6 +311,7 @@ export interface ClinicConfigDocument {
   id?: string;
   name: string;
   clinic_name?: string;
+  address?: string;
   country_id: string;
   country_name?: string;
   timezone?: string;

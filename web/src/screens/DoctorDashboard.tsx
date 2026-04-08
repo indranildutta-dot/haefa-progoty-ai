@@ -46,6 +46,7 @@ import ConsultationPanel from '../components/ConsultationPanel';
 import VitalsSnapshot from '../components/VitalsSnapshot';
 import { initialClinicalAssessment } from '../components/ClinicalAssessmentPanel';
 import CancelQueueDialog from '../components/CancelQueueDialog';
+import PrintPrescriptionDialog from '../components/PrintPrescriptionDialog';
 
 interface DoctorDashboardProps {
   countryId: string;
@@ -66,6 +67,8 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
   const [openCancelDialog, setOpenCancelDialog] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<any>(null);
   const [highlightedPatientIds, setHighlightedPatientIds] = useState<string[]>([]);
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [lastEncounterId, setLastEncounterId] = useState<string | null>(null);
   
   const [consultData, setConsultData] = useState<any>({ 
     diagnosis: '', 
@@ -224,6 +227,9 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
       
       // Advance patient to Pharmacy or Complete
       await updateQueueStatus(selectedItem.id!, status as any);
+      
+      setLastEncounterId(selectedItem.encounter_id);
+      setShowPrintDialog(true);
       
       notify("Consultation finalized successfully.", "success");
       setSelectedItem(null);
@@ -552,6 +558,13 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
         onConfirm={handleCancelQueueItem}
         patientName={cancelTarget?.patient_name || ''}
       />
+      {lastEncounterId && (
+        <PrintPrescriptionDialog 
+          open={showPrintDialog} 
+          onClose={() => setShowPrintDialog(false)} 
+          encounterId={lastEncounterId} 
+        />
+      )}
     </StationLayout>
   );
 };

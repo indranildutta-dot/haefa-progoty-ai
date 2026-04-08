@@ -44,3 +44,11 @@ The Doctor Station is the final point of clinical assessment and prescription.
 - Search must support multiple identifiers (NID, FDMN, Nepal ID, Phone).
 - Results must display the patient photo for verification.
 - Actions (Reprint, Edit, Start Visit) must remain functional across all country configurations.
+
+## 6. User Management & Professional Credentials
+- **Documentation**: Refer to `/user_management.md` for the full RBAC specification.
+- **Key Constraints**:
+  - **Professional IDs**: Always display `professional_reg_no` and `professional_body` on prescriptions (Doctor Station) and dispensing labels (Pharmacy Station).
+  - **Designation**: Include the user's `designation` in the prescriber identification block.
+  - **RBAC**: Ensure `doctor` and `nurse` roles have access to all clinical stations for their assigned clinics to support rural practitioner workflows.
+  - **Missing Info Warning**: Maintain the amber warning on the dashboard if `professional_reg_no` is missing for clinical staff.

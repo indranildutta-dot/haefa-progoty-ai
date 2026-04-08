@@ -15,7 +15,9 @@ import {
   MenuItem,
   Stack,
   IconButton,
-  Menu
+  Menu,
+  Alert,
+  AlertTitle
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -495,6 +497,24 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
         </Stack>
       }
     >
+      {userProfile && !userProfile.professional_reg_no && (userProfile.role === 'doctor' || userProfile.role === 'nurse' || userProfile.role === 'pharmacy') && (
+        <Alert 
+          severity="warning" 
+          sx={{ 
+            mb: 3, 
+            borderRadius: 3, 
+            fontWeight: 'bold',
+            border: '1px solid',
+            borderColor: 'warning.main',
+            bgcolor: 'warning.light',
+            '& .MuiAlert-icon': { color: 'warning.dark' }
+          }}
+        >
+          <AlertTitle sx={{ fontWeight: 900 }}>Warning: Professional License No. missing</AlertTitle>
+          Prescriptions and dispensing labels may be legally invalid. Please update your profile in User Management or contact an administrator.
+        </Alert>
+      )}
+
       {isMobile && (
         <Paper sx={{ p: 2, mb: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
           <Typography variant="subtitle2" color="text.secondary" gutterBottom>

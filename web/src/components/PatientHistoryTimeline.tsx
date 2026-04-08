@@ -35,7 +35,8 @@ import {
 import { getTriageAssessmentByEncounter } from '../services/triageService';
 import { getPatientById } from '../services/patientService';
 import { Encounter, VitalsRecord, DiagnosisRecord, PrescriptionRecord, TriageAssessment, Patient } from '../types';
-import PrescriptionPrintView from './PrescriptionPrintView';
+import PrescriptionPrintTemplate from './PrescriptionPrintTemplate';
+import PrintPrescriptionDialog from './PrintPrescriptionDialog';
 import { useAppStore } from '../store/useAppStore';
 
 interface PatientHistoryTimelineProps {
@@ -58,7 +59,8 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
   const [loading, setLoading] = useState(true);
   const [loadingFull, setLoadingFull] = useState(false);
   const [openFullHistory, setOpenFullHistory] = useState(false);
-  const [printItem, setPrintItem] = useState<HistoryItem | null>(null);
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [printEncounterId, setPrintEncounterId] = useState<string | null>(null);
   const [selectedVisitIndex, setSelectedVisitIndex] = useState<number>(0);
 
   useEffect(() => {
@@ -123,11 +125,8 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
   };
 
   const handlePrint = (item: HistoryItem) => {
-    setPrintItem(item);
-    setTimeout(() => {
-      window.print();
-      setTimeout(() => setPrintItem(null), 1000);
-    }, 100);
+    setPrintEncounterId(item.encounter.id!);
+    setShowPrintDialog(true);
   };
 
   const renderRiskChips = (v: any) => {
@@ -349,19 +348,12 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
         </DialogActions>
       </Dialog>
 
-      {printItem && patient && (
-        <Box sx={{ display: 'none', '@media print': { display: 'block' } }}>
-          <PrescriptionPrintView 
-            patient={patient}
-            encounter={printItem.encounter}
-            vitals={printItem.vitals}
-            diagnosis={printItem.diagnosis}
-            prescription={printItem.prescription}
-            triage={printItem.triage}
-            countryCode={selectedCountry?.id || 'BD'}
-            clinicName={selectedClinic?.name}
-          />
-        </Box>
+      {printEncounterId && (
+        <PrintPrescriptionDialog 
+          open={showPrintDialog} 
+          onClose={() => setShowPrintDialog(false)} 
+          encounterId={printEncounterId} 
+        />
       )}
     </Box>
   );

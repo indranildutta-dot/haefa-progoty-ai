@@ -53,6 +53,7 @@ const TopNavigation: React.FC = () => {
   const navItems = [
     ...(isAdmin ? [{ label: 'Operations', to: '/admin', icon: <DashboardIcon /> }] : []),
     ...(selectedClinic ? [
+      { label: 'Dashboard', to: '/dashboard', icon: <DashboardIcon /> },
       { label: 'Registration', to: '/registration', icon: <PersonAddIcon /> },
       { label: 'Body Measures', to: '/vitals-1', icon: <LocalHospitalIcon /> },
       { label: 'Vital Signs', to: '/vitals-2', icon: <LocalHospitalIcon /> },

@@ -23,6 +23,7 @@ import StationLayout from '../components/StationLayout';
 import StationSearchHeader from '../components/StationSearchHeader';
 import PatientContextBar from '../components/PatientContextBar'; 
 import CancelQueueDialog from '../components/CancelQueueDialog';
+import PrintPrescriptionDialog from '../components/PrintPrescriptionDialog';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -37,7 +38,7 @@ interface InventoryItem {
 }
 
 const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
-  const { notify, selectedClinic, setSelectedPatient } = useAppStore();
+  const { notify, selectedClinic, setSelectedPatient, userProfile } = useAppStore();
   const [activeTab, setActiveTab] = useState(0);
   const [waitingList, setWaitingList] = useState<any[]>([]);
   const [selectedItem, setSelectedItem] = useState<any>(null);
@@ -46,6 +47,8 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<any>(null);
   const [highlightedPatientIds, setHighlightedPatientIds] = useState<string[]>([]);
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [lastEncounterId, setLastEncounterId] = useState<string | null>(null);
   
   // Dispensing State
   const [dispensingModes, setDispensingModes] = useState<Record<string, string>>({});
@@ -174,6 +177,9 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
           });
         }
       }
+
+      setLastEncounterId(selectedItem.encounter_id);
+      setShowPrintDialog(true);
 
       notify("Patient visit finalized. Medications dispensed.", "success");
       setSelectedItem(null);
@@ -354,6 +360,11 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                                 <Typography variant="body2">{med.instructions}</Typography>
                             </Box>
                           )}
+                          <Box sx={{ mt: 2, p: 1.5, bgcolor: '#f0f9ff', borderRadius: 2, border: '1px solid #e0f2fe' }}>
+                            <Typography variant="body2" sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>
+                              Dispensed by: <strong>{userProfile?.name}</strong> ({userProfile?.professional_body || 'PCB'}: {userProfile?.professional_reg_no || 'PENDING'})
+                            </Typography>
+                          </Box>
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
                           <Typography variant="subtitle2" fontWeight="bold" mb={1}>Dispensing Mode:</Typography>
@@ -557,6 +568,13 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
         onConfirm={handleCancelQueueItem}
         patientName={cancelTarget?.patient_name || ''}
       />
+      {lastEncounterId && (
+        <PrintPrescriptionDialog 
+          open={showPrintDialog} 
+          onClose={() => setShowPrintDialog(false)} 
+          encounterId={lastEncounterId} 
+        />
+      )}
     </StationLayout>
   );
 };

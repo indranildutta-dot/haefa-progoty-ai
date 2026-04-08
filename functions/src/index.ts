@@ -218,10 +218,11 @@ export const registerPatient = onCall(async (request) => {
 
 export const saveConsultation = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
-  const { encounterId, patientId, clinicId, prescriptions, diagnosis, notes } = request.data;
+  const { encounterId, patientId, clinicId, prescriptions, diagnosis, notes, treatment_notes, labInvestigations, referrals, assessment } = request.data;
   const db = await getDb();
   const admin = await getAdmin();
   
+  const userProfile = (await db.collection("users").doc(request.auth.uid).get()).data() || {};
   const qSnap = await db.collection("queues_active").where("encounter_id", "==", encounterId).get();
 
   return await db.runTransaction(async (transaction: any) => {
@@ -232,10 +233,22 @@ export const saveConsultation = onCall(async (request) => {
       last_updated: admin.firestore.FieldValue.serverTimestamp()
     });
 
+    const diagRef = db.collection("diagnoses").doc();
+    transaction.set(diagRef, {
+      encounter_id: encounterId, patient_id: patientId, clinic_id: clinicId,
+      diagnosis, notes, treatment_notes, labInvestigations, referrals, assessment,
+      prescriber_name: userProfile.name || "Unknown Doctor",
+      prescriber_reg_no: userProfile.professional_reg_no || "N/A",
+      prescriber_body: userProfile.professional_body || "BMDC",
+      prescriber_designation: userProfile.designation || "Medical Officer",
+      created_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+
     const presRef = db.collection("prescriptions").doc();
     transaction.set(presRef, {
       encounter_id: encounterId, patient_id: patientId, clinic_id: clinicId,
-      prescriptions, created_at: admin.firestore.FieldValue.serverTimestamp()
+      prescriptions, status: 'PENDING',
+      created_at: admin.firestore.FieldValue.serverTimestamp()
     });
 
     for (const med of prescriptions) {
@@ -268,6 +281,8 @@ export const dispenseMedication = onCall(async (request) => {
   const { clinicId, medications, encounterId, patientId } = request.data;
   const db = await getDb();
   const admin = await getAdmin();
+
+  const userProfile = (await db.collection("users").doc(request.auth.uid).get()).data() || {};
 
   return await db.runTransaction(async (transaction: any) => {
     const results: any[] = [];
@@ -313,7 +328,21 @@ export const dispenseMedication = onCall(async (request) => {
           created_at: admin.firestore.FieldValue.serverTimestamp()
         });
       }
-      results.push({ medication: medication_name, dispensed: actualDeducted });
+      results.push({ medication: medication_name, dispensed: actualDeducted, mode, substitution, return_on });
+    }
+
+    // Update prescriptions record for this encounter
+    const presQuery = db.collection("prescriptions").where("encounter_id", "==", encounterId).limit(1);
+    const presSnap = await transaction.get(presQuery);
+    if (!presSnap.empty) {
+      transaction.update(presSnap.docs[0].ref, {
+        status: 'DISPENSED',
+        dispenser_name: userProfile.name || "Unknown Pharmacist",
+        dispenser_reg_no: userProfile.professional_reg_no || "N/A",
+        dispenser_body: userProfile.professional_body || "PCB",
+        dispensation_details: results,
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
     }
 
     transaction.update(db.collection("encounters").doc(encounterId), { 

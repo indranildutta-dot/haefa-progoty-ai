@@ -1,6 +1,7 @@
 export interface ClinicConfig {
   id: string;
   name: string;
+  address?: string;
 }
 
 export interface CountryConfig {

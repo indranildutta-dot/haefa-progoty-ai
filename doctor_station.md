@@ -12,8 +12,9 @@ The Doctor Station is the primary clinical interface where physicians perform as
 | **Historical Visits** | Quick access to the last two clinical encounters for trend analysis. |
 | **Clinical Assessment** | A structured, multi-section workflow for recording symptoms and findings. |
 | **Diagnosis & Notes** | Centralized area for primary diagnosis and clinical notes. |
-| **Prescription System** | Interface for adding medications with dosage and duration. |
-| **Workflow Gating** | Ensures all mandatory assessments are complete before patient movement. |
+| **Prescription System** | Interface for adding medications with dosage and duration. Generates a professional, high-density print template. |
+| **Workflow Gating** | Ensures all mandatory assessments are complete before patient movement. Prescriptions are only generated after finalization. |
+| **Professional Signatures** | Automated inclusion of prescriber's name, designation, and registration number on all outputs. |
 
 ---
 
@@ -103,7 +104,16 @@ Displays a read-only snapshot of all data collected in previous stations.
 
 ---
 
-## 6. Finalization & Movement
+## 6. Prescription & Finalization
+
+### Prescription Generation
+The platform generates a professional, high-density prescription template using MUI Grid and Card components.
+*   **Header**: Includes Clinic Logo, Clinic Details, and a unique Encounter ID.
+*   **Patient Banner**: Displays Patient Name, Age, Sex, Patient Code, and Date.
+*   **Clinical Summary**: Structured blocks for Chief Complaints, O/E (Vitals), and Provisional Diagnosis.
+*   **Medication Table**: Optimized table showing Drug Name, Dosage, Frequency, Duration, and Instructions.
+*   **Footer**: Includes Advice, Follow-up Date, and Referral sections.
+*   **Automated Signature**: The prescriber's name, designation, professional body, and registration number are automatically appended to the footer from their user profile.
 
 ### Completion Requirements
 The "SEND TO PHARMACY" button is enabled only when:
@@ -119,6 +129,8 @@ The "SEND TO PHARMACY" button is enabled only when:
 ---
 
 ## 6. Technical Dependencies
+*   **`PrescriptionPrintTemplate.tsx`**: The new professional, high-density print template for prescriptions.
+*   **`PrintPrescriptionDialog.tsx`**: Dialog for previewing and printing the prescription.
 *   **`ClinicalAssessmentPanel.tsx`**: Main component for the assessment workflow, including CV Risk logic.
 *   **`ConsultationPanel.tsx`**: Orchestrates assessment, diagnosis, and prescriptions.
 *   **`DoctorDashboard.tsx`**: Main screen managing the queue and finalization logic.

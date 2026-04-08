@@ -42,7 +42,7 @@ const ConsultationPanel: React.FC<ConsultationPanelProps> = ({
   onChange, 
   onComplete 
 }) => {
-  const { notify } = useAppStore();
+  const { notify, selectedClinic, userProfile } = useAppStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Local state buffer to ensure smooth typing and selection
@@ -190,6 +190,24 @@ const ConsultationPanel: React.FC<ConsultationPanelProps> = ({
           placeholder="Instructions for the patient..." 
           sx={{ bgcolor: 'white', borderRadius: 2 }}
         />
+      </Box>
+
+      {/* Prescriber Identification Block */}
+      <Box sx={{ mt: 2, p: 3, bgcolor: '#f1f5f9', borderRadius: 4, border: '1px solid #e2e8f0' }}>
+        <Typography variant="overline" sx={{ fontWeight: 900, color: 'text.secondary', letterSpacing: 1.5 }}>
+          Prescriber Identification
+        </Typography>
+        <Box sx={{ mt: 1 }}>
+          <Typography variant="body2" sx={{ fontWeight: 800, fontSize: '0.85rem' }}>
+            - {userProfile?.name || 'Unknown Doctor'}, {userProfile?.designation || 'Medical Officer'}
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.85rem', mt: 0.5 }}>
+            {userProfile?.professional_body || 'BMDC'} Reg No: {userProfile?.professional_reg_no || 'PENDING'}
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.85rem', mt: 0.5 }}>
+            Clinic: {selectedClinic?.name} | Date: {new Date().toLocaleDateString()}
+          </Typography>
+        </Box>
       </Box>
 
       {/* Footer Button */}

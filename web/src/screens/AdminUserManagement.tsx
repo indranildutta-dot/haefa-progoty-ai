@@ -19,6 +19,9 @@ const AdminUserManagement = () => {
   const [selectedClinicIds, setSelectedClinicIds] = useState<string[]>([]);
   const [selectedCountryId, setSelectedCountryId] = useState('');
   const [isApproved, setIsApproved] = useState(false);
+  const [professionalRegNo, setProfessionalRegNo] = useState('');
+  const [professionalBody, setProfessionalBody] = useState('');
+  const [designation, setDesignation] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<any>(null);
@@ -58,6 +61,9 @@ const AdminUserManagement = () => {
     setSelectedClinicIds(user.assignedClinics || []);
     setSelectedCountryId(user.countryCode || '');
     setIsApproved(user.isApproved || false);
+    setProfessionalRegNo(user.professional_reg_no || '');
+    setProfessionalBody(user.professional_body || '');
+    setDesignation(user.designation || '');
   };
 
   const handleClear = () => {
@@ -66,6 +72,9 @@ const AdminUserManagement = () => {
     setSelectedClinicIds([]);
     setSelectedCountryId('');
     setIsApproved(false);
+    setProfessionalRegNo('');
+    setProfessionalBody('');
+    setDesignation('');
   };
 
   const handleSync = async () => {
@@ -77,7 +86,10 @@ const AdminUserManagement = () => {
         role, 
         assignedClinics: selectedClinicIds, 
         countryCode: selectedCountryId,
-        isApproved
+        isApproved,
+        professional_reg_no: professionalRegNo,
+        professional_body: professionalBody,
+        designation: designation
       });
       alert('User permissions synced!');
       fetchUsers();
@@ -160,6 +172,35 @@ const AdminUserManagement = () => {
           control={<Switch checked={isApproved} onChange={(e) => setIsApproved(e.target.checked)} />}
           label="Is Approved"
         />
+
+        <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+          <TextField 
+            label="Professional Reg No" 
+            value={professionalRegNo} 
+            onChange={(e) => setProfessionalRegNo(e.target.value)} 
+            fullWidth 
+          />
+          <FormControl fullWidth>
+            <InputLabel>Professional Body</InputLabel>
+            <Select 
+              value={professionalBody} 
+              onChange={(e) => setProfessionalBody(e.target.value)}
+              label="Professional Body"
+            >
+              <MenuItem value="">None</MenuItem>
+              <MenuItem value="BMDC">BMDC (Bangladesh Medical & Dental Council)</MenuItem>
+              <MenuItem value="BNMC">BNMC (Bangladesh Nursing & Midwifery Council)</MenuItem>
+              <MenuItem value="PCB">PCB (Pharmacy Council of Bangladesh)</MenuItem>
+              <MenuItem value="Other">Other</MenuItem>
+            </Select>
+          </FormControl>
+          <TextField 
+            label="Designation" 
+            value={designation} 
+            onChange={(e) => setDesignation(e.target.value)} 
+            fullWidth 
+          />
+        </Box>
         
         <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
           <Button variant="contained" onClick={handleSync}>Save Permissions</Button>

@@ -337,7 +337,7 @@ service cloud.firestore {
     }
 
     match /inventory_logs/{logId} {
-      allow read: if isGlobalAdmin() || isPharmacist(resource.data.clinic_id);
+      allow read: if isApproved() && (isGlobalAdmin() || isStaff(resource.data.clinic_id));
       allow create: if isAuthenticated();
     }
   }

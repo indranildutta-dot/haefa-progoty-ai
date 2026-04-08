@@ -111,7 +111,11 @@ export const saveConsultation = async (
       clinicId: selectedClinic.id,
       prescriptions: prescriptionData?.prescriptions || [],
       diagnosis: diagnosisData.diagnosis,
-      notes: diagnosisData.notes || ""
+      notes: diagnosisData.notes || "",
+      treatment_notes: diagnosisData.treatment_notes || "",
+      labInvestigations: diagnosisData.labInvestigations || [],
+      referrals: diagnosisData.referrals || [],
+      assessment: diagnosisData.assessment || null
     });
 
     // Logging the successful hand-off for audit purposes
