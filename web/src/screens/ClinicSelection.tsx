@@ -55,11 +55,21 @@ const ClinicSelection: React.FC<ClinicSelectionProps> = ({ selectedCountry, onSe
 
   return (
     <Container maxWidth="md" sx={{ py: 6 }}>
-      <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
         <Button onClick={onBack} startIcon={<ArrowBack />} variant="outlined" sx={{ borderRadius: 2, fontWeight: 700 }}>
           Back
         </Button>
-        <Box>
+        {userProfile?.role === 'global_admin' && (
+          <Button 
+            onClick={() => navigate('/admin')} 
+            variant="contained" 
+            color="secondary"
+            sx={{ borderRadius: 2, fontWeight: 700 }}
+          >
+            Admin Dashboard
+          </Button>
+        )}
+        <Box sx={{ flexGrow: 1 }}>
           <Typography variant="h4" fontWeight={900} color="primary">Select Clinic</Typography>
           <Typography variant="subtitle1" color="text.secondary" fontWeight={700}>
             {selectedCountry.name} {selectedCountry.flag}

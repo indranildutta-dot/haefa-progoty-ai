@@ -30,7 +30,17 @@ The Vitals workflow is split into three modes (Body Measures, Vital Signs, Labs 
   - **Safety Sentinel Sync**: Ensure the `useEffect` in `VitalsStation.tsx` is maintained to sync inputs with the top bar in real-time.
   - **Units**: Always display units clearly (kg, cm, bpm, %, °C, mmol/L).
 
-## 4. Search & Identification
+## 4. Doctor Station Reference
+The Doctor Station is the final point of clinical assessment and prescription.
+- **Documentation**: Refer to `/doctor_station.md` for the full specification of assessment sections and CV Risk logic.
+- **Key Constraints**:
+  - **CV Risk Eligibility**: Only show CRA sections for patients aged **40-74**.
+  - **WHO Risk Logic**: Use the South Asia specific matrices in `cvRisk.ts`.
+  - **Independent Scrolling**: Maintain the `overflowY: 'auto'` on side panels to ensure independent scrolling.
+  - **TB Logic**: Maintain the conditional activation of "Suspected TB" based on screening answers.
+  - **Completion Logic**: Ensure all active sections are marked "Complete" before enabling "Send to Pharmacy".
+
+## 5. Search & Identification
 - Search must support multiple identifiers (NID, FDMN, Nepal ID, Phone).
 - Results must display the patient photo for verification.
 - Actions (Reprint, Edit, Start Visit) must remain functional across all country configurations.

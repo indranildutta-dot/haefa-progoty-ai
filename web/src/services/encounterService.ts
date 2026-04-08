@@ -208,17 +208,25 @@ export const saveVitals = async (
   );
   const querySnapshot = await getDocs(q);
   
+  // Filter out NaN and undefined values to prevent overwriting existing data with "empty" states
+  const cleanVitalsData = Object.entries(vitalsData).reduce((acc: any, [key, value]) => {
+    if (value !== undefined && !Number.isNaN(value)) {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+
   if (!querySnapshot.empty) {
     // Update existing
     const docId = querySnapshot.docs[0].id;
     await updateDoc(doc(db, VITALS_COLLECTION, docId), {
-      ...vitalsData,
+      ...cleanVitalsData,
       updated_at: serverTimestamp()
     });
   } else {
     // Create new
     await addDoc(collection(db, VITALS_COLLECTION), {
-      ...vitalsData,
+      ...cleanVitalsData,
       country_id: selectedCountry.id,
       clinic_id: selectedClinic.id,
       created_at: serverTimestamp(),

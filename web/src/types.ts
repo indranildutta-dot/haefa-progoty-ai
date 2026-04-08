@@ -121,6 +121,8 @@ export interface Vitals {
   hours_since_meal?: number;
   hemoglobin?: number;
   is_pregnant?: boolean;
+  is_fasting?: boolean;
+  has_symptoms?: boolean;
   pregnancy_months?: number;
   allergies?: string[];
   social_history?: SocialHistory;
@@ -205,6 +207,8 @@ export interface VitalsRecord {
   systolic_2?: number;
   diastolic_2?: number;
   is_pregnant?: boolean;
+  is_fasting?: boolean;
+  has_symptoms?: boolean;
   pregnancy_months?: number;
   allergies?: string[];
   social_history?: SocialHistory;

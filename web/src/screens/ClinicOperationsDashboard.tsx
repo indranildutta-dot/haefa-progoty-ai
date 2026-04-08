@@ -691,6 +691,21 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
               Pharmacy
             </Button>
           </Grid>
+          {(userProfile?.role === 'global_admin' || userProfile?.role === 'country_admin') && (
+            <Grid size={{ xs: 6, sm: 6, md: 3 }}>
+              <Button 
+                fullWidth 
+                variant="contained" 
+                color="secondary"
+                component={Link} 
+                to="/admin/users" 
+                startIcon={<PeopleIcon />}
+                sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}
+              >
+                User Management
+              </Button>
+            </Grid>
+          )}
         </Grid>
       </Paper>
     </StationLayout>

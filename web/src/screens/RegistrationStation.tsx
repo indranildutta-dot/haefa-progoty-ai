@@ -40,11 +40,13 @@ import FingerprintIcon from '@mui/icons-material/Fingerprint';
 import ContactPhoneIcon from '@mui/icons-material/ContactPhone';
 import HomeIcon from '@mui/icons-material/Home';
 import BadgeIcon from '@mui/icons-material/Badge';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import PatientPhotoCapture from '../components/PatientPhotoCapture';
 import QrScannerModal from '../components/QrScannerModal';
 import { 
   searchPatients, 
-  updatePatient 
+  updatePatient,
+  getPatientById
 } from '../services/patientService';
 import { 
   createEncounter 
@@ -221,6 +223,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
   
   const [searching, setSearching] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const [searchPerformed, setSearchPerformed] = useState(false);
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   
@@ -431,14 +434,20 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
     );
   }
 
-  const handleSearch = async () => {
-    if (!searchParams.given_name && !searchParams.family_name && !searchParams.phone && !searchParams.national_id && !searchParams.rohingya_number && !searchParams.fcn_number && !searchParams.nepal_id && !searchParams.bhutanese_refugee_number) {
+  const handleSearch = async (qrData?: string) => {
+    if (!qrData && !searchParams.given_name && !searchParams.family_name && !searchParams.phone && !searchParams.national_id && !searchParams.rohingya_number && !searchParams.fcn_number && !searchParams.nepal_id && !searchParams.bhutanese_refugee_number) {
       notify("Please provide a name or identity number.", "warning");
       return;
     }
     setSearching(true);
     try {
-      const results = await searchPatients({ ...searchParams });
+      let results: Patient[] = [];
+      if (qrData) {
+        const p = await getPatientById(qrData);
+        if (p) results = [p];
+      } else {
+        results = await searchPatients({ ...searchParams });
+      }
       setSearchResults(results);
       setSearchPerformed(true);
     } catch (error: any) {
@@ -964,7 +973,26 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
           <Card sx={{ borderRadius: 6, border: '1px solid #e2e8f0', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
             <Box sx={{ bgcolor: 'primary.main', p: 3, color: 'white' }}><Stack direction="row" spacing={2} alignItems="center"><SearchIcon sx={{ fontSize: 32 }} /><Typography variant="h5" fontWeight="900">SYSTEM SEARCH</Typography></Stack></Box>
             <CardContent sx={{ p: 4 }}>
-              <Box sx={{ mb: 4 }}><QrScannerModal onScan={handleSearch as any} /></Box>
+              <Box sx={{ mb: 4 }}>
+                <Button 
+                  fullWidth
+                  variant="outlined" 
+                  color="primary" 
+                  startIcon={<QrCodeScannerIcon />} 
+                  onClick={() => setQrOpen(true)}
+                  sx={{ height: 60, borderRadius: 3, fontSize: '1.1rem', fontWeight: 800, borderWidth: 2 }}
+                >
+                  SCAN PATIENT QR
+                </Button>
+                <QrScannerModal 
+                  open={qrOpen} 
+                  onClose={() => setQrOpen(false)} 
+                  onScan={(data) => {
+                    handleSearch(data);
+                    setQrOpen(false);
+                  }} 
+                />
+              </Box>
               <Grid container spacing={2}>
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <TextField 
@@ -1036,7 +1064,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
                     fullWidth 
                     variant="contained" 
                     color="primary" 
-                    onClick={handleSearch} 
+                    onClick={() => handleSearch()} 
                     disabled={searching} 
                     sx={{ 
                       height: { xs: 60, md: 70 }, 

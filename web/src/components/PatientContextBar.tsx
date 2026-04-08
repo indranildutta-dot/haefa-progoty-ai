@@ -143,6 +143,13 @@ const PatientContextBar: React.FC = () => {
       else if (vitals.fbg >= 100 || vitals.rbg >= 140) updatePriority(colors.YELLOW);
       else if (vitals.fbg > 0 || vitals.rbg > 0) updatePriority(colors.GREEN);
 
+      // Factor: Hemoglobin
+      if (vitals.hemoglobin > 0) {
+        if (vitals.hemoglobin < 7) updatePriority(colors.RED);
+        else if (vitals.hemoglobin < 11) updatePriority(colors.YELLOW); // Simplified threshold for halo
+        else updatePriority(colors.GREEN);
+      }
+
       // CRITICAL: Nurse Override takes absolute precedence if set
       if (vitals.nurse_priority) {
         const overrideStyle = getTriageStyle(vitals.nurse_priority);
@@ -330,10 +337,25 @@ const PatientContextBar: React.FC = () => {
         )}
 
         {/* Blood Sugar Alert */}
-        {vitals?.blood_sugar !== undefined && vitals.blood_sugar >= 200 && (
+        {vitals?.rbg >= 200 && (
           <Chip 
-            label="HIGH SUGAR"
+            label="CRITICAL RBG"
             sx={{ bgcolor: '#9d174d', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
+          />
+        )}
+        {vitals?.fbg >= 126 && (
+          <Chip 
+            label="HIGH FBG"
+            sx={{ bgcolor: '#9d174d', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
+          />
+        )}
+
+        {/* Hemoglobin Alert */}
+        {vitals?.hemoglobin > 0 && vitals.hemoglobin < 11 && (
+          <Chip 
+            icon={<OpacityIcon style={{ color: 'white', fontSize: 16 }} />}
+            label={vitals.hemoglobin < 7 ? "SEVERE ANEMIA" : vitals.hemoglobin < 10 ? "MODERATE ANEMIA" : "MILD ANEMIA"}
+            sx={{ bgcolor: vitals.hemoglobin < 7 ? '#ef4444' : vitals.hemoglobin < 10 ? '#f97316' : '#f59e0b', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
           />
         )}
       </Stack>

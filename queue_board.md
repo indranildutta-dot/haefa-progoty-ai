@@ -73,7 +73,7 @@ Waiting time is calculated as the difference between the patient's `created_at` 
 ### Components
 - **`QueueBoard.tsx`**: Main container; handles Firestore `onSnapshot` listeners and patient caching.
 - **`PatientQueueCard.tsx`**: Individual patient card component; handles halo colors and name splitting.
-- **`QueuePatientDetailDrawer.tsx`**: Modal drawer that appears when a card is clicked; displays vitals, diagnosis, and allows moving the patient to the next station.
+- **`QueuePatientDetailDrawer.tsx`**: Modal drawer that appears when a card is clicked; displays a comprehensive summary of vitals (including new glucose and hemoglobin data), diagnosis, and allows moving the patient to the next station.
 
 ---
 

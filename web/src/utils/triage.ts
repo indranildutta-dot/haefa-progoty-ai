@@ -63,6 +63,31 @@ export const evaluateTriage = (vitals: Partial<Vitals>, age_years: number = 25, 
     }
   }
 
+  // Respiratory Rate Checks (Age-based)
+  if (vitals.respiratoryRate !== undefined) {
+    let rrLow = 12;
+    let rrHigh = 20;
+    let population = "Adult/Teen";
+
+    if (age_years < 1) {
+      rrLow = 30;
+      rrHigh = 60;
+      population = "Infant";
+    } else if (age_years >= 1 && age_years <= 12) {
+      rrLow = 18;
+      rrHigh = 30;
+      population = "Child";
+    }
+
+    if (vitals.respiratoryRate > rrHigh) {
+      reasons.push(`${population} RR ${vitals.respiratoryRate} bpm (High)`);
+      urgentCount++;
+    } else if (vitals.respiratoryRate < rrLow) {
+      reasons.push(`${population} RR ${vitals.respiratoryRate} bpm (Low)`);
+      urgentCount++;
+    }
+  }
+
   // Temperature Checks
   if (vitals.temperature && vitals.temperature >= 40) {
     reasons.push(`Temperature ${vitals.temperature}°C (Critical)`);
@@ -100,20 +125,44 @@ export const evaluateTriage = (vitals: Partial<Vitals>, age_years: number = 25, 
   // Glucose Checks
   if (vitals.fbg !== undefined && vitals.fbg > 0) {
     if (vitals.fbg >= 126) {
-      reasons.push(`FBG ${vitals.fbg} mmol/L (High)`);
+      reasons.push(`FBG ${vitals.fbg} mg/dL (High)`);
       isCritical = true;
     } else if (vitals.fbg >= 100) {
-      reasons.push(`FBG ${vitals.fbg} mmol/L (Alert)`);
+      reasons.push(`FBG ${vitals.fbg} mg/dL (Alert)`);
       urgentCount++;
     }
   }
 
   if (vitals.rbg !== undefined && vitals.rbg > 0) {
     if (vitals.rbg >= 200) {
-      reasons.push(`RBG ${vitals.rbg} mmol/L (Critical)`);
+      reasons.push(`RBG ${vitals.rbg} mg/dL (Critical)`);
       isCritical = true;
     } else if (vitals.rbg >= 140) {
-      reasons.push(`RBG ${vitals.rbg} mmol/L (Alert)`);
+      reasons.push(`RBG ${vitals.rbg} mg/dL (Alert)`);
+      urgentCount++;
+    }
+  }
+
+  // Hemoglobin Checks
+  if (vitals.hemoglobin !== undefined && vitals.hemoglobin > 0) {
+    let threshold = 12.0;
+    const isMale = false; // Simplified for triage utility, ideally passed in
+    const isPregnant = !!vitals.is_pregnant;
+
+    if (age_years < 5) threshold = 11.0;
+    else if (age_years <= 11) threshold = 11.5;
+    else if (age_years <= 14) threshold = 12.0;
+    else {
+      if (isPregnant) threshold = 11.0;
+      // Note: Gender check would be better if we had it here
+      else threshold = 12.0; 
+    }
+
+    if (vitals.hemoglobin < 7) {
+      reasons.push(`Hb ${vitals.hemoglobin} g/dL (Severe Anemia)`);
+      isCritical = true;
+    } else if (vitals.hemoglobin < threshold) {
+      reasons.push(`Hb ${vitals.hemoglobin} g/dL (Anemia)`);
       urgentCount++;
     }
   }

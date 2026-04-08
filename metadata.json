@@ -1,5 +1,5 @@
 {
   "name": "HAEFA Progoty",
   "description": "Multi-country clinical workflow and patient history platform for resource-constrained healthcare environments.",
-  "requestFramePermissions": []
+  "requestFramePermissions": ["camera"]
 }

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Typography, Paper } from '@mui/material';
 import Grid from '@mui/material/Grid';
-import { VitalsRecord } from '../types';
+import { VitalsRecord, Patient } from '../types';
 
 interface VitalsSnapshotProps {
   vitals: VitalsRecord | null;
@@ -48,6 +48,25 @@ const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals }) => {
   const isAbnormalBP = vitals.systolic && vitals.diastolic && (vitals.systolic > 140 || vitals.diastolic > 90 || vitals.systolic < 90 || vitals.diastolic < 60);
   const isAbnormalO2 = vitals.oxygenSaturation && vitals.oxygenSaturation < 95;
 
+  const getGlucoseStatus = (type: 'fbg' | 'rbg', val: number) => {
+    if (type === 'fbg') {
+      if (val >= 126) return { label: 'DIABETES RANGE', color: 'error.main' };
+      if (val >= 100) return { label: 'PREDIABETES', color: 'warning.main' };
+      return { label: 'NORMAL', color: 'success.main' };
+    } else {
+      if (val >= 200) return { label: 'CRITICAL ALERT', color: 'error.main' };
+      if (val >= 140) return { label: 'ELEVATED', color: 'warning.main' };
+      return { label: 'NORMAL', color: 'success.main' };
+    }
+  };
+
+  const getHbStatus = (val: number) => {
+    if (val < 7) return { label: 'SEVERE ANEMIA', color: 'error.main' };
+    if (val < 11) return { label: 'MODERATE ANEMIA', color: 'warning.main' };
+    if (val < 12) return { label: 'MILD ANEMIA', color: 'warning.main' };
+    return { label: 'NORMAL', color: 'success.main' };
+  };
+
   return (
     <Paper variant="outlined" sx={{ p: 2, borderRadius: 4, mb: 3, bgcolor: '#f8fafc', borderColor: '#e2e8f0' }}>
       <Typography variant="subtitle2" color="primary" fontWeight="900" sx={{ mb: 3, borderBottom: '2px solid', pb: 1 }}>
@@ -57,8 +76,8 @@ const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals }) => {
       {renderSection('Body Measures', [
         { label: 'Weight', value: vitals.weight ? `${vitals.weight} kg` : null },
         { label: 'Height', value: vitals.height ? `${vitals.height} cm` : null },
-        { label: 'BMI', value: vitals.bmi ? `${vitals.bmi} (${vitals.bmi_class})` : null },
-        { label: 'MUAC', value: vitals.muac ? `${vitals.muac} (${vitals.muac_class})` : null },
+        { label: 'BMI', value: vitals.bmi ? `${vitals.bmi} (${vitals.bmi_class})` : null, abnormal: vitals.bmi_class === 'Obese' || vitals.bmi_class === 'Underweight' },
+        { label: 'MUAC', value: vitals.muac ? `${vitals.muac} (${vitals.muac_class})` : null, abnormal: vitals.muac_class !== 'Normal' && !!vitals.muac_class },
       ])}
 
       {renderSection('Vital Signs', [
@@ -72,9 +91,11 @@ const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals }) => {
 
       {renderSection('Labs & Risks', [
         { label: 'Blood Group', value: vitals.blood_group, color: 'error.main' },
-        { label: 'FBG', value: vitals.fbg ? `${vitals.fbg} mg/dL` : null },
-        { label: 'RBG', value: vitals.rbg ? `${vitals.rbg} mg/dL` : null },
-        { label: 'Hemoglobin', value: vitals.hemoglobin ? `${vitals.hemoglobin} g/dL` : null },
+        { label: 'FBG', value: vitals.fbg ? `${vitals.fbg} mg/dL (${getGlucoseStatus('fbg', vitals.fbg).label})` : null, color: vitals.fbg ? getGlucoseStatus('fbg', vitals.fbg).color : undefined },
+        { label: 'RBG', value: vitals.rbg ? `${vitals.rbg} mg/dL (${getGlucoseStatus('rbg', vitals.rbg).label})` : null, color: vitals.rbg ? getGlucoseStatus('rbg', vitals.rbg).color : undefined },
+        { label: 'Hemoglobin', value: vitals.hemoglobin ? `${vitals.hemoglobin} g/dL (${getHbStatus(vitals.hemoglobin).label})` : null, color: vitals.hemoglobin ? getHbStatus(vitals.hemoglobin).color : undefined },
+        { label: 'Fasting', value: vitals.is_fasting ? 'Yes' : 'No' },
+        { label: 'Symptomatic', value: vitals.has_symptoms ? 'Yes' : 'No' },
         { label: 'Pregnant', value: vitals.is_pregnant ? `Yes (${vitals.pregnancy_months}m)` : 'No' },
         { label: 'Allergies', value: vitals.allergies?.length ? vitals.allergies.join(', ') : 'None', color: 'error.main' },
       ])}

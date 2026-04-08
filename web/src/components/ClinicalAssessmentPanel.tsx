@@ -11,6 +11,7 @@ import RemoveCircleIcon from '@mui/icons-material/RemoveCircle';
 import EditIcon from '@mui/icons-material/Edit';
 import { useAppStore } from '../store/useAppStore';
 import { calculateAgeYears } from '../utils/patient';
+import { calculateCVRisk, calculateCVRiskLab, getRiskLevel } from '../utils/cvRisk';
 
 export type SectionStatus = 'Not Started' | 'In Progress' | 'Complete';
 
@@ -36,8 +37,16 @@ export interface ClinicalAssessmentData {
     heartNAD: boolean;
     lungsNAD: boolean;
   };
-  physicalExamSystemic: string;
-  currentRx: string;
+  physicalExamSystemic: Record<string, string>;
+  currentRx: {
+    name: string;
+    isAllergic: boolean;
+    frequencyHours: string;
+    dose: string;
+    doseUnit: string;
+    duration: string;
+    durationUnit: string;
+  }[];
   patientHistory: Record<string, { status: string; year?: string }>;
   familyHistory: Record<string, { status: string; records: { year: string; relation: string }[] }>;
   vaccination: Record<string, { received: string; givenByNirog: boolean }>;
@@ -69,6 +78,26 @@ export interface ClinicalAssessmentData {
       where: string;
     };
   };
+  cvRisk: {
+    age: string;
+    sex: string;
+    bmi: string;
+    isSmoker: string;
+    sbp: string;
+    onBPMedication: string;
+    diabetes: string;
+  };
+  cvRiskLab: {
+    age: string;
+    sex: string;
+    bmi: string;
+    isSmoker: string;
+    sbp: string;
+    onBPMedication: string;
+    diabetes: string;
+    totalCholesterol: string;
+    hdlCholesterol: string;
+  };
   sectionStatuses: Record<string, SectionStatus>;
 }
 
@@ -94,8 +123,8 @@ export const initialClinicalAssessment: ClinicalAssessmentData = {
     heartNAD: false,
     lungsNAD: false,
   },
-  physicalExamSystemic: '',
-  currentRx: '',
+  physicalExamSystemic: {},
+  currentRx: [],
   patientHistory: {},
   familyHistory: {},
   vaccination: {},
@@ -129,6 +158,26 @@ export const initialClinicalAssessment: ClinicalAssessmentData = {
       where: '',
     },
   },
+  cvRisk: {
+    age: '',
+    sex: '',
+    bmi: '',
+    isSmoker: '',
+    sbp: '',
+    onBPMedication: '',
+    diabetes: ''
+  },
+  cvRiskLab: {
+    age: '',
+    sex: '',
+    bmi: '',
+    isSmoker: '',
+    sbp: '',
+    onBPMedication: '',
+    diabetes: '',
+    totalCholesterol: '',
+    hdlCholesterol: ''
+  },
   sectionStatuses: {
     complaints: 'Not Started',
     tbScreening: 'Not Started',
@@ -143,7 +192,9 @@ export const initialClinicalAssessment: ClinicalAssessmentData = {
     vaccination: 'Not Started',
     socialHistory: 'Not Started',
     wellbeing: 'Not Started',
-    reproductiveHealth: 'Not Started'
+    reproductiveHealth: 'Not Started',
+    cvRisk: 'Not Started',
+    cvRiskLab: 'Not Started'
   }
 };
 
@@ -159,6 +210,73 @@ const ClinicalAssessmentPanel: React.FC<Props> = ({ data, onChange }) => {
   const { selectedPatient } = useAppStore();
   const isFemaleOver12 = selectedPatient?.gender?.toLowerCase() === 'female' && calculateAgeYears(selectedPatient) > 12;
   const isChild = calculateAgeYears(selectedPatient) < 18;
+  const patientAge = calculateAgeYears(selectedPatient);
+  const isCRAEligible = patientAge >= 40 && patientAge <= 74;
+
+  // Auto-populate CV Risk fields when station data is available
+  React.useEffect(() => {
+    if (selectedPatient && isCRAEligible) {
+      const vitals = selectedPatient.currentVitals;
+      const sbpValue = vitals?.systolic_2 && !isNaN(vitals.systolic_2) ? vitals.systolic_2 : vitals?.systolic;
+      const isSmokerValue = vitals?.social_history?.smoking ? 'Yes' : 'No';
+      const hasDiabetesValue = (vitals?.fbg && vitals.fbg >= 126) || 
+                          (vitals?.rbg && vitals.rbg >= 200) || 
+                          (data.patientHistory['DM']?.status === 'Yes') ? 'Yes' : 'No';
+
+      const updates: Partial<ClinicalAssessmentData> = {};
+
+      if (data.sectionStatuses.cvRisk === 'Not Started') {
+        updates.cvRisk = {
+          ...data.cvRisk,
+          age: patientAge.toString(),
+          sex: selectedPatient.gender === 'male' ? 'Men' : 'Women',
+          bmi: vitals?.bmi ? vitals.bmi.toString() : '',
+          isSmoker: isSmokerValue,
+          sbp: sbpValue ? sbpValue.toString() : '',
+          diabetes: hasDiabetesValue,
+          onBPMedication: data.cvRisk.onBPMedication || 'No'
+        };
+      }
+
+      if (data.sectionStatuses.cvRiskLab === 'Not Started') {
+        updates.cvRiskLab = {
+          ...data.cvRiskLab,
+          age: patientAge.toString(),
+          sex: selectedPatient.gender === 'male' ? 'Men' : 'Women',
+          bmi: vitals?.bmi ? vitals.bmi.toString() : '',
+          isSmoker: isSmokerValue,
+          sbp: sbpValue ? sbpValue.toString() : '',
+          diabetes: hasDiabetesValue,
+          onBPMedication: data.cvRiskLab.onBPMedication || 'No'
+        };
+      }
+
+      if (Object.keys(updates).length > 0) {
+        onChange({ ...data, ...updates });
+      }
+    }
+  }, [selectedPatient, isCRAEligible]);
+
+  const cvRiskPercentage = calculateCVRisk({
+    age: parseInt(data.cvRisk.age),
+    gender: data.cvRisk.sex as any,
+    isSmoker: data.cvRisk.isSmoker === 'Yes',
+    bmi: parseFloat(data.cvRisk.bmi),
+    sbp: parseFloat(data.cvRisk.sbp)
+  });
+
+  const riskInfo = cvRiskPercentage !== null ? getRiskLevel(cvRiskPercentage) : null;
+
+  const cvRiskLabPercentage = calculateCVRiskLab({
+    age: parseInt(data.cvRiskLab.age),
+    gender: data.cvRiskLab.sex as any,
+    isSmoker: data.cvRiskLab.isSmoker === 'Yes',
+    sbp: parseFloat(data.cvRiskLab.sbp),
+    hasDiabetes: data.cvRiskLab.diabetes === 'Yes',
+    totalCholesterol: parseFloat(data.cvRiskLab.totalCholesterol)
+  });
+
+  const riskInfoLab = cvRiskLabPercentage !== null ? getRiskLevel(cvRiskLabPercentage) : null;
 
   const handleChange = (panel: string) => (event: React.SyntheticEvent, isExpanded: boolean) => {
     setExpanded(isExpanded ? panel : false);
@@ -834,16 +952,72 @@ const ClinicalAssessmentPanel: React.FC<Props> = ({ data, onChange }) => {
         {renderAccordionHeader('physicalExamSystemic', 'Physical Examination - Systemic', 'physicalExamSystemic')}
         <AccordionDetails sx={{ bgcolor: 'white' }}>
           {renderSectionControls('physicalExamSystemic')}
-          <TextField 
-            fullWidth multiline rows={4} 
-            placeholder="Enter systemic physical examination details..." 
-            value={data.physicalExamSystemic} 
-            disabled={!editModes['physicalExamSystemic']}
-            onChange={(e) => {
-              handleStartSection('physicalExamSystemic');
-              onChange({ ...data, physicalExamSystemic: e.target.value });
-            }} 
-          />
+          
+          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+            <InputLabel>-- Select System --</InputLabel>
+            <Select
+              label="-- Select System --"
+              disabled={!editModes['physicalExamSystemic']}
+              value=""
+              onChange={(e) => {
+                const system = e.target.value as string;
+                if (!data.physicalExamSystemic[system]) {
+                  handleStartSection('physicalExamSystemic');
+                  onChange({
+                    ...data,
+                    physicalExamSystemic: {
+                      ...data.physicalExamSystemic,
+                      [system]: ''
+                    }
+                  });
+                }
+              }}
+            >
+              <MenuItem value="Cardiovascular System">Cardiovascular System</MenuItem>
+              <MenuItem value="Respiratory System">Respiratory System</MenuItem>
+              <MenuItem value="Nervous System">Nervous System</MenuItem>
+              <MenuItem value="Abdominal">Abdominal</MenuItem>
+              <MenuItem value="Musculoskeletal">Musculoskeletal</MenuItem>
+            </Select>
+          </FormControl>
+
+          {Object.entries(data.physicalExamSystemic).map(([system, findings]) => (
+            <Box key={system} sx={{ mb: 2, p: 2, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle2" fontWeight="bold" color="primary">{system}</Typography>
+                <IconButton 
+                  size="small" 
+                  color="error" 
+                  disabled={!editModes['physicalExamSystemic']}
+                  onClick={() => {
+                    const newSystemic = { ...data.physicalExamSystemic };
+                    delete newSystemic[system];
+                    onChange({ ...data, physicalExamSystemic: newSystemic });
+                  }}
+                >
+                  <RemoveCircleIcon fontSize="small" />
+                </IconButton>
+              </Box>
+              <TextField 
+                fullWidth 
+                multiline 
+                rows={2} 
+                placeholder={`Enter findings for ${system}...`} 
+                value={findings} 
+                disabled={!editModes['physicalExamSystemic']}
+                onChange={(e) => {
+                  handleStartSection('physicalExamSystemic');
+                  onChange({
+                    ...data,
+                    physicalExamSystemic: {
+                      ...data.physicalExamSystemic,
+                      [system]: e.target.value
+                    }
+                  });
+                }} 
+              />
+            </Box>
+          ))}
         </AccordionDetails>
       </Accordion>
 
@@ -852,16 +1026,169 @@ const ClinicalAssessmentPanel: React.FC<Props> = ({ data, onChange }) => {
         {renderAccordionHeader('currentRx', 'Current Rx taken', 'currentRx')}
         <AccordionDetails sx={{ bgcolor: 'white' }}>
           {renderSectionControls('currentRx')}
-          <TextField 
-            fullWidth multiline rows={4} 
-            placeholder="Enter current medications..." 
-            value={data.currentRx} 
-            disabled={!editModes['currentRx']}
-            onChange={(e) => {
-              handleStartSection('currentRx');
-              onChange({ ...data, currentRx: e.target.value });
-            }} 
-          />
+          
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+            <Button 
+              variant="contained" 
+              startIcon={<AddCircleIcon />}
+              disabled={!editModes['currentRx']}
+              onClick={() => {
+                handleStartSection('currentRx');
+                onChange({
+                  ...data,
+                  currentRx: [
+                    ...data.currentRx,
+                    { name: '', isAllergic: false, frequencyHours: '', dose: '', doseUnit: '', duration: '', durationUnit: '' }
+                  ]
+                });
+              }}
+              sx={{ borderRadius: 2, fontWeight: 800 }}
+            >
+              Add Medication
+            </Button>
+          </Box>
+
+          {data.currentRx.map((rx, index) => (
+            <Box key={index} sx={{ mb: 3, p: 2, bgcolor: '#f8fafc', borderRadius: 3, border: '1px solid #e2e8f0' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="subtitle2" fontWeight="900">Medication #{index + 1}</Typography>
+                <IconButton 
+                  color="error" 
+                  disabled={!editModes['currentRx']}
+                  onClick={() => {
+                    const newRx = data.currentRx.filter((_, i) => i !== index);
+                    onChange({ ...data, currentRx: newRx });
+                  }}
+                >
+                  <RemoveCircleIcon />
+                </IconButton>
+              </Box>
+
+              <Grid container spacing={2}>
+                <Grid size={12}>
+                  <TextField 
+                    fullWidth 
+                    label="Enter Medicine Name" 
+                    size="small"
+                    value={rx.name}
+                    disabled={!editModes['currentRx']}
+                    onChange={(e) => {
+                      const newRx = [...data.currentRx];
+                      newRx[index].name = e.target.value;
+                      onChange({ ...data, currentRx: newRx });
+                    }}
+                  />
+                </Grid>
+                <Grid size={12}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox 
+                        checked={rx.isAllergic} 
+                        disabled={!editModes['currentRx']}
+                        onChange={(e) => {
+                          const newRx = [...data.currentRx];
+                          newRx[index].isAllergic = e.target.checked;
+                          onChange({ ...data, currentRx: newRx });
+                        }}
+                      />
+                    }
+                    label={<Typography variant="body2">Allergy to medication</Typography>}
+                  />
+                </Grid>
+                <Grid size={12}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Frequency Hours</InputLabel>
+                    <Select
+                      label="Frequency Hours"
+                      value={rx.frequencyHours}
+                      disabled={!editModes['currentRx']}
+                      onChange={(e) => {
+                        const newRx = [...data.currentRx];
+                        newRx[index].frequencyHours = e.target.value;
+                        onChange({ ...data, currentRx: newRx });
+                      }}
+                    >
+                      <MenuItem value="4">Every 4 hours</MenuItem>
+                      <MenuItem value="6">Every 6 hours</MenuItem>
+                      <MenuItem value="8">Every 8 hours</MenuItem>
+                      <MenuItem value="12">Every 12 hours</MenuItem>
+                      <MenuItem value="24">Once daily</MenuItem>
+                      <MenuItem value="PRN">As needed (PRN)</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={6}>
+                  <TextField 
+                    fullWidth 
+                    label="Dos : 10, 20..." 
+                    size="small"
+                    value={rx.dose}
+                    disabled={!editModes['currentRx']}
+                    onChange={(e) => {
+                      const newRx = [...data.currentRx];
+                      newRx[index].dose = e.target.value;
+                      onChange({ ...data, currentRx: newRx });
+                    }}
+                  />
+                </Grid>
+                <Grid size={6}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>unit</InputLabel>
+                    <Select
+                      label="unit"
+                      value={rx.doseUnit}
+                      disabled={!editModes['currentRx']}
+                      onChange={(e) => {
+                        const newRx = [...data.currentRx];
+                        newRx[index].doseUnit = e.target.value;
+                        onChange({ ...data, currentRx: newRx });
+                      }}
+                    >
+                      <MenuItem value="mg">mg</MenuItem>
+                      <MenuItem value="ml">ml</MenuItem>
+                      <MenuItem value="tablet">tablet</MenuItem>
+                      <MenuItem value="capsule">capsule</MenuItem>
+                      <MenuItem value="drop">drop</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={6}>
+                  <TextField 
+                    fullWidth 
+                    label="Duration : 1, 2..." 
+                    size="small"
+                    value={rx.duration}
+                    disabled={!editModes['currentRx']}
+                    onChange={(e) => {
+                      const newRx = [...data.currentRx];
+                      newRx[index].duration = e.target.value;
+                      onChange({ ...data, currentRx: newRx });
+                    }}
+                  />
+                </Grid>
+                <Grid size={6}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>unit</InputLabel>
+                    <Select
+                      label="unit"
+                      value={rx.durationUnit}
+                      disabled={!editModes['currentRx']}
+                      onChange={(e) => {
+                        const newRx = [...data.currentRx];
+                        newRx[index].durationUnit = e.target.value;
+                        onChange({ ...data, currentRx: newRx });
+                      }}
+                    >
+                      <MenuItem value="days">days</MenuItem>
+                      <MenuItem value="weeks">weeks</MenuItem>
+                      <MenuItem value="months">months</MenuItem>
+                      <MenuItem value="years">years</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+            </Box>
+          ))}
         </AccordionDetails>
       </Accordion>
 
@@ -1314,6 +1641,385 @@ const ClinicalAssessmentPanel: React.FC<Props> = ({ data, onChange }) => {
                   </Select>
                 </FormControl>
               </Box>
+            </Box>
+          </AccordionDetails>
+        </Accordion>
+      )}
+
+      {/* Cardiovascular Risk - Non Lab Based (Age 40-74 only) */}
+      {isCRAEligible && (
+        <Accordion expanded={expanded === 'cvRisk'} onChange={handleChange('cvRisk')} disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
+          {renderAccordionHeader('cvRisk', 'Cardiovascular Risk - Non Lab Based', 'cvRisk')}
+          <AccordionDetails sx={{ bgcolor: 'white' }}>
+            {renderSectionControls('cvRisk')}
+            
+            <Typography variant="subtitle1" sx={{ mb: 2, color: 'primary.main', fontWeight: 'bold', borderBottom: '1px solid #e2e8f0', pb: 1 }}>
+              CRA
+            </Typography>
+
+            <Grid container spacing={3} sx={{ opacity: editModes['cvRisk'] ? 1 : 0.6 }}>
+              <Grid size={12}>
+                <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>Age</Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={data.cvRisk.age}
+                  disabled
+                  helperText="Between : 40-74"
+                />
+              </Grid>
+
+              <Grid size={12}>
+                <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>Sex</Typography>
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={data.cvRisk.sex}
+                    disabled={!editModes['cvRisk']}
+                    onChange={(e) => {
+                      handleStartSection('cvRisk');
+                      onChange({ ...data, cvRisk: { ...data.cvRisk, sex: e.target.value } });
+                    }}
+                  >
+                    <MenuItem value="Men">Men</MenuItem>
+                    <MenuItem value="Women">Women</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid size={12}>
+                <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>BMI</Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={data.cvRisk.bmi}
+                  disabled={!editModes['cvRisk']}
+                  onChange={(e) => {
+                    handleStartSection('cvRisk');
+                    onChange({ ...data, cvRisk: { ...data.cvRisk, bmi: e.target.value } });
+                  }}
+                  placeholder="-- Select --"
+                />
+              </Grid>
+
+              <Grid size={12}>
+                <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>Cigarette Smoker</Typography>
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={data.cvRisk.isSmoker}
+                    disabled={!editModes['cvRisk']}
+                    onChange={(e) => {
+                      handleStartSection('cvRisk');
+                      onChange({ ...data, cvRisk: { ...data.cvRisk, isSmoker: e.target.value } });
+                    }}
+                  >
+                    <MenuItem value="No">No</MenuItem>
+                    <MenuItem value="Yes">Yes</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid size={12}>
+                <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>Systolic Blood Pressure</Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={data.cvRisk.sbp}
+                  disabled={!editModes['cvRisk']}
+                  onChange={(e) => {
+                    handleStartSection('cvRisk');
+                    onChange({ ...data, cvRisk: { ...data.cvRisk, sbp: e.target.value } });
+                  }}
+                />
+              </Grid>
+
+              <Grid size={12}>
+                <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>On Blood Pressure Medication</Typography>
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={data.cvRisk.onBPMedication}
+                    disabled={!editModes['cvRisk']}
+                    onChange={(e) => {
+                      handleStartSection('cvRisk');
+                      onChange({ ...data, cvRisk: { ...data.cvRisk, onBPMedication: e.target.value } });
+                    }}
+                  >
+                    <MenuItem value="No">No</MenuItem>
+                    <MenuItem value="Yes">Yes</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid size={12}>
+                <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>Diabetes</Typography>
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={data.cvRisk.diabetes}
+                    disabled={!editModes['cvRisk']}
+                    onChange={(e) => {
+                      handleStartSection('cvRisk');
+                      onChange({ ...data, cvRisk: { ...data.cvRisk, diabetes: e.target.value } });
+                    }}
+                  >
+                    <MenuItem value="No">No</MenuItem>
+                    <MenuItem value="Yes">Yes</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+
+            {/* Result Section */}
+            <Box sx={{ mt: 4, pt: 3, borderTop: '2px solid #e2e8f0', textAlign: 'center' }}>
+              <Typography variant="h5" fontWeight="bold" sx={{ mb: 2 }}>Result</Typography>
+              
+              {cvRiskPercentage === null ? (
+                <Box sx={{ p: 2, bgcolor: '#f1f5f9', borderRadius: 2 }}>
+                  <Typography color="text.secondary" fontStyle="italic">
+                    Important: Inputs must be complete to perform calculation
+                  </Typography>
+                  <Box sx={{ mt: 2, height: 40, bgcolor: '#e2e8f0', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Typography variant="h6" color="text.disabled">-- %</Typography>
+                  </Box>
+                </Box>
+              ) : (
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Risk</Typography>
+                  <Box sx={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    bgcolor: riskInfo?.color,
+                    color: 'white',
+                    px: 4,
+                    py: 2,
+                    borderRadius: 2,
+                    minWidth: 150,
+                    mb: 3
+                  }}>
+                    <Typography variant="h4" fontWeight="bold">{cvRiskPercentage}%</Typography>
+                  </Box>
+
+                  <Box sx={{ textAlign: 'left', bgcolor: '#f1f5f9', p: 2, borderRadius: 2 }}>
+                    <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>Contributing Factors:</Typography>
+                    <Stack spacing={0.5}>
+                      <Typography variant="caption">• Age: {data.cvRisk.age} years</Typography>
+                      <Typography variant="caption">• Sex: {data.cvRisk.sex}</Typography>
+                      <Typography variant="caption">• Smoking Status: {data.cvRisk.isSmoker}</Typography>
+                      <Typography variant="caption">• BMI: {data.cvRisk.bmi} kg/m²</Typography>
+                      <Typography variant="caption">• SBP: {data.cvRisk.sbp} mmHg</Typography>
+                      <Typography variant="caption">• Diabetes: {data.cvRisk.diabetes}</Typography>
+                      <Typography variant="caption">• On BP Medication: {data.cvRisk.onBPMedication}</Typography>
+                    </Stack>
+                    <Divider sx={{ my: 1.5 }} />
+                    <Typography variant="caption" display="block" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
+                      Aligned with WHO South Asia Non-laboratory based risk chart. Risk Level: {riskInfo?.label}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          </AccordionDetails>
+        </Accordion>
+      )}
+
+      {/* Cardiovascular Risk - Lab Based (Age 40-74 only) */}
+      {isCRAEligible && (
+        <Accordion expanded={expanded === 'cvRiskLab'} onChange={handleChange('cvRiskLab')} disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
+          {renderAccordionHeader('cvRiskLab', 'Cardiovascular Risk - Lab Based', 'cvRiskLab')}
+          <AccordionDetails sx={{ bgcolor: 'white' }}>
+            {renderSectionControls('cvRiskLab')}
+            
+            <Typography variant="subtitle1" sx={{ mb: 2, color: 'primary.main', fontWeight: 'bold', borderBottom: '1px solid #e2e8f0', pb: 1 }}>
+              CRA (LAB)
+            </Typography>
+
+            <Grid container spacing={3} sx={{ opacity: editModes['cvRiskLab'] ? 1 : 0.6 }}>
+              <Grid size={12}>
+                <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>Age</Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={data.cvRiskLab.age}
+                  disabled
+                  helperText="Between : 40-74"
+                />
+              </Grid>
+
+              <Grid size={12}>
+                <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>Sex</Typography>
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={data.cvRiskLab.sex}
+                    disabled={!editModes['cvRiskLab']}
+                    onChange={(e) => {
+                      handleStartSection('cvRiskLab');
+                      onChange({ ...data, cvRiskLab: { ...data.cvRiskLab, sex: e.target.value } });
+                    }}
+                  >
+                    <MenuItem value="Men">Men</MenuItem>
+                    <MenuItem value="Women">Women</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid size={12}>
+                <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>BMI</Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={data.cvRiskLab.bmi}
+                  disabled={!editModes['cvRiskLab']}
+                  onChange={(e) => {
+                    handleStartSection('cvRiskLab');
+                    onChange({ ...data, cvRiskLab: { ...data.cvRiskLab, bmi: e.target.value } });
+                  }}
+                  placeholder="-- Select --"
+                />
+              </Grid>
+
+              <Grid size={12}>
+                <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>Cigarette Smoker</Typography>
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={data.cvRiskLab.isSmoker}
+                    disabled={!editModes['cvRiskLab']}
+                    onChange={(e) => {
+                      handleStartSection('cvRiskLab');
+                      onChange({ ...data, cvRiskLab: { ...data.cvRiskLab, isSmoker: e.target.value } });
+                    }}
+                  >
+                    <MenuItem value="No">No</MenuItem>
+                    <MenuItem value="Yes">Yes</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid size={12}>
+                <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>Systolic Blood Pressure</Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={data.cvRiskLab.sbp}
+                  disabled={!editModes['cvRiskLab']}
+                  onChange={(e) => {
+                    handleStartSection('cvRiskLab');
+                    onChange({ ...data, cvRiskLab: { ...data.cvRiskLab, sbp: e.target.value } });
+                  }}
+                />
+              </Grid>
+
+              <Grid size={12}>
+                <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>On Blood Pressure Medication</Typography>
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={data.cvRiskLab.onBPMedication}
+                    disabled={!editModes['cvRiskLab']}
+                    onChange={(e) => {
+                      handleStartSection('cvRiskLab');
+                      onChange({ ...data, cvRiskLab: { ...data.cvRiskLab, onBPMedication: e.target.value } });
+                    }}
+                  >
+                    <MenuItem value="No">No</MenuItem>
+                    <MenuItem value="Yes">Yes</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid size={12}>
+                <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>Diabetes</Typography>
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={data.cvRiskLab.diabetes}
+                    disabled={!editModes['cvRiskLab']}
+                    onChange={(e) => {
+                      handleStartSection('cvRiskLab');
+                      onChange({ ...data, cvRiskLab: { ...data.cvRiskLab, diabetes: e.target.value } });
+                    }}
+                  >
+                    <MenuItem value="No">No</MenuItem>
+                    <MenuItem value="Yes">Yes</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid size={12}>
+                <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>Total Cholesterol In Mg/Dl</Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={data.cvRiskLab.totalCholesterol}
+                  disabled={!editModes['cvRiskLab']}
+                  onChange={(e) => {
+                    handleStartSection('cvRiskLab');
+                    onChange({ ...data, cvRiskLab: { ...data.cvRiskLab, totalCholesterol: e.target.value } });
+                  }}
+                />
+              </Grid>
+
+              <Grid size={12}>
+                <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>HDL Cholesterol In Mg/Dl</Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={data.cvRiskLab.hdlCholesterol}
+                  disabled={!editModes['cvRiskLab']}
+                  onChange={(e) => {
+                    handleStartSection('cvRiskLab');
+                    onChange({ ...data, cvRiskLab: { ...data.cvRiskLab, hdlCholesterol: e.target.value } });
+                  }}
+                />
+              </Grid>
+            </Grid>
+
+            {/* Result Section */}
+            <Box sx={{ mt: 4, pt: 3, borderTop: '2px solid #e2e8f0', textAlign: 'center' }}>
+              <Typography variant="h5" fontWeight="bold" sx={{ mb: 2 }}>Result</Typography>
+              
+              {cvRiskLabPercentage === null ? (
+                <Box sx={{ p: 2, bgcolor: '#f1f5f9', borderRadius: 2 }}>
+                  <Typography color="text.secondary" fontStyle="italic">
+                    Important: Inputs must be complete to perform calculation
+                  </Typography>
+                  <Box sx={{ mt: 2, height: 40, bgcolor: '#e2e8f0', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Typography variant="h6" color="text.disabled">-- %</Typography>
+                  </Box>
+                </Box>
+              ) : (
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Risk</Typography>
+                  <Box sx={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    bgcolor: riskInfoLab?.color,
+                    color: 'white',
+                    px: 4,
+                    py: 2,
+                    borderRadius: 2,
+                    minWidth: 150,
+                    mb: 3
+                  }}>
+                    <Typography variant="h4" fontWeight="bold">{cvRiskLabPercentage}%</Typography>
+                  </Box>
+
+                  <Box sx={{ textAlign: 'left', bgcolor: '#f1f5f9', p: 2, borderRadius: 2 }}>
+                    <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>Contributing Factors:</Typography>
+                    <Stack spacing={0.5}>
+                      <Typography variant="caption">• Age: {data.cvRiskLab.age} years</Typography>
+                      <Typography variant="caption">• Sex: {data.cvRiskLab.sex}</Typography>
+                      <Typography variant="caption">• Smoking Status: {data.cvRiskLab.isSmoker}</Typography>
+                      <Typography variant="caption">• SBP: {data.cvRiskLab.sbp} mmHg</Typography>
+                      <Typography variant="caption">• Diabetes: {data.cvRiskLab.diabetes}</Typography>
+                      <Typography variant="caption">• Total Cholesterol: {data.cvRiskLab.totalCholesterol} mg/dL</Typography>
+                      <Typography variant="caption">• HDL Cholesterol: {data.cvRiskLab.hdlCholesterol} mg/dL</Typography>
+                      <Typography variant="caption">• On BP Medication: {data.cvRiskLab.onBPMedication}</Typography>
+                    </Stack>
+                    <Divider sx={{ my: 1.5 }} />
+                    <Typography variant="caption" display="block" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
+                      Aligned with WHO South Asia Laboratory-based risk chart. Risk Level: {riskInfoLab?.label}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
             </Box>
           </AccordionDetails>
         </Accordion>

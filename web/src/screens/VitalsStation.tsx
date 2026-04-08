@@ -30,6 +30,7 @@ import { auth } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
 import { evaluateTriage, TriageResult } from '../utils/triage';
 import StationLayout from '../components/StationLayout';
+import StationSearchHeader from '../components/StationSearchHeader';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import CancelQueueDialog from '../components/CancelQueueDialog';
 
@@ -45,6 +46,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
   const [selectedQueueItem, setSelectedQueueItem] = useState<QueueItem | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<QueueItem | null>(null);
+  const [highlightedPatientIds, setHighlightedPatientIds] = useState<string[]>([]);
 
   const { isMobile, isTablet } = useResponsiveLayout();
 
@@ -83,6 +85,8 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
     fbg: NaN,
     hours_since_meal: NaN,
     hemoglobin: NaN, 
+    is_fasting: false,
+    has_symptoms: false,
     is_pregnant: false,
     pregnancy_months: NaN,
     social_history: {
@@ -101,6 +105,8 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
   };
 
   const [vitals, setVitals] = useState<any>(initialVitals);
+  const [glucoseUnit, setGlucoseUnit] = useState<'mg/dL' | 'mmol/L'>('mg/dL');
+  const [hbUnit, setHbUnit] = useState<'g/dL' | 'g/L'>('g/dL');
 
   useEffect(() => {
     if (!selectedClinic) return;
@@ -222,6 +228,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
     return years ?? 0;
   };
 
+  const isPediatric = getAgeYears(selectedPatient) < 18;
   const isUnderFive = getAgeYears(selectedPatient) < 5;
 
   const getVitalStatus = (type: 'bp' | 'hr' | 'o2' | 'rr' | 'fbg' | 'rbg', val1: number, val2?: number) => {
@@ -284,16 +291,42 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
       return { color: '#10b981', label: 'NORMAL' };
     }
     if (type === 'fbg') {
-      if (val1 >= 126) return { color: '#ef4444', label: 'HIGH' };
-      if (val1 >= 100) return { color: '#f59e0b', label: 'ALERT' };
+      if (val1 >= 126) return { color: '#ef4444', label: 'DIABETES RANGE' };
+      if (val1 >= 100) return { color: '#f59e0b', label: 'PREDIABETES' };
       return { color: '#10b981', label: 'NORMAL' };
     }
     if (type === 'rbg') {
-      if (val1 >= 200) return { color: '#ef4444', label: 'CRITICAL' };
-      if (val1 >= 140) return { color: '#f59e0b', label: 'ALERT' };
+      if (val1 >= 200) return { color: '#ef4444', label: 'CRITICAL ALERT' };
+      if (val1 >= 140) return { color: '#f59e0b', label: 'ELEVATED' };
       return { color: '#10b981', label: 'NORMAL' };
     }
     return { color: '#e2e8f0', label: '' };
+  };
+
+  const getHbStatus = (hb: number) => {
+    if (!hb || isNaN(hb)) return { color: '#e2e8f0', label: 'PENDING' };
+    
+    const age_years = getAgeYears(selectedPatient);
+    const age_months = selectedPatient?.age_months ?? 0;
+    const isMale = selectedPatient?.gender?.toLowerCase() === 'male';
+    const isPregnant = !!vitals.is_pregnant;
+    
+    let threshold = 12.0;
+    
+    if (age_years === 0 && age_months >= 1) threshold = 10.5;
+    else if (age_years >= 1 && age_years <= 5) threshold = 11.0;
+    else if (age_years >= 6 && age_years <= 11) threshold = 11.5;
+    else if (age_years >= 12 && age_years <= 14) threshold = 12.0;
+    else if (age_years >= 15) {
+      if (isPregnant) threshold = 11.0;
+      else if (isMale) threshold = 13.0;
+      else threshold = 12.0;
+    }
+    
+    if (hb >= threshold) return { color: '#10b981', label: 'NORMAL' };
+    if (hb >= 10) return { color: '#f59e0b', label: 'MILD ANEMIA' };
+    if (hb >= 7) return { color: '#f97316', label: 'MODERATE ANEMIA' };
+    return { color: '#ef4444', label: 'SEVERE ANEMIA' };
   };
 
   const handleCancelQueueItem = async (reason: string) => {
@@ -314,11 +347,45 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
       setSelectedPatient(patient);
       setSelectedQueueItem(item);
       
-      // ALWAYS start with blank vitals for a new station session as requested
-      setVitals(initialVitals);
-      
-      // We can fetch existing vitals for reference if needed, but the form 
-      // should be blank for a new reading at this station.
+      // Fetch existing vitals to preserve data from previous stations
+      try {
+        const existingVitals = await getVitalsByEncounter(item.encounter_id);
+        if (existingVitals) {
+          // Merge existing vitals with initial state
+          let mergedVitals = { ...initialVitals, ...existingVitals };
+          
+          // Clear fields for the current mode to respect "blank form" requirement
+          // This ensures the nurse starts with a fresh form for the current station
+          // while preserving data from previous stations for the top bar and final save.
+          if (mode === 1) {
+            mergedVitals = { 
+              ...mergedVitals, 
+              weight: NaN, height: NaN, bmi: NaN, bmi_class: '', muac: NaN, muac_class: '', 
+              blood_group: '', is_pregnant: false, pregnancy_months: NaN 
+            };
+          } else if (mode === 2) {
+            mergedVitals = { 
+              ...mergedVitals, 
+              systolic: NaN, diastolic: NaN, systolic_2: NaN, diastolic_2: NaN, 
+              heartRate: NaN, temperature: NaN, oxygenSaturation: NaN, respiratoryRate: NaN,
+              social_history: initialVitals.social_history, alcohol_use: 'None'
+            };
+          } else if (mode === 3) {
+            mergedVitals = { 
+              ...mergedVitals, 
+              blood_sugar: NaN, rbg: NaN, fbg: NaN, hours_since_meal: NaN, 
+              hemoglobin: NaN, is_fasting: false, has_symptoms: false, 
+              allergies: '', chronic_conditions: [] 
+            };
+          }
+          setVitals(mergedVitals);
+        } else {
+          setVitals(initialVitals);
+        }
+      } catch (err) {
+        console.error("Error fetching existing vitals:", err);
+        setVitals(initialVitals);
+      }
     }
   };
 
@@ -328,6 +395,21 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
 
   const handleSaveVitals = async (nextStatus: EncounterStatus) => {
     if (!selectedQueueItem) return;
+
+    // Reject impossible values
+    if (vitals.rbg > 600 || (vitals.rbg < 20 && vitals.rbg > 0)) {
+      notify("Impossible RBG value. Please recheck.", "error");
+      return;
+    }
+    if (vitals.fbg > 600 || (vitals.fbg < 20 && vitals.fbg > 0)) {
+      notify("Impossible FBG value. Please recheck.", "error");
+      return;
+    }
+    if (vitals.hemoglobin > 25 || (vitals.hemoglobin < 3 && vitals.hemoglobin > 0)) {
+      notify("Impossible Hemoglobin value. Please recheck.", "error");
+      return;
+    }
+
     setIsSaving(true);
     try {
       const finalPriority = vitals.nurse_priority || systemTriage.triage_level;
@@ -369,6 +451,14 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
     <StationLayout title={stationTitle} stationName={stationName} showPatientContext={!!selectedPatient}>
       {!selectedPatient ? (
         <Box>
+          <StationSearchHeader 
+            stationStatus={station as any}
+            onPatientFound={(p, item) => item ? handleSelectPatient(item) : null}
+            waitingList={waitingList}
+            highlightedPatientIds={highlightedPatientIds}
+            setHighlightedPatientIds={setHighlightedPatientIds}
+          />
+
           <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 5, border: '1px solid #e2e8f0' }}>
             <Table>
               <TableHead sx={{ bgcolor: '#f8fafc' }}>
@@ -379,47 +469,64 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {waitingList.map(item => (
-                  <TableRow key={item.id} hover>
-                    <TableCell>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <TimerIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                        <Typography variant="body2">{formatWaitTime(item.created_at)}</Typography>
+                {waitingList.map(item => {
+                  const isHighlighted = highlightedPatientIds.includes(item.patient_id);
+                  return (
+                    <TableRow 
+                      key={item.id} 
+                      hover 
+                      sx={{ 
+                        bgcolor: isHighlighted ? '#fef9c3' : 'inherit',
+                        transition: 'background-color 0.3s ease',
+                        borderLeft: isHighlighted ? '6px solid #facc15' : 'none'
+                      }}
+                    >
+                      <TableCell>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <TimerIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                          <Typography variant="body2">{formatWaitTime(item.created_at)}</Typography>
+                        </Stack>
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 'bold', py: 3 }}>
+                        {item.patient_name}
+                        {isHighlighted && (
+                          <Chip label="MATCH" size="small" color="warning" sx={{ ml: 2, fontWeight: 900, height: 20 }} />
+                        )}
+                      </TableCell>
+                    <TableCell align="right">
+                      <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
+                        <Tooltip title="Cancel Visit">
+                          <IconButton 
+                            color="error" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCancelTarget(item);
+                            }}
+                            sx={{ mr: 4 }}
+                          >
+                            <CancelIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Button 
+                          variant="contained" 
+                          size="large" 
+                          onClick={() => handleSelectPatient(item)}
+                          sx={{ 
+                            height: { xs: 50, sm: 60 }, 
+                            borderRadius: 3, 
+                            px: { xs: 2, sm: 4 }, 
+                            fontWeight: 900,
+                            fontSize: { xs: '0.8rem', sm: '0.9rem', md: '1rem' },
+                            bgcolor: isHighlighted ? '#ca8a04' : 'primary.main'
+                          }}
+                        >
+                          Start Triage
+                        </Button>
                       </Stack>
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 'bold', py: 3 }}>{item.patient_name}</TableCell>
-                  <TableCell align="right">
-                    <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
-                      <Tooltip title="Cancel Visit">
-                        <IconButton 
-                          color="error" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCancelTarget(item);
-                          }}
-                          sx={{ mr: 4 }}
-                        >
-                          <CancelIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Button 
-                        variant="contained" 
-                        size="large" 
-                        onClick={() => handleSelectPatient(item)}
-                        sx={{ 
-                          height: { xs: 50, sm: 60 }, 
-                          borderRadius: 3, 
-                          px: { xs: 2, sm: 4 }, 
-                          fontWeight: 900,
-                          fontSize: { xs: '0.8rem', sm: '0.9rem', md: '1rem' }
-                        }}
-                      >
-                        Start Triage
-                      </Button>
-                    </Stack>
-                  </TableCell>
-                  </TableRow>
-                ))}
+                    </TableRow>
+                  );
+                })}
                 {waitingList.length === 0 && <TableRow><TableCell colSpan={3} align="center" sx={{ py: 10 }}>No patients waiting in queue.</TableCell></TableRow>}
               </TableBody>
             </Table>
@@ -806,63 +913,118 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
 
             {mode === 3 && (
               <Stack spacing={6}>
-                <Typography variant="h4" fontWeight="900" color="primary" textAlign="center">GLUCOSE & HEMOGLOBIN</Typography>
+                <Box>
+                  <Typography variant="h4" fontWeight="900" color="primary" textAlign="center">LABS & RISK</Typography>
+                  {isPediatric && (
+                    <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', color: 'text.secondary', fontWeight: 700, mt: 1 }}>
+                      * Clinical interpretation required for pediatrics
+                    </Typography>
+                  )}
+                </Box>
                 
                 <Stack spacing={4}>
+                  {/* RBG Section */}
                   <Box>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                      <Typography variant="h6" fontWeight="700">RBG</Typography>
+                      <Typography variant="h6" fontWeight="700">Random Blood Glucose (RBG)</Typography>
+                      <ToggleButtonGroup
+                        size="small"
+                        color="primary"
+                        value={glucoseUnit}
+                        exclusive
+                        onChange={(_, val) => val && setGlucoseUnit(val)}
+                      >
+                        <ToggleButton value="mg/dL">mg/dL</ToggleButton>
+                        <ToggleButton value="mmol/L">mmol/L</ToggleButton>
+                      </ToggleButtonGroup>
+                    </Stack>
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                      <TextField 
+                        fullWidth 
+                        placeholder={glucoseUnit === 'mg/dL' ? "EX: 140" : "EX: 7.8"}
+                        type="number"
+                        value={isNaN(vitals.rbg) || vitals.rbg === 0 ? '' : (glucoseUnit === 'mg/dL' ? vitals.rbg : parseFloat((vitals.rbg / 18).toFixed(2)))} 
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          if (isNaN(val)) {
+                            setVitals({...vitals, rbg: NaN});
+                            return;
+                          }
+                          const mgdl = glucoseUnit === 'mg/dL' ? val : val * 18;
+                          if (mgdl > 600 || (mgdl < 20 && mgdl > 0)) {
+                            notify("Impossible Glucose value. Please recheck.", "warning");
+                          }
+                          setVitals({...vitals, rbg: mgdl});
+                        }} 
+                        InputProps={{ 
+                          sx: { 
+                            height: 80, 
+                            fontSize: '1.5rem', 
+                            fontWeight: 700,
+                            borderLeft: vitals.rbg > 0 ? `10px solid ${getVitalStatus('rbg', vitals.rbg).color}` : 'none'
+                          },
+                          endAdornment: <Typography variant="h6" sx={{ ml: 2, color: 'text.secondary' }}>{glucoseUnit}</Typography>
+                        }}
+                      />
                       {vitals.rbg > 0 && (
                         <Chip 
                           label={getVitalStatus('rbg', vitals.rbg).label} 
-                          sx={{ bgcolor: getVitalStatus('rbg', vitals.rbg).color, color: 'white', fontWeight: 900 }} 
+                          sx={{ bgcolor: getVitalStatus('rbg', vitals.rbg).color, color: 'white', fontWeight: 900, height: 40, px: 2 }} 
                         />
                       )}
-                    </Stack>
-                    <TextField 
-                      fullWidth 
-                      placeholder="EX: 00.00"
-                      type="number"
-                      value={isNaN(vitals.rbg) || vitals.rbg === 0 ? '' : vitals.rbg} 
-                      onChange={(e) => setVitals({...vitals, rbg: parseFloat(e.target.value)})} 
-                      InputProps={{ 
-                        sx: { 
-                          height: 80, 
-                          fontSize: '1.5rem', 
-                          fontWeight: 700,
-                          borderLeft: vitals.rbg > 0 ? `10px solid ${getVitalStatus('rbg', vitals.rbg).color}` : 'none'
-                        },
-                        endAdornment: <Typography variant="h6" sx={{ ml: 2, color: 'text.secondary' }}>mmol/L</Typography>
-                      }}
-                    />
+                    </Box>
                   </Box>
 
+                  {/* FBG Section */}
                   <Box>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                      <Typography variant="h6" fontWeight="700">FBG</Typography>
+                      <Typography variant="h6" fontWeight="700">Fasting Blood Glucose (FBG)</Typography>
+                      <ToggleButtonGroup
+                        size="small"
+                        color="primary"
+                        value={glucoseUnit}
+                        exclusive
+                        onChange={(_, val) => val && setGlucoseUnit(val)}
+                      >
+                        <ToggleButton value="mg/dL">mg/dL</ToggleButton>
+                        <ToggleButton value="mmol/L">mmol/L</ToggleButton>
+                      </ToggleButtonGroup>
+                    </Stack>
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                      <TextField 
+                        fullWidth 
+                        placeholder={glucoseUnit === 'mg/dL' ? "EX: 100" : "EX: 5.6"}
+                        type="number"
+                        value={isNaN(vitals.fbg) || vitals.fbg === 0 ? '' : (glucoseUnit === 'mg/dL' ? vitals.fbg : parseFloat((vitals.fbg / 18).toFixed(2)))} 
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          if (isNaN(val)) {
+                            setVitals({...vitals, fbg: NaN});
+                            return;
+                          }
+                          const mgdl = glucoseUnit === 'mg/dL' ? val : val * 18;
+                          if (mgdl > 600 || (mgdl < 20 && mgdl > 0)) {
+                            notify("Impossible Glucose value. Please recheck.", "warning");
+                          }
+                          setVitals({...vitals, fbg: mgdl});
+                        }} 
+                        InputProps={{ 
+                          sx: { 
+                            height: 80, 
+                            fontSize: '1.5rem', 
+                            fontWeight: 700,
+                            borderLeft: vitals.fbg > 0 ? `10px solid ${getVitalStatus('fbg', vitals.fbg).color}` : 'none'
+                          },
+                          endAdornment: <Typography variant="h6" sx={{ ml: 2, color: 'text.secondary' }}>{glucoseUnit}</Typography>
+                        }}
+                      />
                       {vitals.fbg > 0 && (
                         <Chip 
                           label={getVitalStatus('fbg', vitals.fbg).label} 
-                          sx={{ bgcolor: getVitalStatus('fbg', vitals.fbg).color, color: 'white', fontWeight: 900 }} 
+                          sx={{ bgcolor: getVitalStatus('fbg', vitals.fbg).color, color: 'white', fontWeight: 900, height: 40, px: 2 }} 
                         />
                       )}
-                    </Stack>
-                    <TextField 
-                      fullWidth 
-                      placeholder="EX: 00.00"
-                      type="number"
-                      value={isNaN(vitals.fbg) || vitals.fbg === 0 ? '' : vitals.fbg} 
-                      onChange={(e) => setVitals({...vitals, fbg: parseFloat(e.target.value)})} 
-                      InputProps={{ 
-                        sx: { 
-                          height: 80, 
-                          fontSize: '1.5rem', 
-                          fontWeight: 700,
-                          borderLeft: vitals.fbg > 0 ? `10px solid ${getVitalStatus('fbg', vitals.fbg).color}` : 'none'
-                        },
-                        endAdornment: <Typography variant="h6" sx={{ ml: 2, color: 'text.secondary' }}>mmol/L</Typography>
-                      }}
-                    />
+                    </Box>
                   </Box>
 
                   <Box>
@@ -877,21 +1039,76 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                     />
                   </Box>
 
+                  {/* Hemoglobin Section */}
                   <Box>
-                    <Typography variant="h6" fontWeight="700" sx={{ mb: 1 }}>Hemoglobin</Typography>
-                    <TextField 
-                      fullWidth 
-                      placeholder="Ex : 13.8"
-                      type="number"
-                      value={isNaN(vitals.hemoglobin) || vitals.hemoglobin === 0 ? '' : vitals.hemoglobin} 
-                      onChange={(e) => setVitals({...vitals, hemoglobin: parseFloat(e.target.value)})} 
-                      InputProps={{ 
-                        sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 },
-                        endAdornment: <Typography variant="h6" sx={{ ml: 2, color: 'text.secondary' }}>mmol/L</Typography>
-                      }}
-                    />
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                      <Typography variant="h6" fontWeight="700">Hemoglobin (Hb)</Typography>
+                      <ToggleButtonGroup
+                        size="small"
+                        color="primary"
+                        value={hbUnit}
+                        exclusive
+                        onChange={(_, val) => val && setHbUnit(val)}
+                      >
+                        <ToggleButton value="g/dL">g/dL</ToggleButton>
+                        <ToggleButton value="g/L">g/L</ToggleButton>
+                      </ToggleButtonGroup>
+                    </Stack>
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                      <TextField 
+                        fullWidth 
+                        placeholder={hbUnit === 'g/dL' ? "Ex : 13.8" : "Ex : 138"}
+                        type="number"
+                        value={isNaN(vitals.hemoglobin) || vitals.hemoglobin === 0 ? '' : (hbUnit === 'g/dL' ? vitals.hemoglobin : parseFloat((vitals.hemoglobin * 10).toFixed(1)))} 
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          if (isNaN(val)) {
+                            setVitals({...vitals, hemoglobin: NaN});
+                            return;
+                          }
+                          const gdl = hbUnit === 'g/dL' ? val : val / 10;
+                          if (gdl > 25 || (gdl < 3 && gdl > 0)) {
+                            notify("Impossible Hemoglobin value. Please recheck.", "warning");
+                          }
+                          setVitals({...vitals, hemoglobin: gdl});
+                        }} 
+                        InputProps={{ 
+                          sx: { 
+                            height: 80, 
+                            fontSize: '1.5rem', 
+                            fontWeight: 700,
+                            borderLeft: vitals.hemoglobin > 0 ? `10px solid ${getHbStatus(vitals.hemoglobin).color}` : 'none'
+                          },
+                          endAdornment: <Typography variant="h6" sx={{ ml: 2, color: 'text.secondary' }}>{hbUnit}</Typography>
+                        }}
+                      />
+                      {vitals.hemoglobin > 0 && (
+                        <Chip 
+                          label={getHbStatus(vitals.hemoglobin).label} 
+                          sx={{ bgcolor: getHbStatus(vitals.hemoglobin).color, color: 'white', fontWeight: 900, height: 40, px: 2 }} 
+                        />
+                      )}
+                    </Box>
                   </Box>
                 </Stack>
+
+                <Box sx={{ p: 4, bgcolor: '#f8fafc', borderRadius: 4, border: '1px solid #e2e8f0' }}>
+                  <Typography variant="h6" fontWeight="900" color="text.secondary" gutterBottom>Clinical Context Flags</Typography>
+                  <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <FormControlLabel
+                        control={<Switch checked={vitals.is_fasting} onChange={(e) => setVitals({...vitals, is_fasting: e.target.checked})} />}
+                        label="Patient is Fasting"
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <FormControlLabel
+                        control={<Switch checked={vitals.has_symptoms} onChange={(e) => setVitals({...vitals, has_symptoms: e.target.checked})} />}
+                        label="Symptomatic (for RBG)"
+                      />
+                    </Grid>
+                  </Grid>
+                </Box>
 
                 <TextField 
                   fullWidth 
@@ -900,7 +1117,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                   label="Allergies" 
                   value={vitals.allergies} 
                   onChange={(e) => setVitals({...vitals, allergies: e.target.value})} 
-                  InputProps={{ sx: { fontSize: '1.5rem', fontWeight: 500 }}}
+                  InputProps={{ sx: { fontSize: '1.25rem', fontWeight: 500 }}}
                 />
                 
                 <Divider sx={{ my: 4 }} />
@@ -926,44 +1143,55 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
               </Stack>
             )}
 
-            <Stack direction="row" spacing={4} sx={{ mt: 8 }}>
-              <Button 
-                fullWidth 
-                size="large" 
-                variant="outlined" 
-                sx={{ 
-                  height: { xs: 60, sm: 80 }, 
-                  fontWeight: 900, 
-                  fontSize: { xs: '1rem', sm: '1.25rem', md: '1.5rem' }, 
-                  borderRadius: 4, 
-                  border: '3px solid' 
-                }} 
-                onClick={() => setSelectedPatient(null)}
-              >
-                Cancel
-              </Button>
-              <Button 
-                fullWidth 
-                size="large" 
-                variant="contained" 
-                sx={{ 
-                  height: { xs: 60, sm: 80 }, 
-                  fontWeight: 900, 
-                  fontSize: { xs: '1rem', sm: '1.25rem', md: '1.5rem' }, 
-                  borderRadius: 4 
-                }} 
-                onClick={() => {
-                  let nextStatus: EncounterStatus = 'READY_FOR_DOCTOR';
-                  if (mode === 1) nextStatus = 'WAITING_FOR_VITALS_2';
-                  else if (mode === 2) nextStatus = 'WAITING_FOR_VITALS_3';
-                  handleSaveVitals(nextStatus);
-                }} 
-                disabled={isSaving}
-              >
-                {mode === 1 ? 'SUBMIT TO VITAL SIGNS' : 
-                 mode === 2 ? 'SUBMIT TO LABS' : 'FINISH & SEND TO DOCTOR'}
-              </Button>
-            </Stack>
+            <Box sx={{ mt: 8, pt: 4, borderTop: '2px dashed #e2e8f0' }}>
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                  <Button 
+                    fullWidth variant="outlined" color="inherit" size="large" 
+                    startIcon={<CancelIcon />} onClick={() => setSelectedPatient(null)}
+                    sx={{ height: 60, borderRadius: 3, fontWeight: 800 }}
+                  >
+                    Cancel
+                  </Button>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                  <Button 
+                    fullWidth variant="outlined" color="primary" size="large" 
+                    startIcon={<SaveIcon />} onClick={() => handleSaveVitals(station as any)}
+                    disabled={isSaving}
+                    sx={{ height: 60, borderRadius: 3, fontWeight: 800 }}
+                  >
+                    Save Progress
+                  </Button>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                  <Button 
+                    fullWidth variant="contained" color="info" size="large" 
+                    onClick={() => handleSaveVitals(station as any)}
+                    disabled={isSaving}
+                    sx={{ height: 60, borderRadius: 3, fontWeight: 800 }}
+                  >
+                    Complete Collection
+                  </Button>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                  <Button 
+                    fullWidth variant="contained" color="primary" size="large" 
+                    endIcon={<NextIcon />} 
+                    onClick={() => {
+                      let nextStatus: EncounterStatus = 'READY_FOR_DOCTOR';
+                      if (mode === 1) nextStatus = 'WAITING_FOR_VITALS_2';
+                      else if (mode === 2) nextStatus = 'WAITING_FOR_VITALS_3';
+                      handleSaveVitals(nextStatus);
+                    }}
+                    disabled={isSaving}
+                    sx={{ height: 60, borderRadius: 3, fontWeight: 900, fontSize: '1.1rem' }}
+                  >
+                    Complete & Move
+                  </Button>
+                </Grid>
+              </Grid>
+            </Box>
           </Paper>
         </Box>
       )}

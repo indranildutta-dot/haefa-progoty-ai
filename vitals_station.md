@@ -59,19 +59,51 @@ The Vitals workflow is split into three distinct modes (stations), typically han
     *   **Warning**: ≥ 38.5°C
 
 ### Mode 3: Labs & Risk
-*   **Fields**: RBG (mmol/L), FBG (mmol/L), Hours Since Last Meal, Hemoglobin (mmol/L), Allergies, Social History (Smoking, Chewing Tobacco, Betel Nuts, Recreational Drugs, Housing, Water Source), Alcohol Use.
+*   **Fields**: RBG (mg/dL or mmol/L), FBG (mg/dL or mmol/L), Fasting Status (Yes/No), Has Symptoms (Yes/No), Hemoglobin (g/dL or g/L), Allergies, Social History (Smoking, Chewing Tobacco, Betel Nuts, Recreational Drugs, Housing, Water Source), Alcohol Use.
+*   **Unit Support**:
+    *   **Glucose**: Supports both `mg/dL` and `mmol/L`. Internal storage and triage logic use `mg/dL` (Conversion: `mmol/L * 18 = mg/dL`).
+    *   **Hemoglobin**: Supports both `g/dL` and `g/L`. Internal storage and triage logic use `g/dL` (Conversion: `g/L / 10 = g/dL`).
 *   **Fasting Blood Glucose (FBG)**:
-    *   **High (Emergency)**: ≥ 126
-    *   **Alert (Urgent)**: 100-125
-    *   **Normal**: < 100
+    *   **High (Emergency)**: ≥ 126 mg/dL
+    *   **Alert (Urgent)**: 100-125 mg/dL
+    *   **Normal**: < 100 mg/dL
 *   **Random Blood Glucose (RBG)**:
-    *   **Critical (Emergency)**: ≥ 200
-    *   **Alert (Urgent)**: 140-199
-    *   **Normal**: < 140
+    *   **Critical (Emergency)**: ≥ 200 mg/dL
+    *   **Alert (Urgent)**: 140-199 mg/dL
+    *   **Normal**: < 140 mg/dL
+*   **Hemoglobin (Hb) - Age/Sex/Pregnancy Based**:
+    *   **Severe Anemia (Emergency)**: < 7.0 g/dL
+    *   **Anemia (Urgent)**:
+        *   *Children (6m - 5y)*: < 11.0 g/dL
+        *   *Children (5y - 11y)*: < 11.5 g/dL
+        *   *Children (12y - 14y)*: < 12.0 g/dL
+        *   *Adult Men*: < 13.0 g/dL
+        *   *Adult Women (Non-pregnant)*: < 12.0 g/dL
+        *   *Pregnant Women*: < 11.0 g/dL
+*   **Safety Validations (Impossible Values)**:
+    *   **Glucose**: Rejects values < 20 or > 600 mg/dL.
+    *   **Hemoglobin**: Rejects values < 3 or > 25 g/dL.
+*   **Pediatric Note**: A clinical warning is displayed for all patients under 18: "* Clinical interpretation required for pediatrics".
 
 ---
 
-## 3. Core Logic & Systems
+## 3. UI & UX Capabilities
+
+### Compact UI Design
+To minimize scrolling and improve efficiency on tablets, all input fields (TextFields, Selects, Switches) use a compact design with reduced padding and font sizes. This allows the entire vital signs form to be visible with minimal vertical movement.
+
+### Safety Sentinel Sync
+A real-time synchronization mechanism in `VitalsStation.tsx` using a `useEffect` hook. It monitors all vital input fields and updates the global `selectedPatient` state as the nurse types. This ensures the top bar (PatientContextBar) and any other dependent components reflect the latest data and triage status instantly.
+
+---
+
+## 4. Core Logic & Systems
+
+### Data Persistence (Smart Merging)
+To ensure data integrity across the three triage modes, the platform implements a **Smart Merging** strategy:
+*   **Mode-Specific Blanking**: When a nurse starts a triage session, the form fields for the *current* mode are initialized as blank (NaN) to ensure a fresh reading.
+*   **Background Preservation**: Fields from *other* modes are fetched from the database and preserved in the background state. This ensures the top bar highlights remain accurate.
+*   **Incremental Saving**: The `saveVitals` service filters out `NaN` and `undefined` values before updating Firestore. This prevents "empty" fields in the current form from overwriting valid data recorded in previous stations.
 
 ### Triage Calculation (`evaluateTriage`)
 A utility function that processes all current vitals and patient age to suggest a triage level.
@@ -84,9 +116,6 @@ The halo (border/shadow) around the patient's picture in the `PatientContextBar`
 *   **Priority Order**: Red (Emergency/Critical) > Yellow (Urgent/Warning) > Green (Normal) > Gray (Pending).
 *   **Factors**: Triage Level, BP, HR, RR, SpO2, BMI, Glucose.
 *   **Nurse Override**: If the nurse manually selects a priority (Nurse Override), this value **takes absolute precedence** over the system-calculated color.
-
-### Safety Sentinel Sync
-A real-time synchronization mechanism in `VitalsStation.tsx` using a `useEffect` hook. It monitors all vital input fields and updates the global `selectedPatient` state as the nurse types. This ensures the top bar (PatientContextBar) and any other dependent components reflect the latest data and triage status instantly.
 
 ### Previous History Display
 The `PatientHistoryTimeline.tsx` component fetches and displays all previous `VitalsRecord` entries for a patient. It uses the same threshold logic to highlight abnormal values in past visits, providing clinical context to the current provider.

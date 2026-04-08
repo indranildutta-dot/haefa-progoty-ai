@@ -39,6 +39,7 @@ import { getPatientById } from '../services/patientService';
 import { useAppStore } from '../store/useAppStore';
 import { calculateAgeYears } from '../utils/patient';
 import StationLayout from '../components/StationLayout';
+import StationSearchHeader from '../components/StationSearchHeader';
 import PatientContextBar from '../components/PatientContextBar';
 import PatientHistoryTimeline from '../components/PatientHistoryTimeline';
 import ConsultationPanel from '../components/ConsultationPanel';
@@ -64,6 +65,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [openCancelDialog, setOpenCancelDialog] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<any>(null);
+  const [highlightedPatientIds, setHighlightedPatientIds] = useState<string[]>([]);
   
   const [consultData, setConsultData] = useState<any>({ 
     diagnosis: '', 
@@ -257,94 +259,127 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
       maxWidth={selectedItem ? false : "xl"}
     >
       {!selectedItem ? (
-        <TableContainer 
-          component={Paper} 
-          elevation={0} 
-          sx={{ 
-            p: 2, 
-            borderRadius: 4, 
-            border: '1px solid #e2e8f0',
-            bgcolor: 'white'
-          }}
-        >
-          <Table>
-            <TableHead sx={{ bgcolor: '#f8fafc' }}>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 800 }}>Wait Time</TableCell>
-                <TableCell sx={{ fontWeight: 800 }}>Triage</TableCell>
-                <TableCell sx={{ fontWeight: 800 }}>Patient Name</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 800 }}>Action</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {waitingList.map(item => (
-                <TableRow key={item.id} hover>
-                  <TableCell>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <TimerIcon sx={{ fontSize: 16, color: 'text.secondary' }} /> 
-                      <Typography variant="body2">
-                        {formatWaitTime(item.created_at)}
-                      </Typography>
-                    </Stack>
-                  </TableCell>
-                  <TableCell>
-                    <Chip 
-                      label={item.triage_level?.toUpperCase()} 
-                      size="small" 
-                      sx={{ 
-                        bgcolor: triageColors[item.triage_level] || '#94a3b8', 
-                        color: 'white', 
-                        fontWeight: 900,
-                        fontSize: '0.65rem'
-                      }} 
-                    />
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>
-                    {item.patient_name}
-                  </TableCell>
-                  <TableCell align="right">
-                    <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
-                      <Tooltip title="Cancel Visit">
-                        <IconButton 
-                          color="error" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCancelTarget(item);
-                          }}
-                          sx={{ mr: 1 }}
-                        >
-                          <CancelIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Button 
-                        variant="contained" 
-                        color="primary"
-                        onClick={() => handleOpenConsult(item)}
-                        sx={{ borderRadius: 2, fontWeight: 700 }}
-                      >
-                        Start Consultation
-                      </Button>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {waitingList.length === 0 && (
+        <Box>
+          <StationSearchHeader 
+            stationStatus="READY_FOR_DOCTOR"
+            onPatientFound={(p, item) => item ? handleOpenConsult(item) : null}
+            waitingList={waitingList}
+            highlightedPatientIds={highlightedPatientIds}
+            setHighlightedPatientIds={setHighlightedPatientIds}
+          />
+
+          <TableContainer 
+            component={Paper} 
+            elevation={0} 
+            sx={{ 
+              p: 2, 
+              borderRadius: 4, 
+              border: '1px solid #e2e8f0',
+              bgcolor: 'white'
+            }}
+          >
+            <Table>
+              <TableHead sx={{ bgcolor: '#f8fafc' }}>
                 <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 12 }}>
-                    <Typography variant="body1" color="text.secondary">
-                      The consultation queue is currently empty.
-                    </Typography>
-                  </TableCell>
+                  <TableCell sx={{ fontWeight: 800 }}>Wait Time</TableCell>
+                  <TableCell sx={{ fontWeight: 800 }}>Triage</TableCell>
+                  <TableCell sx={{ fontWeight: 800 }}>Patient Name</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 800 }}>Action</TableCell>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {waitingList.map(item => {
+                  const isHighlighted = highlightedPatientIds.includes(item.patient_id);
+                  return (
+                    <TableRow 
+                      key={item.id} 
+                      hover
+                      sx={{ 
+                        bgcolor: isHighlighted ? '#fef9c3' : 'inherit',
+                        transition: 'background-color 0.3s ease',
+                        borderLeft: isHighlighted ? '6px solid #facc15' : 'none'
+                      }}
+                    >
+                      <TableCell>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <TimerIcon sx={{ fontSize: 16, color: 'text.secondary' }} /> 
+                          <Typography variant="body2">
+                            {formatWaitTime(item.created_at)}
+                          </Typography>
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={item.triage_level?.toUpperCase()} 
+                          size="small" 
+                          sx={{ 
+                            bgcolor: triageColors[item.triage_level] || '#94a3b8', 
+                            color: 'white', 
+                            fontWeight: 900,
+                            fontSize: '0.65rem'
+                          }} 
+                        />
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>
+                        {item.patient_name}
+                        {isHighlighted && (
+                          <Chip label="MATCH" size="small" color="warning" sx={{ ml: 2, fontWeight: 900, height: 20 }} />
+                        )}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
+                          <Tooltip title="Cancel Visit">
+                            <IconButton 
+                              color="error" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCancelTarget(item);
+                              }}
+                              sx={{ mr: 1 }}
+                            >
+                              <CancelIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Button 
+                            variant="contained" 
+                            color={isHighlighted ? "warning" : "primary"}
+                            onClick={() => handleOpenConsult(item)}
+                            sx={{ borderRadius: 2, fontWeight: 700 }}
+                          >
+                            Start Consultation
+                          </Button>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {waitingList.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center" sx={{ py: 12 }}>
+                      <Typography variant="body1" color="text.secondary">
+                        The consultation queue is currently empty.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
       ) : (
         <Box sx={{ mt: -3, pb: 12 }}>
           <Grid container spacing={3} sx={{ mt: 1 }}>
             {/* LEFT COLUMN: Vitals & Lab Results */}
-            <Grid size={{ xs: 12, md: 2.5 }} sx={{ position: 'sticky', top: 80, alignSelf: 'flex-start' }}>
+            <Grid size={{ xs: 12, md: 2.5 }} sx={{ 
+              position: 'sticky', 
+              top: 80, 
+              alignSelf: 'flex-start',
+              maxHeight: 'calc(100vh - 160px)',
+              overflowY: 'auto',
+              pr: 1,
+              '&::-webkit-scrollbar': { width: '4px' },
+              '&::-webkit-scrollbar-thumb': { bgcolor: '#cbd5e1', borderRadius: '4px' }
+            }}>
               <VitalsSnapshot vitals={currentVitals} />
             </Grid>
 
@@ -386,7 +421,16 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
             </Grid>
 
             {/* RIGHT COLUMN: Patient History & Trends */}
-            <Grid size={{ xs: 12, md: 2.5 }} sx={{ position: 'sticky', top: 80, alignSelf: 'flex-start' }}>
+            <Grid size={{ xs: 12, md: 2.5 }} sx={{ 
+              position: 'sticky', 
+              top: 80, 
+              alignSelf: 'flex-start',
+              maxHeight: 'calc(100vh - 160px)',
+              overflowY: 'auto',
+              pl: 1,
+              '&::-webkit-scrollbar': { width: '4px' },
+              '&::-webkit-scrollbar-thumb': { bgcolor: '#cbd5e1', borderRadius: '4px' }
+            }}>
               <PatientHistoryTimeline patientId={selectedItem.patient_id} />
             </Grid>
           </Grid>
@@ -417,7 +461,8 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
                 borderRadius: 2,
                 fontSize: { xs: '0.75rem', sm: '0.85rem', md: '0.9rem' }
               }} 
-              onClick={() => setSelectedItem(null)}
+              onClick={() => handleFinalize('IN_CONSULTATION')}
+              disabled={isFinalizing}
             >
               Save Progress
             </Button>
@@ -437,7 +482,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
             </Button>
             <Button 
               variant="contained" 
-              color="primary" 
+              color="info" 
               sx={{ 
                 px: { xs: 2, md: 4 }, 
                 height: 50, 
@@ -452,7 +497,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
             </Button>
             <Button 
               variant="contained" 
-              color="secondary" 
+              color="primary" 
               sx={{ 
                 px: { xs: 2, md: 4 }, 
                 height: 50, 
@@ -463,7 +508,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ countryId }) => {
               disabled={isFinalizing || !isAssessmentComplete() || !consultData.diagnosis}
               onClick={() => handleFinalize('WAITING_FOR_PHARMACY')}
             >
-              {isFinalizing ? <CircularProgress size={24} color="inherit" /> : "Complete and Send to Pharmacy"}
+              {isFinalizing ? <CircularProgress size={24} color="inherit" /> : "Complete & Send to Pharmacy"}
             </Button>
           </Box>
         </Box>

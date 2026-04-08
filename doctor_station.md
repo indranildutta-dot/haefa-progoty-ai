@@ -30,14 +30,16 @@ The Clinical Assessment is divided into several subsections, each with its own s
 1.  **Complaints**: Dynamic list of patient complaints with date and duration.
 2.  **TB Screening**: Core screening questions for Tuberculosis.
 3.  **Suspected TB (Conditional)**: Detailed history for suspected PTB cases.
-4.  **Physical Examination - General**: Anemia, Jaundice, Edema (Rating 0-3), and NAD switches.
-5.  **Physical Examination - Systemic**: Free-text area for systemic findings.
-6.  **Current Rx taken**: Recording of current medications.
-7.  **Patient H/O illness**: History of chronic or acute diseases.
-8.  **Family H/O illness**: Family medical history.
-9.  **Vaccination**: Tracking of received vaccines and Nirog team involvement.
-10. **Patient Social H/O**: Habits like smoking, alcohol, and drug use.
-11. **Patient Wellbeing**: Mental health screening and physical limitation assessment.
+4.  **Cardiovascular Risk - Non Lab Based (Conditional)**: WHO 10-year risk assessment for patients aged 40-74.
+5.  **Cardiovascular Risk - Lab Based (Conditional)**: WHO 10-year risk assessment including cholesterol for patients aged 40-74.
+6.  **Physical Examination - General**: Anemia, Jaundice, Edema (Rating 0-3), and NAD switches.
+7.  **Physical Examination - Systemic**: Free-text area for systemic findings.
+8.  **Current Rx taken**: Recording of current medications.
+9.  **Patient H/O illness**: History of chronic or acute diseases.
+10. **Family H/O illness**: Family medical history.
+11. **Vaccination**: Tracking of received vaccines and Nirog team involvement.
+12. **Patient Social H/O**: Habits like smoking, alcohol, and drug use.
+13. **Patient Wellbeing**: Mental health screening and physical limitation assessment.
 
 ### Workflow Controls
 *   **ENABLE EDITING**: A switch to prevent accidental changes to a section.
@@ -70,20 +72,38 @@ When active, these sections must also be marked "Complete" for the assessment to
 
 ---
 
-## 4. Patient Data & History Display
+## 4. Cardiovascular Risk Assessment (CRA)
 
-### Station Data Summary (Left Panel)
-Displays a read-only snapshot of all data collected in previous stations:
-*   **Body Measures**: Weight, Height, BMI, MUAC.
-*   **Vital Signs**: BP, HR, RR, SpO2, Temp.
-*   **Labs & Risks**: Glucose levels, Hemoglobin, Allergies, and Social Risk factors.
+The platform implements the **WHO South Asia Cardiovascular Risk Charts** for patients aged **40 to 74 years**.
 
-### Historical Visits (Right Panel)
-Provides a timeline of the **last two visits**. Doctors can toggle between "Last Visit" and "2nd Last Visit" to view detailed vitals and clinical notes from those encounters.
+### Non-Laboratory Based CRA
+*   **Auto-population**: Pulls Age, Sex, BMI, Smoking Status, Diabetes Status, and Systolic BP (prioritizing the 2nd reading if the 1st was abnormal) from previous stations.
+*   **Manual Inputs**: Doctor selects "On BP Medication" (Yes/No).
+*   **Calculation**: Uses the WHO Non-Lab chart for the South Asia region.
+*   **Output**: 10-year risk percentage and risk level (Low, Moderate, High, Very High, Critical).
+
+### Laboratory Based CRA
+*   **Auto-population**: Same as Non-Lab based.
+*   **Manual Inputs**: Doctor inputs **Total Cholesterol** and **HDL Cholesterol** from lab results.
+*   **Calculation**: Uses the WHO Lab-based chart (incorporating cholesterol and diabetes status).
+*   **Output**: Independent risk calculation based on biochemical markers.
 
 ---
 
-## 5. Finalization & Movement
+## 5. Patient Data & History Display
+
+### Station Data Summary (Left Panel)
+Displays a read-only snapshot of all data collected in previous stations.
+*   **Independent Scrolling**: The panel has its own scrollbar, allowing doctors to review vitals and labs without moving the main assessment form.
+*   **Content**: Weight, Height, BMI, MUAC, BP, HR, RR, SpO2, Temp, Glucose, Hb, Allergies, and Social Risks.
+
+### Historical Visits (Right Panel)
+*   **Independent Scrolling**: Allows reviewing previous visit notes and trends independently.
+*   **Timeline**: Provides a timeline of the **last two visits**. Doctors can toggle between "Last Visit" and "2nd Last Visit" to view detailed vitals and clinical notes from those encounters.
+
+---
+
+## 6. Finalization & Movement
 
 ### Completion Requirements
 The "SEND TO PHARMACY" button is enabled only when:
@@ -99,8 +119,11 @@ The "SEND TO PHARMACY" button is enabled only when:
 ---
 
 ## 6. Technical Dependencies
-*   **`ClinicalAssessmentPanel.tsx`**: Main component for the assessment workflow.
+*   **`ClinicalAssessmentPanel.tsx`**: Main component for the assessment workflow, including CV Risk logic.
 *   **`ConsultationPanel.tsx`**: Orchestrates assessment, diagnosis, and prescriptions.
 *   **`DoctorDashboard.tsx`**: Main screen managing the queue and finalization logic.
+*   **`VitalsSnapshot.tsx`**: Component for the Station Data Summary.
+*   **`PatientHistoryTimeline.tsx`**: Component for the historical visits panel.
+*   **`cvRisk.ts`**: Utility containing the WHO risk matrices and calculation logic.
 *   **`encounterService.ts`**: Handles `saveConsultation` and `getVitalsByEncounter`.
 *   **`initialClinicalAssessment`**: Defines the default state and structure for assessment data.

@@ -176,6 +176,40 @@ const ClinicalSidebar: React.FC = () => {
                 isWarning={(v.temperature >= 38 && v.temperature < 39) || (v.temperature >= 35 && v.temperature < 36)}
               />
             </Box>
+
+            <Box>
+              <Typography variant="overline" fontWeight="900" color="text.disabled">Labs & Risk</Typography>
+              <Divider sx={{ mb: 2 }} />
+              {v.rbg > 0 && (
+                <DataRow 
+                  label="RBG" 
+                  value={v.rbg} 
+                  unit="mg/dL" 
+                  isEmergency={v.rbg >= 200}
+                  isWarning={v.rbg >= 140 && v.rbg < 200}
+                />
+              )}
+              {v.fbg > 0 && (
+                <DataRow 
+                  label="FBG" 
+                  value={v.fbg} 
+                  unit="mg/dL" 
+                  isEmergency={v.fbg >= 126}
+                  isWarning={v.fbg >= 100 && v.fbg < 126}
+                />
+              )}
+              {v.hemoglobin > 0 && (
+                <DataRow 
+                  label="Hemoglobin" 
+                  value={v.hemoglobin} 
+                  unit="g/dL" 
+                  isEmergency={v.hemoglobin < 7}
+                  isWarning={v.hemoglobin < 11} // Simplified warning for sidebar
+                />
+              )}
+              {v.is_fasting && <Chip label="FASTING" size="small" sx={{ mr: 1, mb: 1, fontWeight: 900, fontSize: '0.65rem' }} />}
+              {v.has_symptoms && <Chip label="SYMPTOMATIC" size="small" color="error" sx={{ mb: 1, fontWeight: 900, fontSize: '0.65rem' }} />}
+            </Box>
           </>
         )}
 
@@ -224,8 +258,9 @@ const ClinicalSidebar: React.FC = () => {
                   <Typography variant="caption" fontWeight="900">LABS</Typography>
                 </AccordionSummary>
                 <AccordionDetails sx={{ pt: 0 }}>
-                  <DataRow label="Sugar" value={lastVitals.blood_sugar} unit="mg/dL" />
-                  <DataRow label="Hgb" value={lastVitals.hemoglobin} unit="g/dL" />
+                  {lastVitals.rbg > 0 && <DataRow label="RBG" value={lastVitals.rbg} unit="mg/dL" />}
+                  {lastVitals.fbg > 0 && <DataRow label="FBG" value={lastVitals.fbg} unit="mg/dL" />}
+                  {lastVitals.hemoglobin > 0 && <DataRow label="Hb" value={lastVitals.hemoglobin} unit="g/dL" />}
                 </AccordionDetails>
               </Accordion>
             </Stack>
