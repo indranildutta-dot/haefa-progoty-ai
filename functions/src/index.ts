@@ -19,6 +19,63 @@ setGlobalOptions({
 });
 
 // ==========================================
+// ICD-11 INTEGRATION FUNCTIONS
+// ==========================================
+
+let cachedToken: { token: string; expiry: number } | null = null;
+
+export const getIcdToken = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Login required.");
+  }
+
+  const now = Date.now();
+  // Reuse token if it's still valid for at least 2 minutes
+  if (cachedToken && cachedToken.expiry > now + 120000) {
+    return { access_token: cachedToken.token };
+  }
+
+  const clientId = process.env.WHO_CLIENT_ID;
+  const clientSecret = process.env.WHO_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    throw new HttpsError("failed-precondition", "WHO ICD-11 credentials are not configured in the environment.");
+  }
+
+  try {
+    const response = await fetch("https://icdaccessmanagement.who.int/connect/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: clientId,
+        client_secret: clientSecret,
+        scope: "icdapi_access",
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("WHO Token Error:", errorText);
+      throw new Error(`WHO API error: ${response.statusText}`);
+    }
+
+    const data: any = await response.json();
+    cachedToken = {
+      token: data.access_token,
+      expiry: now + (data.expires_in * 1000),
+    };
+
+    return { access_token: data.access_token };
+  } catch (error: any) {
+    console.error("getIcdToken Error:", error);
+    throw new HttpsError("internal", error.message);
+  }
+});
+
+// ==========================================
 // ADMINISTRATIVE & RBAC FUNCTIONS
 // ==========================================
 

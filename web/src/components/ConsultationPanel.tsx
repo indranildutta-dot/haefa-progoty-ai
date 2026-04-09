@@ -1,8 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Box, Typography, TextField, Chip, Divider, Button, 
   Autocomplete, Stack, CircularProgress, Alert, Paper 
 } from '@mui/material';
+import * as ECT from '@whoicd/icd11ect';
+import '@whoicd/icd11ect/style.css';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../firebase';
 import PrescriptionBuilder from './PrescriptionBuilder';
 import ClinicalAssessmentPanel, { ClinicalAssessmentData, initialClinicalAssessment } from './ClinicalAssessmentPanel';
 import { Prescription } from '../types';
@@ -47,6 +51,44 @@ const ConsultationPanel: React.FC<ConsultationPanelProps> = ({
   
   // Local state buffer to ensure smooth typing and selection
   const [localData, setLocalData] = useState<ConsultationData>(data);
+  const icdInputRef = useRef<HTMLInputElement>(null);
+
+  // Initialize ICD-11 ECT
+  useEffect(() => {
+    const settings = {
+      apiServerUrl: "https://id.who.int",
+      apiLinearization: "mms",
+      getNewTokenFunction: async () => {
+        try {
+          const getIcdToken = httpsCallable(functions, 'getIcdToken');
+          const result: any = await getIcdToken();
+          return result.data.access_token;
+        } catch (error) {
+          console.error("Failed to get ICD token:", error);
+          return "";
+        }
+      }
+    };
+
+    const callbacks = {
+      selectedEntityFunction: (selectedEntity: any) => {
+        if (selectedEntity) {
+          // Capture code and URI as requested
+          const diagnosisString = `${selectedEntity.code} - ${selectedEntity.bestMatchText}`;
+          handleLocalChange({ 
+            diagnosis: diagnosisString,
+            // We can also store the URI in notes or a hidden field if needed, 
+            // but for now we follow the instruction to populate the Diagnosis field.
+          });
+          // Clear the search tool after selection
+          ECT.Handler.clear("1");
+        }
+      }
+    };
+
+    // Configure the ECT handler
+    ECT.Handler.configure(settings, callbacks);
+  }, []);
 
   // Sync with parent when encounter changes
   useEffect(() => {
@@ -130,16 +172,51 @@ const ConsultationPanel: React.FC<ConsultationPanelProps> = ({
 
       <Divider />
 
-      {/* Section 3: Diagnosis (Fixed typing) */}
+      {/* Section 3: Diagnosis (ICD-11 Integrated) */}
       <Box>
-        <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>Section 3 — Provisional Diagnosis</Typography>
-        <TextField 
-          fullWidth variant="outlined" 
-          value={localData.diagnosis || ""} 
-          onChange={(e) => handleLocalChange({ diagnosis: e.target.value })} 
-          placeholder="Enter diagnosis..." 
-          sx={{ bgcolor: 'white', borderRadius: 2 }}
-        />
+        <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>
+          Section 3 — Provisional Diagnosis (ICD-11)
+        </Typography>
+        <Box sx={{ position: 'relative' }}>
+          <TextField 
+            fullWidth 
+            variant="outlined" 
+            value={localData.diagnosis || ""} 
+            onChange={(e) => handleLocalChange({ diagnosis: e.target.value })} 
+            placeholder="Search ICD-11 Diagnosis..." 
+            inputProps={{ 
+              "data-ctw-ino": "1",
+              autoComplete: "off"
+            }}
+            sx={{ 
+              bgcolor: 'white', 
+              borderRadius: 2,
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': { borderColor: '#e2e8f0' },
+                '&:hover fieldset': { borderColor: '#3b82f6' },
+              }
+            }}
+          />
+          {/* WHO ECT Search Results Window */}
+          <Box 
+            className="ctw-window" 
+            data-ctw-ino="1" 
+            sx={{ 
+              position: 'absolute', 
+              top: '100%', 
+              left: 0, 
+              right: 0, 
+              zIndex: 2000,
+              bgcolor: 'white',
+              boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+              borderRadius: '0 0 8px 8px',
+              border: '1px solid #e2e8f0',
+              borderTop: 'none',
+              maxHeight: '400px',
+              overflowY: 'auto'
+            }}
+          />
+        </Box>
       </Box>
 
       <Divider />
