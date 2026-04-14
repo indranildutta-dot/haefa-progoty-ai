@@ -10,7 +10,7 @@ import ClinicSelection from './screens/ClinicSelection';
 import ClinicOperationsDashboard from './screens/ClinicOperationsDashboard'; // FIXED: Added 's' to match filename
 import RegistrationStation from './screens/RegistrationStation';
 import VitalsStation from './screens/VitalsStation';
-import DoctorDashboard from './screens/DoctorDashboard';
+import DoctorStation from './screens/DoctorStation';
 import PharmacyStation from './screens/PharmacyStation';
 import QueueBoard from './screens/QueueBoard';
 import AdminDashboard from './screens/AdminDashboard';
@@ -32,7 +32,7 @@ const App: React.FC = () => {
     const unsubscribe = subscribeToAuthChanges(async (firebaseUser) => {
       try {
         if (firebaseUser) {
-          const profile = await getUserProfile(firebaseUser.uid);
+          const profile = await getUserProfile(firebaseUser.uid, firebaseUser.email);
           setUser(firebaseUser, profile);
         } else {
           setUser(null, null);
@@ -129,7 +129,7 @@ const App: React.FC = () => {
       } />
 
       <Route path="/doctor" element={
-        isAuthorized() && selectedClinic ? <DoctorDashboard countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+        isAuthorized() && selectedClinic ? <DoctorStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
       } />
 
       <Route path="/pharmacy" element={

@@ -32,13 +32,16 @@ export const getIcdToken = onCall(async (request) => {
   const now = Date.now();
   // Reuse token if it's still valid for at least 2 minutes
   if (cachedToken && cachedToken.expiry > now + 120000) {
-    return { access_token: cachedToken.token };
+    console.log("Returning cached ICD token.");
+    return cachedToken.token;
   }
 
   const clientId = process.env.WHO_CLIENT_ID;
   const clientSecret = process.env.WHO_CLIENT_SECRET;
 
+  console.log("Fetching new ICD token from WHO API...");
   if (!clientId || !clientSecret) {
+    console.error("WHO_CLIENT_ID or WHO_CLIENT_SECRET missing in environment.");
     throw new HttpsError("failed-precondition", "WHO ICD-11 credentials are not configured in the environment.");
   }
 
@@ -58,19 +61,26 @@ export const getIcdToken = onCall(async (request) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("WHO Token Error:", errorText);
-      throw new Error(`WHO API error: ${response.statusText}`);
+      console.error("WHO Token Error Response:", errorText);
+      throw new Error(`WHO API error: ${response.status} - ${errorText}`);
     }
 
     const data: any = await response.json();
+    if (!data.access_token) {
+      console.error("WHO API returned success but no access_token:", data);
+      throw new Error("WHO API returned no access_token.");
+    }
+
+    console.log("Successfully retrieved ICD token. Length:", data.access_token.length);
+    
     cachedToken = {
       token: data.access_token,
       expiry: now + (data.expires_in * 1000),
     };
 
-    return { access_token: data.access_token };
+    return data.access_token;
   } catch (error: any) {
-    console.error("getIcdToken Error:", error);
+    console.error("getIcdToken Exception:", error);
     throw new HttpsError("internal", error.message);
   }
 });
