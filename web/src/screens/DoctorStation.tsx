@@ -1047,8 +1047,8 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
             const getIcdToken = httpsCallable(functions, 'getIcdToken');
             const result: any = await getIcdToken();
             
-            // WHO library expects a plain string token
-            console.log("ICD Token received successfully.");
+            // WHO library strictly requires the string inside .data
+            console.log('HAEFA: Unwrapped Token:', result.data);
             return result.data; 
           } catch (error) {
             console.error("Critical Token Error:", error);
@@ -1080,9 +1080,12 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
       // Configure the ECT Handler
       ECT_LIB.Handler.configure(settings, callbacks);
       
-      // CRITICAL: Manually connect the search tool to the input field
-      console.log("Binding ICD-11 search tool to input field...");
-      ECT_LIB.Handler.bind("1");
+      // CRITICAL: Manually connect the search tool to the input field with delay
+      setTimeout(() => {
+        console.log("Binding ICD-11 search tool to input field...");
+        ECT_LIB.Handler.bind("1");
+        console.log('HAEFA: ICD-11 Engine Bound');
+      }, 500);
     };
 
     if (selectedItem) {
