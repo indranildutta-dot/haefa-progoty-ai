@@ -815,25 +815,170 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
         </AccordionDetails>
       </Accordion>
 
+      {/* Wellbeing */}
+      <Accordion expanded={expanded === 'wellbeing'} onChange={handleChange('wellbeing')} disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
+        {renderAccordionHeader('wellbeing', 'Wellbeing', 'wellbeing')}
+        <AccordionDetails sx={{ bgcolor: 'white' }}>
+          {renderSectionControls('wellbeing', ['signsOfMentalIllness'])}
+          {renderYesNoGroup('wellbeing', 'signsOfMentalIllness', 'Any signs of mental illness?')}
+        </AccordionDetails>
+      </Accordion>
+
       {/* Reproductive Health */}
       {isFemaleOver12 && (
         <Accordion expanded={expanded === 'reproductiveHealth'} onChange={handleChange('reproductiveHealth')} disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
           {renderAccordionHeader('reproductiveHealth', 'Reproductive Health', 'reproductiveHealth')}
           <AccordionDetails sx={{ bgcolor: 'white' }}>
             {renderSectionControls('reproductiveHealth')}
-            <Typography variant="subtitle2">Obstetric History</Typography>
+            <Typography variant="subtitle2" sx={{ mb: 1, mt: 2, fontWeight: 'bold' }}>Obstetric History</Typography>
             <Grid container spacing={2}>
-              <Grid size={6}><TextField fullWidth size="small" label="Gravida" value={data.reproductiveHealth.obstetric.gravida} onChange={(e) => {
+              <Grid size={4}><TextField fullWidth size="small" label="Gravida" value={data.reproductiveHealth.obstetric.gravida} onChange={(e) => {
                 handleStartSection('reproductiveHealth');
                 onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, obstetric: { ...data.reproductiveHealth.obstetric, gravida: e.target.value } } });
               }} /></Grid>
-              <Grid size={6}><TextField fullWidth size="small" label="Para" value={data.reproductiveHealth.obstetric.para} onChange={(e) => {
+              <Grid size={4}><TextField fullWidth size="small" label="Para" value={data.reproductiveHealth.obstetric.para} onChange={(e) => {
                 handleStartSection('reproductiveHealth');
                 onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, obstetric: { ...data.reproductiveHealth.obstetric, para: e.target.value } } });
+              }} /></Grid>
+              <Grid size={4}><TextField fullWidth size="small" label="Still Birth" value={data.reproductiveHealth.obstetric.stillBirth} onChange={(e) => {
+                handleStartSection('reproductiveHealth');
+                onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, obstetric: { ...data.reproductiveHealth.obstetric, stillBirth: e.target.value } } });
+              }} /></Grid>
+              <Grid size={4}><TextField fullWidth size="small" label="Miscarriage" value={data.reproductiveHealth.obstetric.miscarriage} onChange={(e) => {
+                handleStartSection('reproductiveHealth');
+                onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, obstetric: { ...data.reproductiveHealth.obstetric, miscarriage: e.target.value } } });
+              }} /></Grid>
+              <Grid size={4}><TextField fullWidth size="small" label="MR" value={data.reproductiveHealth.obstetric.mr} onChange={(e) => {
+                handleStartSection('reproductiveHealth');
+                onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, obstetric: { ...data.reproductiveHealth.obstetric, mr: e.target.value } } });
+              }} /></Grid>
+              <Grid size={4}><TextField fullWidth size="small" label="Live Birth (M)" value={data.reproductiveHealth.obstetric.liveMaleBirth} onChange={(e) => {
+                handleStartSection('reproductiveHealth');
+                onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, obstetric: { ...data.reproductiveHealth.obstetric, liveMaleBirth: e.target.value } } });
+              }} /></Grid>
+              <Grid size={4}><TextField fullWidth size="small" label="Live Birth (F)" value={data.reproductiveHealth.obstetric.liveFemaleBirth} onChange={(e) => {
+                handleStartSection('reproductiveHealth');
+                onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, obstetric: { ...data.reproductiveHealth.obstetric, liveFemaleBirth: e.target.value } } });
+              }} /></Grid>
+            </Grid>
+
+            <Typography variant="subtitle2" sx={{ mb: 1, mt: 3, fontWeight: 'bold' }}>Menstrual History</Typography>
+            <Grid container spacing={2}>
+              <Grid size={6}><TextField fullWidth type="date" size="small" label="LMP" InputLabelProps={{ shrink: true }} value={data.reproductiveHealth.menstrual.lmp} onChange={(e) => {
+                handleStartSection('reproductiveHealth');
+                onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, menstrual: { ...data.reproductiveHealth.menstrual, lmp: e.target.value } } });
+              }} /></Grid>
+              <Grid size={6}><TextField fullWidth size="small" label="Contraception Method" value={data.reproductiveHealth.menstrual.contraceptionMethod} onChange={(e) => {
+                handleStartSection('reproductiveHealth');
+                onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, menstrual: { ...data.reproductiveHealth.menstrual, contraceptionMethod: e.target.value } } });
+              }} /></Grid>
+            </Grid>
+
+            <Typography variant="subtitle2" sx={{ mb: 1, mt: 3, fontWeight: 'bold' }}>Cervical Cancer Screening (VIA)</Typography>
+            <Grid container spacing={2}>
+              <Grid size={6}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>VIA Results</InputLabel>
+                  <Select value={data.reproductiveHealth.cervicalCancer.viaResults} label="VIA Results" onChange={(e) => {
+                    handleStartSection('reproductiveHealth');
+                    onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, cervicalCancer: { ...data.reproductiveHealth.cervicalCancer, viaResults: e.target.value } } });
+                  }}>
+                    <MenuItem value="Negative">Negative</MenuItem>
+                    <MenuItem value="Positive">Positive</MenuItem>
+                    <MenuItem value="Suspicious">Suspicious</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={6}><TextField fullWidth size="small" label="Referred To" value={data.reproductiveHealth.cervicalCancer.where} onChange={(e) => {
+                handleStartSection('reproductiveHealth');
+                onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, cervicalCancer: { ...data.reproductiveHealth.cervicalCancer, where: e.target.value } } });
               }} /></Grid>
             </Grid>
           </AccordionDetails>
         </Accordion>
+      )}
+
+      {/* CV Risk Assessment */}
+      {isCRAEligible && (
+        <>
+          <Accordion expanded={expanded === 'cvRisk'} onChange={handleChange('cvRisk')} disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
+            {renderAccordionHeader('cvRisk', 'CV Risk Assessment (Non-Lab)', 'cvRisk')}
+            <AccordionDetails sx={{ bgcolor: 'white' }}>
+              {renderSectionControls('cvRisk')}
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                WHO CV Risk Assessment for South Asia (Age 40-74)
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid size={4}>
+                  <TextField fullWidth size="small" label="SBP" value={data.cvRisk.sbp} onChange={(e) => handleRadioChange('cvRisk', 'sbp', e.target.value)} />
+                </Grid>
+                <Grid size={4}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Smoker</InputLabel>
+                    <Select value={data.cvRisk.isSmoker} label="Smoker" onChange={(e) => handleRadioChange('cvRisk', 'isSmoker', e.target.value)}>
+                      <MenuItem value="Yes">Yes</MenuItem>
+                      <MenuItem value="No">No</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={4}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Diabetes</InputLabel>
+                    <Select value={data.cvRisk.diabetes} label="Diabetes" onChange={(e) => handleRadioChange('cvRisk', 'diabetes', e.target.value)}>
+                      <MenuItem value="Yes">Yes</MenuItem>
+                      <MenuItem value="No">No</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={6}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>On BP Medication</InputLabel>
+                    <Select value={data.cvRisk.onBPMedication} label="On BP Medication" onChange={(e) => handleRadioChange('cvRisk', 'onBPMedication', e.target.value)}>
+                      <MenuItem value="Yes">Yes</MenuItem>
+                      <MenuItem value="No">No</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+            </AccordionDetails>
+          </Accordion>
+
+          <Accordion expanded={expanded === 'cvRiskLab'} onChange={handleChange('cvRiskLab')} disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
+            {renderAccordionHeader('cvRiskLab', 'CV Risk Assessment (Lab-Based)', 'cvRiskLab')}
+            <AccordionDetails sx={{ bgcolor: 'white' }}>
+              {renderSectionControls('cvRiskLab')}
+              <Grid container spacing={2}>
+                <Grid size={4}>
+                  <TextField fullWidth size="small" label="SBP" value={data.cvRiskLab.sbp} onChange={(e) => handleRadioChange('cvRiskLab', 'sbp', e.target.value)} />
+                </Grid>
+                <Grid size={4}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Smoker</InputLabel>
+                    <Select value={data.cvRiskLab.isSmoker} label="Smoker" onChange={(e) => handleRadioChange('cvRiskLab', 'isSmoker', e.target.value)}>
+                      <MenuItem value="Yes">Yes</MenuItem>
+                      <MenuItem value="No">No</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={4}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Diabetes</InputLabel>
+                    <Select value={data.cvRiskLab.diabetes} label="Diabetes" onChange={(e) => handleRadioChange('cvRiskLab', 'diabetes', e.target.value)}>
+                      <MenuItem value="Yes">Yes</MenuItem>
+                      <MenuItem value="No">No</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={6}>
+                  <TextField fullWidth size="small" label="Total Cholesterol" value={data.cvRiskLab.totalCholesterol} onChange={(e) => handleRadioChange('cvRiskLab', 'totalCholesterol', e.target.value)} />
+                </Grid>
+                <Grid size={6}>
+                  <TextField fullWidth size="small" label="HDL Cholesterol" value={data.cvRiskLab.hdlCholesterol} onChange={(e) => handleRadioChange('cvRiskLab', 'hdlCholesterol', e.target.value)} />
+                </Grid>
+              </Grid>
+            </AccordionDetails>
+          </Accordion>
+        </>
       )}
     </Box>
   );
@@ -890,7 +1035,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
         return;
       }
 
-      console.log("Initializing ICD-11 ECT Handler via CDN...");
+      console.log("Initializing ICD-11 ECT Handler via Local Assets...");
       const ECT_LIB = (window as any).ECT;
       
       const settings = {
@@ -942,7 +1087,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
 
     if (selectedItem) {
       // Delay initialization slightly to ensure DOM is ready
-      const timer = setTimeout(initECT, 300);
+      const timer = setTimeout(initECT, 500);
       return () => clearTimeout(timer);
     }
 
@@ -1023,6 +1168,44 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
     } finally {
       setIsFinalizing(false);
     }
+  };
+
+  const isCRAEligible = calculateAgeYears(selectedPatient) >= 40 && calculateAgeYears(selectedPatient) <= 74;
+  const isFemaleOver12 = selectedPatient?.gender === 'female' && calculateAgeYears(selectedPatient) >= 12;
+
+  const isSuspectedTBActive = () => {
+    const { cough, lgerf, nightSweat, weightLoss } = consultData.clinicalAssessment.tbScreening;
+    const countYes = [lgerf, nightSweat, weightLoss].filter(v => v === 'Yes').length;
+    return cough === 'Yes' || countYes >= 2;
+  };
+
+  const areAllSectionsComplete = () => {
+    const statuses = consultData.clinicalAssessment.sectionStatuses;
+    const activeSections = [
+      'complaints',
+      'tbScreening',
+      'physicalExamGeneral',
+      'currentRx',
+      'patientHistory',
+      'familyHistory',
+      'socialHistory',
+      'wellbeing'
+    ];
+    
+    if (isSuspectedTBActive()) {
+      activeSections.push('suspectedTBAdditionalSymptoms');
+    }
+    
+    if (isFemaleOver12) {
+      activeSections.push('reproductiveHealth');
+    }
+    
+    if (isCRAEligible) {
+      activeSections.push('cvRisk');
+      activeSections.push('cvRiskLab');
+    }
+    
+    return activeSections.every(section => statuses[section] === 'Complete');
   };
 
   // ==========================================
@@ -1198,9 +1381,18 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
           {/* ACTIONS */}
           <Box sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, bgcolor: 'white', borderTop: '1px solid #e2e8f0', p: 2, zIndex: 1100, display: 'flex', justifyContent: 'center', gap: 2 }}>
             <Button variant="outlined" color="error" onClick={() => setOpenCancelDialog(true)}>Cancel</Button>
-            <Button variant="contained" color="primary" onClick={() => handleFinalize('WAITING_FOR_PHARMACY')} disabled={isFinalizing || !consultData.diagnosis}>
-              {isFinalizing ? <CircularProgress size={24} color="inherit" /> : "Complete & Send to Pharmacy"}
-            </Button>
+            <Tooltip title={!areAllSectionsComplete() ? "Please complete all clinical assessment sections first" : ""}>
+              <span>
+                <Button 
+                  variant="contained" 
+                  color="primary" 
+                  onClick={() => handleFinalize('WAITING_FOR_PHARMACY')} 
+                  disabled={isFinalizing || !consultData.diagnosis || !areAllSectionsComplete()}
+                >
+                  {isFinalizing ? <CircularProgress size={24} color="inherit" /> : "Complete & Send to Pharmacy"}
+                </Button>
+              </span>
+            </Tooltip>
           </Box>
         </Box>
       )}
