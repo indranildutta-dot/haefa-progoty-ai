@@ -1043,6 +1043,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
         apiLinearization: "mms",
         getNewTokenFunction: async () => {
           try {
+            console.log('HAEFA: Library is requesting a new token...');
             console.log("Fetching ICD token from backend Function...");
             const getIcdToken = httpsCallable(functions, 'getIcdToken');
             const result: any = await getIcdToken();
@@ -1079,6 +1080,10 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
 
       // Configure the ECT Handler
       ECT_LIB.Handler.configure(settings, callbacks);
+      
+      // CRITICAL: Manual initialization to ensure server URL is explicitly set before binding
+      console.log("HAEFA: Setting explicit apiServerUrl and binding...");
+      ECT_LIB.Handler.configure({ apiServerUrl: "https://id.who.int" });
       
       // CRITICAL: Manually connect the search tool to the input field with delay
       setTimeout(() => {
@@ -1317,6 +1322,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
                         fullWidth
                         inputRef={icdInputRef}
                         inputProps={{ 
+                          "id": "icd11-input",
                           "data-ctw-ino": "1",
                           autoComplete: "off"
                         }}
@@ -1383,7 +1389,64 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
 
           {/* ACTIONS */}
           <Box sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, bgcolor: 'white', borderTop: '1px solid #e2e8f0', p: 2, zIndex: 1100, display: 'flex', justifyContent: 'center', gap: 2 }}>
-            <Button variant="outlined" color="error" onClick={() => setOpenCancelDialog(true)}>Cancel</Button>
+            <Button variant="outlined" color="error" onClick={() => setOpenCancelDialog(true)}>
+              Cancel
+            </Button>
+            
+            <Button 
+              variant="outlined" 
+              color="primary" 
+              onClick={async () => {
+                try {
+                  setIsFinalizing(true);
+                  await saveConsultation({ 
+                    ...consultData, 
+                    encounter_id: selectedItem.encounter_id, 
+                    patient_id: selectedItem.patient_id
+                  }, {
+                    encounter_id: selectedItem.encounter_id,
+                    patient_id: selectedItem.patient_id,
+                    prescriptions: consultData.prescriptions
+                  });
+                  notify("Progress saved locally.", "info");
+                } catch (e) {
+                  notify("Failed to save progress.", "error");
+                } finally {
+                  setIsFinalizing(false);
+                }
+              }}
+              disabled={isFinalizing}
+            >
+              Save Progress
+            </Button>
+
+            <Button 
+              variant="contained" 
+              color="warning"
+              disabled={isFinalizing || !consultData.diagnosis}
+              onClick={async () => {
+                try {
+                  setIsFinalizing(true);
+                  await saveConsultation({ 
+                    ...consultData, 
+                    encounter_id: selectedItem.encounter_id, 
+                    patient_id: selectedItem.patient_id
+                  }, {
+                    encounter_id: selectedItem.encounter_id,
+                    patient_id: selectedItem.patient_id,
+                    prescriptions: consultData.prescriptions
+                  });
+                  notify("Diagnosis marked as complete.", "success");
+                } catch (e) {
+                  notify("Failed to complete diagnosis.", "error");
+                } finally {
+                  setIsFinalizing(false);
+                }
+              }}
+            >
+              Complete Diagnosis
+            </Button>
+
             <Tooltip title={!areAllSectionsComplete() ? "Please complete all clinical assessment sections first" : ""}>
               <span>
                 <Button 
