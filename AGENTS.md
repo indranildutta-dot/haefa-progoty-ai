@@ -52,3 +52,28 @@ The Doctor Station is the final point of clinical assessment and prescription.
   - **Designation**: Include the user's `designation` in the prescriber identification block.
   - **RBAC**: Ensure `doctor` and `nurse` roles have access to all clinical stations for their assigned clinics to support rural practitioner workflows.
   - **Missing Info Warning**: Maintain the amber warning on the dashboard if `professional_reg_no` is missing for clinical staff.
+
+## 7. Sacred Section Strategy (Regression Prevention)
+To ensure that existing features, thresholds, and clinical logic are never lost during code updates, all agents MUST follow this protocol:
+
+### The "Zero-Loss" Protocol
+1.  **Mandatory Spec Review**: Before editing any station file (e.g., `DoctorStation.tsx`), the agent MUST read the corresponding `.md` file (e.g., `/doctor_station.md`).
+2.  **Feature Comparison**: Compare the current code against the spec in the `.md` file to identify any "hidden" or conditional features (like age-based filters).
+3.  **Surgical Edits**: Use `multi_edit_file` with targeted chunks. NEVER replace large UI blocks (e.g., an entire Accordion set) if you are only changing one field.
+4.  **Threshold Preservation**: Never modify clinical thresholds (Heart Rate, BP, CRA scores) unless explicitly requested and documented in a spec change.
+
+### Sacred Checklist per Station
+- **Registration**: Bangladesh Residency (NID vs FDMN), Minor Detection (DOB vs age_years), Step-by-Step wizard flow.
+- **Queue Board**: 200px column density, 2-line name split, 1Y vs 6M age logic, 6px Triage Halo.
+- **Vitals - Body Measures**: BMI calculation, MUAC grading, pediatric clinical warning.
+- **Vitals - Vital Signs**: Age-based HR/RR thresholds, SpO2 emergency triggers, Safety Sentinel real-time sync.
+- **Vitals - Labs & Risk**: Unit conversion logic (mg/dL/mmol/L), Fasting/Random glucose thresholds, Hb sex/age/pregnancy specific ranges.
+- **Doctor Station**: CRA eligibility (40-74), Systemic Examination (all 5 systems), TB screening logic, independent side-panel scrolling, pharmacist dispensing summary visibility.
+- **CRA Calculation Integrity**: Calculations for both Lab and Non-Lab must ONLY proceed if all required fields are valid. Never default missing values to zero. Display `--%` if inputs are incomplete.
+- **BP Medication Warning**: Always display a prominent Amber Clinical Warning if `onBPMedication` is "Yes", as risk may be underestimated.
+- **CRA Locking & Overrides**: All pre-populated CRA fields (Age, Sex, BMI, SBP, Smoker, Diabetes) MUST be locked by default. Manual overrides must be recorded in the `overrides` array of the clinical assessment record.
+- **Pharmacy**: Inventory-coupled dispensing, Substitution/Return-Later logic, Professional ID stamps on labels.
+- **Operations Dashboard**: Real-time KPI aggregation, Bottleneck analysis, Triage distribution charts.
+
+### Documentation as Source of Truth
+If a feature is implemented in code but missing from the `.md` file, the agent MUST update the `.md` file first to register it as a "Sacred Feature".

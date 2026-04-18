@@ -1,21 +1,13 @@
+import * as admin from 'firebase-admin';
+
 // ==========================================
-// LAZY LOADERS
+// INITIALIZATION
 // ==========================================
 
-let adminCache: any = null;
-export const getAdmin = async () => {
-  if (!adminCache) {
-    adminCache = await import("firebase-admin");
-    if (!adminCache.apps.length) {
-      adminCache.initializeApp();
-    }
-  }
-  return adminCache;
-};
-
+export const getAdmin = async () => admin;
 export const getDb = async () => {
-  const admin = await getAdmin();
-  return admin.firestore();
+  const db = admin.firestore(); // This defaults to (default)
+  return db;
 };
 
 export const getCrypto = async () => {
@@ -55,16 +47,50 @@ export const generateId = async () => {
   }
 };
 
-export const sanitizeData = (data: any) => {
-  if (!data || typeof data !== 'object') return {};
-  const sanitized: any = {};
-  for (const key in data) {
-    if (Object.prototype.hasOwnProperty.call(data, key)) {
-      const value = data[key];
-      if (value !== undefined && value !== null) {
-        sanitized[key] = value;
+export const deepSanitize = (data: any): any => {
+  if (data === undefined) return null;
+  if (data === null) return null;
+  
+  // Handle Numbers - convert NaN and Infinity to null as Firestore doesn't support them
+  if (typeof data === 'number') {
+    if (isNaN(data) || !isFinite(data)) return null;
+    return data;
+  }
+
+  // Handle Dates
+  if (data instanceof Date) {
+    return data;
+  }
+  
+  if (Array.isArray(data)) {
+    return data.map(v => deepSanitize(v));
+  }
+  
+  if (typeof data === 'object') {
+    // IMPROVED: Safely check for Firestore FieldValue
+    const constructorName = data.constructor?.name;
+    const isFieldValue = constructorName === 'FieldValue' || 
+                         constructorName === 'FirestoreFieldValue' ||
+                         (typeof data._methodName === 'string') ||
+                         (data._sentinel !== undefined);
+    
+    if (isFieldValue) {
+      return data;
+    }
+
+    // Handle standard objects
+    const sanitized: any = {};
+    for (const key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        sanitized[key] = deepSanitize(data[key]);
       }
     }
+    return sanitized;
   }
-  return sanitized;
+  
+  return data;
+};
+
+export const sanitizeData = (data: any) => {
+  return deepSanitize(data);
 };

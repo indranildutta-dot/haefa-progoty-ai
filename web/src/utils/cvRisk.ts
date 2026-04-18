@@ -8,6 +8,7 @@ export interface CVRiskInputs {
   isSmoker: boolean;
   bmi: number;
   sbp: number;
+  hasDiabetes: boolean;
 }
 
 // WHO Non-laboratory based risk chart for South Asia
@@ -257,7 +258,7 @@ const riskData: Record<string, Record<Gender, Record<SmokingStatus, number[][]>>
 };
 
 export const calculateCVRisk = (inputs: CVRiskInputs): number | null => {
-  const { age, gender, isSmoker, bmi, sbp } = inputs;
+  const { age, gender, isSmoker, bmi, sbp, hasDiabetes } = inputs;
 
   if (isNaN(age) || isNaN(bmi) || isNaN(sbp)) return null;
 
@@ -291,6 +292,15 @@ export const calculateCVRisk = (inputs: CVRiskInputs): number | null => {
   else bmiIndex = 4;
 
   try {
+    // If patient has diabetes, we use the lab-based chart with median cholesterol (4-4.9 mmol/L -> index 1)
+    // as a refined proxy since non-lab Diabetic charts are effectively this in many WHO adaptations.
+    if (hasDiabetes) {
+      const diabetesKey = 1;
+      const labAgeGroup = getLabAgeGroup(age);
+      if (!labAgeGroup) return null;
+      return riskDataLab[diabetesKey][labAgeGroup][gender][smokingStatus][sbpIndex][1];
+    }
+    
     return riskData[ageGroup][gender][smokingStatus][sbpIndex][bmiIndex];
   } catch (e) {
     return null;

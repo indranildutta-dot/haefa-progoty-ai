@@ -121,6 +121,8 @@ export interface Vitals {
   blood_sugar?: number;
   rbg?: number;
   fbg?: number;
+  total_cholesterol?: number;
+  hdl_cholesterol?: number;
   hours_since_meal?: number;
   hemoglobin?: number;
   is_pregnant?: boolean;
@@ -205,6 +207,8 @@ export interface VitalsRecord {
   blood_sugar?: number;
   rbg?: number;
   fbg?: number;
+  total_cholesterol?: number;
+  hdl_cholesterol?: number;
   hours_since_meal?: number;
   hemoglobin?: number;
   systolic_2?: number;

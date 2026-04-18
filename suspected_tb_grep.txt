@@ -1,0 +1,29 @@
+  complaints: { date: string; description: string; duration: string }[];
+  tbScreening: Record<string, string | null>;
+  suspectedTBAdditionalSymptoms: Record<string, string | null>;
+  suspectedTBExamFindings: Record<string, string | null>;
+  suspectedTBPastHistory: {
+    year: string | null;
+    evidence: string[];
+    treatment: string | null;
+    duration: string | null;
+--
+  complaints: [],
+  tbScreening: {},
+  suspectedTBAdditionalSymptoms: {},
+  suspectedTBExamFindings: {},
+  suspectedTBPastHistory: {
+    year: null,
+    evidence: [],
+    treatment: null,
+    duration: null,
+--
+    complaints: 'Not Started',
+    tbScreening: 'Not Started',
+    suspectedTBAdditionalSymptoms: 'Not Started',
+    suspectedTBExamFindings: 'Not Started',
+    suspectedTBPastHistory: 'Not Started',
+    physicalExamGeneral: 'Not Started',
+    physicalExamSystemic: 'Not Started',
+    currentRx: 'Not Started',
+    patientHistory: 'Not Started',

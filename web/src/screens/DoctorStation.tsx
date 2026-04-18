@@ -48,6 +48,8 @@ import TimerIcon from '@mui/icons-material/Timer';
 import CancelIcon from '@mui/icons-material/Cancel';
 import SendIcon from '@mui/icons-material/Send';
 import InfoIcon from '@mui/icons-material/Info';
+import EditIcon from '@mui/icons-material/Edit';
+import HistoryIcon from '@mui/icons-material/History';
 
 import { auth, functions } from "../firebase";
 import { httpsCallable } from 'firebase/functions';
@@ -64,7 +66,7 @@ import {
 import { getPatientById } from '../services/patientService';
 import { useAppStore } from '../store/useAppStore';
 import { calculateAgeYears } from '../utils/patient';
-import { calculateCVRisk, calculateCVRiskLab, getRiskLevel } from '../utils/cvRisk';
+import { calculateCVRisk, calculateCVRiskLab, getRiskLevel, CVRiskInputs, CVRiskLabInputs, Gender } from '../utils/cvRisk';
 
 import StationLayout from '../components/StationLayout';
 import StationSearchHeader from '../components/StationSearchHeader';
@@ -82,31 +84,37 @@ import PrescriptionBuilder from '../components/PrescriptionBuilder';
 // TYPES & CONSTANTS
 // ==========================================
 
+const sanitizeForFirestore = (obj: any) => {
+  return JSON.parse(JSON.stringify(obj, (key, value) => 
+    value === undefined ? null : value
+  ));
+};
+
 export type SectionStatus = 'Not Started' | 'In Progress' | 'Complete';
 
 export interface ClinicalAssessmentData {
   complaints: { date: string; description: string; duration: string }[];
-  tbScreening: Record<string, string>;
-  suspectedTBAdditionalSymptoms: Record<string, string>;
-  suspectedTBExamFindings: Record<string, string>;
+  tbScreening: Record<string, string | null>;
+  suspectedTBAdditionalSymptoms: Record<string, string | null>;
+  suspectedTBExamFindings: Record<string, string | null>;
   suspectedTBPastHistory: {
-    year: string;
+    year: string | null;
     evidence: string[];
-    treatment: string;
-    duration: string;
-    result: string;
-    recovery: string;
-    others: string;
+    treatment: string | null;
+    duration: string | null;
+    result: string | null;
+    recovery: string | null;
+    others: string | null;
   };
   physicalExamGeneral: {
-    anemia: number;
-    jaundice: number;
-    edema: number;
-    lymphNodesPalpable: boolean;
-    heartNAD: boolean;
-    lungsNAD: boolean;
+    anemia: number | null;
+    jaundice: number | null;
+    edema: number | null;
+    lymphNodesPalpable: boolean | null;
+    heartNAD: boolean | null;
+    lungsNAD: boolean | null;
   };
-  physicalExamSystemic: Record<string, string>;
+  physicalExamSystemic: Record<string, string | null>;
   currentRx: {
     name: string;
     isAllergic: boolean;
@@ -116,58 +124,62 @@ export interface ClinicalAssessmentData {
     duration: string;
     durationUnit: string;
   }[];
-  patientHistory: Record<string, { status: string; year?: string }>;
-  familyHistory: Record<string, { status: string; records: { year: string; relation: string }[] }>;
-  vaccination: Record<string, { received: string; givenByNirog: boolean }>;
-  socialHistory: Record<string, string>;
-  wellbeing: Record<string, string>;
+  patientHistory: Record<string, { status: string | null; year?: string | null }>;
+  familyHistory: Record<string, { status: string | null; records: { year: string | null; relation: string | null }[] }>;
+  vaccination: Record<string, { received: string | null; givenByNirog: boolean | null }>;
+  socialHistory: Record<string, string | null>;
+  wellbeing: Record<string, string | null>;
   reproductiveHealth: {
     obstetric: {
-      gravida: string;
-      para: string;
-      stillBirth: string;
-      miscarriage: string;
-      mr: string;
-      liveMaleBirth: string;
-      liveFemaleBirth: string;
-      childMortalityMale: string;
-      childMortalityFemale: string;
+      gravida: string | null;
+      para: string | null;
+      stillBirth: string | null;
+      miscarriage: string | null;
+      mr: string | null;
+      liveMaleBirth: string | null;
+      liveFemaleBirth: string | null;
+      childMortalityMale: string | null;
+      childMortalityFemale: string | null;
     };
     menstrual: {
-      lmp: string;
-      contraceptionMethod: string;
-      comments: string;
-      menstruationProduct: string;
-      changeFrequency: string;
+      lmp: string | null;
+      contraceptionMethod: string | null;
+      comments: string | null;
+      menstruationProduct: string | null;
+      changeFrequency: string | null;
     };
     cervicalCancer: {
-      consent: string;
-      viaResults: string;
-      referred: string;
-      where: string;
+      consent: string | null;
+      viaResults: string | null;
+      referred: string | null;
+      where: string | null;
     };
   };
   cvRisk: {
-    age: string;
-    sex: string;
-    bmi: string;
-    isSmoker: string;
-    sbp: string;
-    onBPMedication: string;
-    diabetes: string;
+    age: string | null;
+    sex: string | null;
+    bmi: string | null;
+    isSmoker: string | null;
+    sbp: string | null;
+    onBPMedication: string | null;
+    diabetes: string | null;
+    riskScore: number | null;
+    overrides: string[];
   };
   cvRiskLab: {
-    age: string;
-    sex: string;
-    bmi: string;
-    isSmoker: string;
-    sbp: string;
-    onBPMedication: string;
-    diabetes: string;
-    totalCholesterol: string;
-    hdlCholesterol: string;
+    age: string | null;
+    sex: string | null;
+    bmi: string | null;
+    isSmoker: string | null;
+    sbp: string | null;
+    onBPMedication: string | null;
+    diabetes: string | null;
+    totalCholesterol: string | null;
+    hdlCholesterol: string | null;
+    riskScore: number | null;
+    overrides: string[];
   };
-  sectionStatuses: Record<string, SectionStatus>;
+  sectionStatuses: Record<string, SectionStatus | null>;
 }
 
 export const initialClinicalAssessment: ClinicalAssessmentData = {
@@ -176,13 +188,13 @@ export const initialClinicalAssessment: ClinicalAssessmentData = {
   suspectedTBAdditionalSymptoms: {},
   suspectedTBExamFindings: {},
   suspectedTBPastHistory: {
-    year: '',
+    year: null,
     evidence: [],
-    treatment: '',
-    duration: '',
-    result: '',
-    recovery: '',
-    others: ''
+    treatment: null,
+    duration: null,
+    result: null,
+    recovery: null,
+    others: null
   },
   physicalExamGeneral: {
     anemia: 0,
@@ -199,53 +211,57 @@ export const initialClinicalAssessment: ClinicalAssessmentData = {
   vaccination: {},
   socialHistory: {},
   wellbeing: {
-    signsOfMentalIllness: 'No'
+    signsOfMentalIllness: null
   },
   reproductiveHealth: {
     obstetric: {
-      gravida: '',
-      para: '',
-      stillBirth: '',
-      miscarriage: '',
-      mr: '',
-      liveMaleBirth: '',
-      liveFemaleBirth: '',
-      childMortalityMale: '',
-      childMortalityFemale: '',
+      gravida: null,
+      para: null,
+      stillBirth: null,
+      miscarriage: null,
+      mr: null,
+      liveMaleBirth: null,
+      liveFemaleBirth: null,
+      childMortalityMale: null,
+      childMortalityFemale: null,
     },
     menstrual: {
-      lmp: '',
-      contraceptionMethod: '',
-      comments: '',
-      menstruationProduct: '',
-      changeFrequency: '',
+      lmp: null,
+      contraceptionMethod: null,
+      comments: null,
+      menstruationProduct: null,
+      changeFrequency: null,
     },
     cervicalCancer: {
-      consent: '',
-      viaResults: '',
-      referred: '',
-      where: '',
+      consent: null,
+      viaResults: null,
+      referred: null,
+      where: null,
     },
   },
   cvRisk: {
-    age: '',
-    sex: '',
-    bmi: '',
-    isSmoker: '',
-    sbp: '',
-    onBPMedication: '',
-    diabetes: ''
+    age: null,
+    sex: null,
+    bmi: null,
+    isSmoker: null,
+    sbp: null,
+    onBPMedication: null,
+    diabetes: null,
+    riskScore: null,
+    overrides: []
   },
   cvRiskLab: {
-    age: '',
-    sex: '',
-    bmi: '',
-    isSmoker: '',
-    sbp: '',
-    onBPMedication: '',
-    diabetes: '',
-    totalCholesterol: '',
-    hdlCholesterol: ''
+    age: null,
+    sex: null,
+    bmi: null,
+    isSmoker: null,
+    sbp: null,
+    onBPMedication: null,
+    diabetes: null,
+    totalCholesterol: null,
+    hdlCholesterol: null,
+    riskScore: null,
+    overrides: []
   },
   sectionStatuses: {
     complaints: 'Not Started',
@@ -270,9 +286,9 @@ export const initialClinicalAssessment: ClinicalAssessmentData = {
 export interface ConsultationData {
   diagnosis: string;
   notes: string;
-  treatmentNotes: string;
+  treatment_notes: string;
   prescriptions: any[];
-  clinicalAssessment: ClinicalAssessmentData;
+  assessment: ClinicalAssessmentData;
   labInvestigations: string[];
   referrals: string[];
 }
@@ -295,6 +311,16 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
   const [editModes, setEditModes] = useState<Record<string, boolean>>({});
 
   const { selectedPatient } = useAppStore();
+  
+  if (!data || !data.sectionStatuses) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <CircularProgress />
+        <Typography variant="body2" sx={{ mt: 2 }}>Loading assessment panel...</Typography>
+      </Box>
+    );
+  }
+
   const patientAge = calculateAgeYears(selectedPatient);
   const isCRAEligible = patientAge >= 40 && patientAge <= 74;
   const isFemaleOver12 = selectedPatient?.gender === 'female' && patientAge >= 12;
@@ -318,6 +344,92 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
     if (data.sectionStatuses[section] === 'Not Started') {
       updateStatus(section, 'In Progress');
     }
+  };
+
+  const renderCRAField = ({ 
+    label, 
+    value, 
+    field, 
+    section, 
+    type = 'text', 
+    options, 
+    placeholder,
+    helperText
+  }: { 
+    label: string, 
+    value: string | null, 
+    field: string, 
+    section: 'cvRisk' | 'cvRiskLab', 
+    type?: 'text' | 'select', 
+    options?: { label: string, value: string }[],
+    placeholder?: string,
+    helperText?: string
+  }) => {
+    const isOverridden = data[section].overrides?.includes(field);
+    const hasValue = value !== '' && value !== null && value !== undefined;
+    
+    // Lock if it has a value AND hasn't been specifically marked for override
+    const isLocked = hasValue && !isOverridden;
+
+    return (
+      <Grid size={12}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{label}</Typography>
+          {hasValue && (
+            <Tooltip title={isLocked ? "Override this pre-populated value" : "Restore original value"}>
+              <IconButton 
+                size="small" 
+                onClick={() => {
+                  const currentOverrides = data[section].overrides || [];
+                  const newOverrides = isLocked 
+                    ? [...currentOverrides, field] 
+                    : currentOverrides.filter(f => f !== field);
+                  onChange({ ...data, [section]: { ...data[section], overrides: newOverrides } });
+                }}
+                color={isOverridden ? "primary" : "default"}
+                sx={{ p: 0.5 }}
+              >
+                {isOverridden ? <HistoryIcon sx={{ fontSize: 16 }} /> : <EditIcon sx={{ fontSize: 16 }} />}
+              </IconButton>
+            </Tooltip>
+          )}
+        </Stack>
+        {type === 'text' ? (
+          <TextField 
+            fullWidth 
+            size="small" 
+            placeholder={placeholder}
+            value={value || ''}
+            disabled={isLocked}
+            onChange={(e) => {
+              handleStartSection(section);
+              onChange({ ...data, [section]: { ...data[section], [field]: e.target.value }, sectionStatuses: { ...data.sectionStatuses, [section]: 'Complete' } });
+            }}
+            helperText={isLocked ? "Pre-populated from previous station" : helperText}
+            FormHelperTextProps={{ sx: { fontStyle: 'italic', m: 0, mt: 0.5 } }}
+            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5, bgcolor: isLocked ? '#f1f5f9' : '#fdfdfd' } }}
+          />
+        ) : (
+          <FormControl fullWidth size="small" disabled={isLocked}>
+            <Select 
+              value={value || ''} 
+              displayEmpty
+              onChange={(e) => {
+                handleStartSection(section);
+                onChange({ ...data, [section]: { ...data[section], [field]: e.target.value }, sectionStatuses: { ...data.sectionStatuses, [section]: 'Complete' } });
+              }}
+              sx={{ borderRadius: 1.5, bgcolor: isLocked ? '#f1f5f9' : '#fdfdfd' }}
+            >
+              <MenuItem value="" disabled>-- Select --</MenuItem>
+              {options?.map(opt => (
+                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+              ))}
+            </Select>
+            {isLocked && <Typography variant="caption" sx={{ fontStyle: 'italic', color: 'text.secondary', mt: 0.5 }}>Pre-populated from previous station</Typography>}
+          </FormControl>
+        )}
+      </Grid>
+    );
   };
 
   const handleNoToAll = (section: string, fields: string[]) => {
@@ -409,6 +521,59 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
     }
   };
 
+  // CRA Auto-calculation
+  useEffect(() => {
+    if (!isCRAEligible) return;
+
+    // 1. Non-Lab
+    const nonLabSBP = parseFloat(data.cvRisk.sbp) || (typeof selectedPatient?.currentVitals?.systolic === 'number' ? selectedPatient.currentVitals.systolic : parseFloat(selectedPatient?.currentVitals?.systolic || ''));
+    const nonLabBMI = parseFloat(data.cvRisk.bmi) || (typeof selectedPatient?.currentVitals?.bmi === 'number' ? selectedPatient.currentVitals.bmi : parseFloat(selectedPatient?.currentVitals?.bmi || ''));
+
+    const inputs: CVRiskInputs = {
+      age: parseInt(data.cvRisk.age) || patientAge,
+      gender: (data.cvRisk.sex === 'Men' || data.cvRisk.sex === 'Women') ? (data.cvRisk.sex as Gender) : (selectedPatient?.gender === 'male' ? 'Men' : 'Women') as Gender,
+      isSmoker: data.cvRisk.isSmoker === 'Yes',
+      bmi: isNaN(nonLabBMI) ? 0 : nonLabBMI,
+      sbp: isNaN(nonLabSBP) ? 0 : nonLabSBP,
+      hasDiabetes: data.cvRisk.diabetes === 'Yes',
+    };
+
+    // Only calculate if essential fields are present
+    const canCalculateNonLab = !isNaN(inputs.age) && inputs.sbp > 0 && inputs.bmi > 0 && data.cvRisk.sex !== '' && data.cvRisk.isSmoker !== '' && data.cvRisk.diabetes !== '';
+    const score = canCalculateNonLab ? calculateCVRisk(inputs) : null;
+    
+    if (score !== data.cvRisk.riskScore) {
+      onChange({
+        ...data,
+        cvRisk: { ...data.cvRisk, riskScore: score }
+      });
+    }
+
+    // 2. Lab-Based
+    const labSBP = parseFloat(data.cvRiskLab.sbp) || (typeof selectedPatient?.currentVitals?.systolic === 'number' ? selectedPatient.currentVitals.systolic : parseFloat(selectedPatient?.currentVitals?.systolic || ''));
+    const labChol = parseFloat(data.cvRiskLab.totalCholesterol);
+
+    const labInputs: CVRiskLabInputs = {
+      age: parseInt(data.cvRiskLab.age) || patientAge,
+      gender: (data.cvRiskLab.sex === 'Men' || data.cvRiskLab.sex === 'Women') ? (data.cvRiskLab.sex as Gender) : (selectedPatient?.gender === 'male' ? 'Men' : 'Women') as Gender,
+      isSmoker: data.cvRiskLab.isSmoker === 'Yes',
+      sbp: isNaN(labSBP) ? 0 : labSBP,
+      hasDiabetes: data.cvRiskLab.diabetes === 'Yes',
+      totalCholesterol: isNaN(labChol) ? 0 : labChol,
+    };
+
+    // Requirement: All lab fields MUST be present including Cholesterol
+    const canCalculateLab = !isNaN(labInputs.age) && labInputs.sbp > 0 && labInputs.totalCholesterol > 0 && data.cvRiskLab.sex !== '' && data.cvRiskLab.isSmoker !== '' && data.cvRiskLab.diabetes !== '';
+    const labScore = canCalculateLab ? calculateCVRiskLab(labInputs) : null;
+
+    if (labScore !== data.cvRiskLab.riskScore) {
+      onChange({
+        ...data,
+        cvRiskLab: { ...data.cvRiskLab, riskScore: labScore }
+      });
+    }
+  }, [data.cvRisk, data.cvRiskLab, isCRAEligible, patientAge, selectedPatient]);
+
   const renderSectionControls = (section: string, fields?: string[]) => (
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, pb: 1, borderBottom: '1px solid #e2e8f0' }}>
       <Stack direction="row" spacing={2} alignItems="center">
@@ -454,7 +619,7 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
           <Typography variant="body2">{label}</Typography>
           <RadioGroup 
             row 
-            value={value.status} 
+            value={value.status || ''} 
             onChange={(e) => handleRadioChange(section, field, e.target.value)}
           >
             <FormControlLabel value="No" control={<Radio size="small" disabled={!editModes[section]} />} label={<Typography variant="caption">No</Typography>} sx={{ mr: 1 }} />
@@ -502,7 +667,7 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
           <Typography variant="body2">{label}</Typography>
           <RadioGroup 
             row 
-            value={value.status} 
+            value={value.status || ''} 
             onChange={(e) => handleRadioChange(section, field, e.target.value)}
           >
             <FormControlLabel value="No" control={<Radio size="small" disabled={!editModes[section]} />} label={<Typography variant="caption">No</Typography>} sx={{ mr: 1 }} />
@@ -517,7 +682,7 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
                 <FormControl size="small" sx={{ minWidth: 100 }}>
                   <InputLabel>Year</InputLabel>
                   <Select
-                    value={record.year}
+                    value={record.year || ''}
                     label="Year"
                     disabled={!editModes[section]}
                     onChange={(e) => {
@@ -532,7 +697,7 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
                 <TextField 
                   size="small" 
                   label="Relation" 
-                  value={record.relation} 
+                  value={record.relation || ''} 
                   disabled={!editModes[section]}
                   onChange={(e) => {
                     const newRecords = [...value.records];
@@ -607,7 +772,7 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
             <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: '#f8fafc', p: 1.5, borderRadius: 3, mb: 1 }}>
               <TextField 
                 type="date" 
-                value={complaint.date} 
+                value={complaint.date || ''} 
                 disabled={!editModes['complaints']}
                 onChange={(e) => {
                   handleStartSection('complaints');
@@ -619,7 +784,7 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
               <TextField 
                 fullWidth 
                 placeholder="Complaint description" 
-                value={complaint.description} 
+                value={complaint.description || ''} 
                 disabled={!editModes['complaints']}
                 onChange={(e) => {
                   handleStartSection('complaints');
@@ -630,7 +795,7 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
               />
               <TextField 
                 placeholder="Duration" 
-                value={complaint.duration} 
+                value={complaint.duration || ''} 
                 disabled={!editModes['complaints']}
                 onChange={(e) => {
                   handleStartSection('complaints');
@@ -728,6 +893,40 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
         </AccordionDetails>
       </Accordion>
 
+      {/* Physical Examination - Systemic */}
+      <Accordion expanded={expanded === 'physicalExamSystemic'} onChange={handleChange('physicalExamSystemic')} disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
+        {renderAccordionHeader('physicalExamSystemic', 'Physical Examination - Systemic', 'physicalExamSystemic')}
+        <AccordionDetails sx={{ bgcolor: 'white' }}>
+          {renderSectionControls('physicalExamSystemic')}
+          <Grid container spacing={2}>
+            {['Cardiovascular System', 'Respiratory System', 'Nervous System', 'Abdominal', 'Musculoskeletal'].map((system) => (
+              <Grid size={12} key={system}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  size="small"
+                  label={system}
+                  value={data.physicalExamSystemic[system] || ''}
+                  disabled={!editModes['physicalExamSystemic']}
+                  placeholder={`Enter findings for ${system}...`}
+                  onChange={(e) => {
+                    handleStartSection('physicalExamSystemic');
+                    onChange({
+                      ...data,
+                      physicalExamSystemic: {
+                        ...data.physicalExamSystemic,
+                        [system]: e.target.value
+                      }
+                    });
+                  }}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        </AccordionDetails>
+      </Accordion>
+
       {/* Current Rx taken */}
       <Accordion expanded={expanded === 'currentRx'} onChange={handleChange('currentRx')} disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
         {renderAccordionHeader('currentRx', 'Current Rx taken', 'currentRx')}
@@ -759,7 +958,7 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
                 fullWidth 
                 label="Medicine Name" 
                 size="small"
-                value={rx.name}
+                value={rx.name || ''}
                 disabled={!editModes['currentRx']}
                 onChange={(e) => {
                   const newRx = [...data.currentRx];
@@ -769,7 +968,7 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
                 sx={{ mb: 1 }}
               />
               <Stack direction="row" spacing={1}>
-                <TextField size="small" label="Dose" value={rx.dose} onChange={(e) => {
+                <TextField size="small" label="Dose" value={rx.dose || ''} onChange={(e) => {
                   const newRx = [...data.currentRx];
                   newRx[index].dose = e.target.value;
                   onChange({ ...data, currentRx: newRx });
@@ -832,31 +1031,31 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
             {renderSectionControls('reproductiveHealth')}
             <Typography variant="subtitle2" sx={{ mb: 1, mt: 2, fontWeight: 'bold' }}>Obstetric History</Typography>
             <Grid container spacing={2}>
-              <Grid size={4}><TextField fullWidth size="small" label="Gravida" value={data.reproductiveHealth.obstetric.gravida} onChange={(e) => {
+              <Grid size={4}><TextField fullWidth size="small" label="Gravida" value={data.reproductiveHealth.obstetric.gravida || ''} onChange={(e) => {
                 handleStartSection('reproductiveHealth');
                 onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, obstetric: { ...data.reproductiveHealth.obstetric, gravida: e.target.value } } });
               }} /></Grid>
-              <Grid size={4}><TextField fullWidth size="small" label="Para" value={data.reproductiveHealth.obstetric.para} onChange={(e) => {
+              <Grid size={4}><TextField fullWidth size="small" label="Para" value={data.reproductiveHealth.obstetric.para || ''} onChange={(e) => {
                 handleStartSection('reproductiveHealth');
                 onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, obstetric: { ...data.reproductiveHealth.obstetric, para: e.target.value } } });
               }} /></Grid>
-              <Grid size={4}><TextField fullWidth size="small" label="Still Birth" value={data.reproductiveHealth.obstetric.stillBirth} onChange={(e) => {
+              <Grid size={4}><TextField fullWidth size="small" label="Still Birth" value={data.reproductiveHealth.obstetric.stillBirth || ''} onChange={(e) => {
                 handleStartSection('reproductiveHealth');
                 onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, obstetric: { ...data.reproductiveHealth.obstetric, stillBirth: e.target.value } } });
               }} /></Grid>
-              <Grid size={4}><TextField fullWidth size="small" label="Miscarriage" value={data.reproductiveHealth.obstetric.miscarriage} onChange={(e) => {
+              <Grid size={4}><TextField fullWidth size="small" label="Miscarriage" value={data.reproductiveHealth.obstetric.miscarriage || ''} onChange={(e) => {
                 handleStartSection('reproductiveHealth');
                 onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, obstetric: { ...data.reproductiveHealth.obstetric, miscarriage: e.target.value } } });
               }} /></Grid>
-              <Grid size={4}><TextField fullWidth size="small" label="MR" value={data.reproductiveHealth.obstetric.mr} onChange={(e) => {
+              <Grid size={4}><TextField fullWidth size="small" label="MR" value={data.reproductiveHealth.obstetric.mr || ''} onChange={(e) => {
                 handleStartSection('reproductiveHealth');
                 onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, obstetric: { ...data.reproductiveHealth.obstetric, mr: e.target.value } } });
               }} /></Grid>
-              <Grid size={4}><TextField fullWidth size="small" label="Live Birth (M)" value={data.reproductiveHealth.obstetric.liveMaleBirth} onChange={(e) => {
+              <Grid size={4}><TextField fullWidth size="small" label="Live Birth (M)" value={data.reproductiveHealth.obstetric.liveMaleBirth || ''} onChange={(e) => {
                 handleStartSection('reproductiveHealth');
                 onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, obstetric: { ...data.reproductiveHealth.obstetric, liveMaleBirth: e.target.value } } });
               }} /></Grid>
-              <Grid size={4}><TextField fullWidth size="small" label="Live Birth (F)" value={data.reproductiveHealth.obstetric.liveFemaleBirth} onChange={(e) => {
+              <Grid size={4}><TextField fullWidth size="small" label="Live Birth (F)" value={data.reproductiveHealth.obstetric.liveFemaleBirth || ''} onChange={(e) => {
                 handleStartSection('reproductiveHealth');
                 onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, obstetric: { ...data.reproductiveHealth.obstetric, liveFemaleBirth: e.target.value } } });
               }} /></Grid>
@@ -864,11 +1063,11 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
 
             <Typography variant="subtitle2" sx={{ mb: 1, mt: 3, fontWeight: 'bold' }}>Menstrual History</Typography>
             <Grid container spacing={2}>
-              <Grid size={6}><TextField fullWidth type="date" size="small" label="LMP" InputLabelProps={{ shrink: true }} value={data.reproductiveHealth.menstrual.lmp} onChange={(e) => {
+              <Grid size={6}><TextField fullWidth type="date" size="small" label="LMP" InputLabelProps={{ shrink: true }} value={data.reproductiveHealth.menstrual.lmp || ''} onChange={(e) => {
                 handleStartSection('reproductiveHealth');
                 onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, menstrual: { ...data.reproductiveHealth.menstrual, lmp: e.target.value } } });
               }} /></Grid>
-              <Grid size={6}><TextField fullWidth size="small" label="Contraception Method" value={data.reproductiveHealth.menstrual.contraceptionMethod} onChange={(e) => {
+              <Grid size={6}><TextField fullWidth size="small" label="Contraception Method" value={data.reproductiveHealth.menstrual.contraceptionMethod || ''} onChange={(e) => {
                 handleStartSection('reproductiveHealth');
                 onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, menstrual: { ...data.reproductiveHealth.menstrual, contraceptionMethod: e.target.value } } });
               }} /></Grid>
@@ -879,7 +1078,7 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
               <Grid size={6}>
                 <FormControl fullWidth size="small">
                   <InputLabel>VIA Results</InputLabel>
-                  <Select value={data.reproductiveHealth.cervicalCancer.viaResults} label="VIA Results" onChange={(e) => {
+                  <Select value={data.reproductiveHealth.cervicalCancer.viaResults || ''} label="VIA Results" onChange={(e) => {
                     handleStartSection('reproductiveHealth');
                     onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, cervicalCancer: { ...data.reproductiveHealth.cervicalCancer, viaResults: e.target.value } } });
                   }}>
@@ -889,7 +1088,7 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid size={6}><TextField fullWidth size="small" label="Referred To" value={data.reproductiveHealth.cervicalCancer.where} onChange={(e) => {
+              <Grid size={6}><TextField fullWidth size="small" label="Referred To" value={data.reproductiveHealth.cervicalCancer.where || ''} onChange={(e) => {
                 handleStartSection('reproductiveHealth');
                 onChange({ ...data, reproductiveHealth: { ...data.reproductiveHealth, cervicalCancer: { ...data.reproductiveHealth.cervicalCancer, where: e.target.value } } });
               }} /></Grid>
@@ -905,41 +1104,114 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
             {renderAccordionHeader('cvRisk', 'CV Risk Assessment (Non-Lab)', 'cvRisk')}
             <AccordionDetails sx={{ bgcolor: 'white' }}>
               {renderSectionControls('cvRisk')}
-              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
-                WHO CV Risk Assessment for South Asia (Age 40-74)
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid size={4}>
-                  <TextField fullWidth size="small" label="SBP" value={data.cvRisk.sbp} onChange={(e) => handleRadioChange('cvRisk', 'sbp', e.target.value)} />
+              
+              <Box sx={{ p: 1 }}>
+                <Typography variant="h6" color="primary" gutterBottom sx={{ fontWeight: 'bold' }}>CRA (NON-LAB)</Typography>
+                <Divider sx={{ mb: 3 }} />
+                
+                <Grid container spacing={2.5}>
+                  {renderCRAField({
+                    label: "Age",
+                    field: "age",
+                    section: "cvRisk",
+                    value: data.cvRisk.age,
+                    placeholder: "Between : 40-74"
+                  })}
+
+                  {renderCRAField({
+                    label: "Sex",
+                    field: "sex",
+                    section: "cvRisk",
+                    value: data.cvRisk.sex,
+                    type: "select",
+                    options: [{ label: "Men", value: "Men" }, { label: "Women", value: "Women" }]
+                  })}
+
+                  {renderCRAField({
+                    label: "BMI",
+                    field: "bmi",
+                    section: "cvRisk",
+                    value: data.cvRisk.bmi,
+                    placeholder: "-- Enter BMI --"
+                  })}
+
+                  {renderCRAField({
+                    label: "Cigarette Smoker",
+                    field: "isSmoker",
+                    section: "cvRisk",
+                    value: data.cvRisk.isSmoker,
+                    type: "select",
+                    options: [{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]
+                  })}
+
+                  {renderCRAField({
+                    label: "Systolic Blood Pressure",
+                    field: "sbp",
+                    section: "cvRisk",
+                    value: data.cvRisk.sbp,
+                    placeholder: "mmHg"
+                  })}
+
+                  {renderCRAField({
+                    label: "On Blood Pressure Medication",
+                    field: "onBPMedication",
+                    section: "cvRisk",
+                    value: data.cvRisk.onBPMedication,
+                    type: "select",
+                    options: [{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]
+                  })}
+
+                  {renderCRAField({
+                    label: "Diabetes",
+                    field: "diabetes",
+                    section: "cvRisk",
+                    value: data.cvRisk.diabetes,
+                    type: "select",
+                    options: [{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]
+                  })}
+
+                  {data.cvRisk.riskScore !== null && (
+                    <Grid size={12}>
+                      <Box sx={{ 
+                        mt: 3, 
+                        p: 2.5, 
+                        bgcolor: 'white', 
+                        borderRadius: 3, 
+                        border: '3px solid', 
+                        borderColor: getRiskLevel(data.cvRisk.riskScore).color,
+                        boxShadow: `0 8px 16px -4px ${getRiskLevel(data.cvRisk.riskScore).color}25`,
+                        textAlign: 'center'
+                      }}>
+                        <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 800, mb: 1 }}>
+                          WHO 10-Year Risk Score
+                        </Typography>
+                        <Typography variant="h3" sx={{ color: getRiskLevel(data.cvRisk.riskScore).color, fontWeight: 950, my: 1 }}>
+                          {data.cvRisk.riskScore}%
+                        </Typography>
+                        <Box sx={{ 
+                          display: 'inline-block',
+                          px: 2, 
+                          py: 0.5, 
+                          borderRadius: 1, 
+                          bgcolor: getRiskLevel(data.cvRisk.riskScore).color,
+                          color: data.cvRisk.riskScore < 20 ? '#1e293b' : 'white' // Dark text for light backgrounds
+                        }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 900, textTransform: 'uppercase' }}>
+                            {getRiskLevel(data.cvRisk.riskScore).label}
+                          </Typography>
+                        </Box>
+                      </Box>
+                      {data.cvRisk.onBPMedication === 'Yes' && (
+                        <Alert severity="warning" sx={{ mt: 2, border: '1px solid #ed6c02', borderRadius: 2 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            Clinical Warning: Risk value may be underestimated due to current antihypertensive therapy (On BP Medication).
+                          </Typography>
+                        </Alert>
+                      )}
+                    </Grid>
+                  )}
                 </Grid>
-                <Grid size={4}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Smoker</InputLabel>
-                    <Select value={data.cvRisk.isSmoker} label="Smoker" onChange={(e) => handleRadioChange('cvRisk', 'isSmoker', e.target.value)}>
-                      <MenuItem value="Yes">Yes</MenuItem>
-                      <MenuItem value="No">No</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid size={4}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Diabetes</InputLabel>
-                    <Select value={data.cvRisk.diabetes} label="Diabetes" onChange={(e) => handleRadioChange('cvRisk', 'diabetes', e.target.value)}>
-                      <MenuItem value="Yes">Yes</MenuItem>
-                      <MenuItem value="No">No</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid size={6}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>On BP Medication</InputLabel>
-                    <Select value={data.cvRisk.onBPMedication} label="On BP Medication" onChange={(e) => handleRadioChange('cvRisk', 'onBPMedication', e.target.value)}>
-                      <MenuItem value="Yes">Yes</MenuItem>
-                      <MenuItem value="No">No</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
+              </Box>
             </AccordionDetails>
           </Accordion>
 
@@ -947,35 +1219,166 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
             {renderAccordionHeader('cvRiskLab', 'CV Risk Assessment (Lab-Based)', 'cvRiskLab')}
             <AccordionDetails sx={{ bgcolor: 'white' }}>
               {renderSectionControls('cvRiskLab')}
-              <Grid container spacing={2}>
-                <Grid size={4}>
-                  <TextField fullWidth size="small" label="SBP" value={data.cvRiskLab.sbp} onChange={(e) => handleRadioChange('cvRiskLab', 'sbp', e.target.value)} />
+              
+              <Box sx={{ p: 1 }}>
+                <Typography variant="h6" color="primary" gutterBottom sx={{ fontWeight: 'bold' }}>CRA (LAB BASED)</Typography>
+                <Divider sx={{ mb: 3 }} />
+                
+                <Grid container spacing={2.5}>
+                  {renderCRAField({
+                    label: "Age",
+                    field: "age",
+                    section: "cvRiskLab",
+                    value: data.cvRiskLab.age,
+                    placeholder: "Between : 40-74"
+                  })}
+
+                  {renderCRAField({
+                    label: "Sex",
+                    field: "sex",
+                    section: "cvRiskLab",
+                    value: data.cvRiskLab.sex,
+                    type: "select",
+                    options: [{ label: "Men", value: "Men" }, { label: "Women", value: "Women" }]
+                  })}
+
+                  {renderCRAField({
+                    label: "BMI",
+                    field: "bmi",
+                    section: "cvRiskLab",
+                    value: data.cvRiskLab.bmi,
+                    placeholder: "-- Enter BMI --"
+                  })}
+
+                  {renderCRAField({
+                    label: "Cigarette Smoker",
+                    field: "isSmoker",
+                    section: "cvRiskLab",
+                    value: data.cvRiskLab.isSmoker,
+                    type: "select",
+                    options: [{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]
+                  })}
+
+                  {renderCRAField({
+                    label: "Systolic Blood Pressure",
+                    field: "sbp",
+                    section: "cvRiskLab",
+                    value: data.cvRiskLab.sbp,
+                    placeholder: "mmHg"
+                  })}
+
+                  {renderCRAField({
+                    label: "On Blood Pressure Medication",
+                    field: "onBPMedication",
+                    section: "cvRiskLab",
+                    value: data.cvRiskLab.onBPMedication,
+                    type: "select",
+                    options: [{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]
+                  })}
+
+                  {renderCRAField({
+                    label: "Diabetes",
+                    field: "diabetes",
+                    section: "cvRiskLab",
+                    value: data.cvRiskLab.diabetes,
+                    type: "select",
+                    options: [{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]
+                  })}
+
+                  {renderCRAField({
+                    label: "Total Cholesterol In Mg/Dl",
+                    field: "totalCholesterol",
+                    section: "cvRiskLab",
+                    value: data.cvRiskLab.totalCholesterol,
+                    placeholder: "EX: 180"
+                  })}
+
+                  {renderCRAField({
+                    label: "HDL Cholesterol In Mg/Dl",
+                    field: "hdlCholesterol",
+                    section: "cvRiskLab",
+                    value: data.cvRiskLab.hdlCholesterol,
+                    placeholder: "EX: 50"
+                  })}
+
+                  <Grid size={12}>
+                    <Box sx={{ mt: 4, textAlign: 'center' }}>
+                      <Typography variant="h5" fontWeight="900" sx={{ mb: 1 }}>Result</Typography>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Important: Inputs must be complete to perform calculation
+                      </Typography>
+                      
+                      <Box sx={{ 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        mt: 2,
+                        p: 3,
+                        borderRadius: 4,
+                        bgcolor: 'white',
+                        border: '3px dashed',
+                        borderColor: data.cvRiskLab.riskScore !== null ? getRiskLevel(data.cvRiskLab.riskScore).color : '#e2e8f0',
+                        boxShadow: data.cvRiskLab.riskScore !== null ? `0 10px 15px -3px ${getRiskLevel(data.cvRiskLab.riskScore).color}20` : 'none'
+                      }}>
+                        <Typography variant="subtitle1" fontWeight="800" sx={{ color: '#475569', mb: 2 }}>10-Year Cardiovascular Risk</Typography>
+                        <Box sx={{ 
+                          width: 160, 
+                          height: 70, 
+                          bgcolor: data.cvRiskLab.riskScore !== null ? `${getRiskLevel(data.cvRiskLab.riskScore).color}10` : '#f1f5f9', 
+                          border: '2px solid',
+                          borderColor: data.cvRiskLab.riskScore !== null ? getRiskLevel(data.cvRiskLab.riskScore).color : '#cbd5e1', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          borderRadius: 3
+                        }}>
+                          <Typography variant="h3" fontWeight="950" color={data.cvRiskLab.riskScore !== null ? getRiskLevel(data.cvRiskLab.riskScore).color : 'text.disabled'}>
+                            {data.cvRiskLab.riskScore !== null ? data.cvRiskLab.riskScore : '--'}
+                          </Typography>
+                          <Typography variant="h5" fontWeight="900" sx={{ ml: 1, color: '#64748b' }}>%</Typography>
+                        </Box>
+                      </Box>
+                      
+                      {data.cvRiskLab.riskScore !== null && (
+                        <>
+                         <Box sx={{ 
+                           mt: 2, 
+                           display: 'inline-block', 
+                           px: 3, 
+                           py: 1, 
+                           borderRadius: 2, 
+                           bgcolor: getRiskLevel(data.cvRiskLab.riskScore).color,
+                           color: data.cvRiskLab.riskScore < 20 ? '#1e293b' : 'white'
+                         }}>
+                           <Typography variant="h6" sx={{ fontWeight: 900, textTransform: 'uppercase' }}>
+                             {getRiskLevel(data.cvRiskLab.riskScore).label}
+                           </Typography>
+                         </Box>
+                         {data.cvRiskLab.onBPMedication === 'Yes' && (
+                           <Alert severity="warning" sx={{ mt: 3, border: '1px solid #ed6c02', borderRadius: 2, textAlign: 'left' }}>
+                             <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                               Clinical Warning: Risk value may be underestimated due to current antihypertensive therapy (On BP Medication).
+                             </Typography>
+                           </Alert>
+                         )}
+                        </>
+                      )}
+                    </Box>
+                  </Grid>
+
+                  {/* History Tracking Note */}
+                  {((data.cvRiskLab.overrides || []).length > 0 || (data.cvRisk.overrides || []).length > 0) && (
+                    <Grid size={12}>
+                      <Alert severity="info" sx={{ mt: 3, borderRadius: 2 }}>
+                        <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
+                          Clinical Note: The following fields were manually overridden by the doctor: {[...(data.cvRisk.overrides || []), ...(data.cvRiskLab.overrides || [])].join(', ')}. Original vitals are preserved in history.
+                        </Typography>
+                      </Alert>
+                    </Grid>
+                  )}
                 </Grid>
-                <Grid size={4}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Smoker</InputLabel>
-                    <Select value={data.cvRiskLab.isSmoker} label="Smoker" onChange={(e) => handleRadioChange('cvRiskLab', 'isSmoker', e.target.value)}>
-                      <MenuItem value="Yes">Yes</MenuItem>
-                      <MenuItem value="No">No</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid size={4}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Diabetes</InputLabel>
-                    <Select value={data.cvRiskLab.diabetes} label="Diabetes" onChange={(e) => handleRadioChange('cvRiskLab', 'diabetes', e.target.value)}>
-                      <MenuItem value="Yes">Yes</MenuItem>
-                      <MenuItem value="No">No</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid size={6}>
-                  <TextField fullWidth size="small" label="Total Cholesterol" value={data.cvRiskLab.totalCholesterol} onChange={(e) => handleRadioChange('cvRiskLab', 'totalCholesterol', e.target.value)} />
-                </Grid>
-                <Grid size={6}>
-                  <TextField fullWidth size="small" label="HDL Cholesterol" value={data.cvRiskLab.hdlCholesterol} onChange={(e) => handleRadioChange('cvRiskLab', 'hdlCholesterol', e.target.value)} />
-                </Grid>
-              </Grid>
+              </Box>
             </AccordionDetails>
           </Accordion>
         </>
@@ -1014,9 +1417,9 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
   const [consultData, setConsultData] = useState<ConsultationData>({ 
     diagnosis: '', 
     notes: '', 
-    treatmentNotes: '', 
+    treatment_notes: '', 
     prescriptions: [], 
-    clinicalAssessment: initialClinicalAssessment,
+    assessment: initialClinicalAssessment,
     labInvestigations: [],
     referrals: []
   });
@@ -1043,12 +1446,14 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
         apiLinearization: "mms",
         getNewTokenFunction: async () => {
           try {
+            console.table({ event: 'ICD_TOKEN_REQUEST', timestamp: new Date().toISOString() });
             console.log('HAEFA: Library is requesting a new token...');
             console.log("Fetching ICD token from backend Function...");
             const getIcdToken = httpsCallable(functions, 'getIcdToken');
             const result: any = await getIcdToken();
             
             // WHO library strictly requires the string inside .data
+            console.log('DEBUG: Backend Token Response:', result);
             console.log('HAEFA: Unwrapped Token:', result.data);
             return result.data; 
           } catch (error) {
@@ -1130,12 +1535,41 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
       setSelectedPatient({ ...patient, currentVitals: vitals, triage_level: item.triage_level });
       await updateQueueStatus(item.id, 'IN_CONSULTATION' as any);
       
+      const patientAge = calculateAgeYears(patient);
+      
+      // Pre-fill CRA data from previous stations
+      const preFilledAssessment = {
+        ...initialClinicalAssessment,
+        cvRisk: {
+          ...initialClinicalAssessment.cvRisk,
+          age: patientAge.toString(),
+          sex: patient?.gender === 'male' ? 'Men' : 'Women',
+          bmi: vitals?.bmi?.toString() || '',
+          sbp: vitals?.systolic?.toString() || '',
+          isSmoker: vitals?.social_history?.smoking === true ? 'Yes' : (vitals?.social_history?.smoking === false ? 'No' : ''),
+          diabetes: (vitals?.rbg >= 200 || vitals?.fbg >= 126) ? 'Yes' : (vitals?.rbg || vitals?.fbg ? 'No' : ''),
+          overrides: [],
+        },
+        cvRiskLab: {
+          ...initialClinicalAssessment.cvRiskLab,
+          age: patientAge.toString(),
+          sex: patient?.gender === 'male' ? 'Men' : 'Women',
+          bmi: vitals?.bmi?.toString() || '',
+          sbp: vitals?.systolic?.toString() || '',
+          isSmoker: vitals?.social_history?.smoking === true ? 'Yes' : (vitals?.social_history?.smoking === false ? 'No' : ''),
+          diabetes: (vitals?.rbg >= 200 || vitals?.fbg >= 126) ? 'Yes' : (vitals?.rbg || vitals?.fbg ? 'No' : ''),
+          totalCholesterol: vitals?.total_cholesterol?.toString() || '',
+          hdlCholesterol: vitals?.hdl_cholesterol?.toString() || '',
+          overrides: [],
+        }
+      };
+
       setConsultData({
         diagnosis: '', 
         notes: '', 
-        treatmentNotes: '', 
+        treatment_notes: '', 
         prescriptions: [], 
-        clinicalAssessment: initialClinicalAssessment,
+        assessment: preFilledAssessment,
         labInvestigations: [],
         referrals: []
       });
@@ -1145,54 +1579,79 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
     }
   };
 
+  const handleSave = async (options: { isProgress?: boolean; isComplete?: boolean; isFinalize?: boolean } = {}) => {
+    if (!selectedItem) return;
+    
+    console.group('HAEFA SAVE DIAGNOSTICS');
+    
+    const payload = { 
+      ...consultData, 
+      encounter_id: selectedItem.encounter_id, 
+      patient_id: selectedItem.patient_id
+    };
+
+    const prescriptionPayload = {
+      encounter_id: selectedItem.encounter_id,
+      patient_id: selectedItem.patient_id,
+      prescriptions: consultData.prescriptions
+    };
+
+    // The Permanent Shield: Global Sanitizer
+    const cleanPayload = sanitizeForFirestore(payload);
+    const finalPrescriptionData = sanitizeForFirestore(prescriptionPayload);
+
+    console.groupEnd();
+
+    try {
+      setIsFinalizing(true);
+      await saveConsultation(cleanPayload, finalPrescriptionData);
+      
+      if (options.isFinalize) {
+        await updateQueueStatus(selectedItem.id, 'WAITING_FOR_PHARMACY' as any);
+        setLastEncounterId(selectedItem.encounter_id);
+        setShowPrintDialog(true);
+        setSelectedItem(null);
+        setSelectedPatient(null);
+        notify("Consultation finalized.", "success");
+      } else if (options.isComplete) {
+        notify("Diagnosis marked as complete.", "success");
+      } else {
+        notify("Progress saved locally.", "info");
+      }
+    } catch (e: any) {
+      console.error('HAEFA SAVE ERROR:', e);
+      notify(`Failed to save: ${e.message}`, "error");
+    } finally {
+      setIsFinalizing(false);
+    }
+  };
+
   const handleFinalize = async (status: string) => {
     if (!consultData.diagnosis) {
       notify("A primary diagnosis is required.", "warning");
       return;
     }
-    
-    setIsFinalizing(true);
-    try {
-      await saveConsultation({ 
-        ...consultData, 
-        encounter_id: selectedItem.encounter_id, 
-        patient_id: selectedItem.patient_id
-      }, {
-        encounter_id: selectedItem.encounter_id,
-        patient_id: selectedItem.patient_id,
-        prescriptions: consultData.prescriptions
-      });
-      
-      await updateQueueStatus(selectedItem.id!, status as any);
-      setLastEncounterId(selectedItem.encounter_id);
-      setShowPrintDialog(true);
-      
-      notify("Consultation finalized.", "success");
-      setSelectedItem(null);
-      setSelectedPatient(null);
-    } catch (e) { 
-      notify("Failed to save consultation.", "error"); 
-      console.error(e);
-    } finally {
-      setIsFinalizing(false);
-    }
+    await handleSave({ isFinalize: true });
   };
 
   const isCRAEligible = calculateAgeYears(selectedPatient) >= 40 && calculateAgeYears(selectedPatient) <= 74;
   const isFemaleOver12 = selectedPatient?.gender === 'female' && calculateAgeYears(selectedPatient) >= 12;
 
   const isSuspectedTBActive = () => {
-    const { cough, lgerf, nightSweat, weightLoss } = consultData.clinicalAssessment.tbScreening;
+    if (!consultData.assessment?.tbScreening) return false;
+    const { cough, lgerf, nightSweat, weightLoss } = consultData.assessment.tbScreening;
     const countYes = [lgerf, nightSweat, weightLoss].filter(v => v === 'Yes').length;
     return cough === 'Yes' || countYes >= 2;
   };
 
   const areAllSectionsComplete = () => {
-    const statuses = consultData.clinicalAssessment.sectionStatuses;
+    if (!consultData.assessment?.sectionStatuses) return false;
+    const statuses = consultData.assessment.sectionStatuses;
     const activeSections = [
       'complaints',
       'tbScreening',
       'physicalExamGeneral',
+      'physicalExamSystemic',
       'currentRx',
       'patientHistory',
       'familyHistory',
@@ -1259,7 +1718,17 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
                       </Stack>
                     </TableCell>
                     <TableCell>
-                      <Chip label={item.triage_level?.toUpperCase()} size="small" color={item.triage_level === 'emergency' ? 'error' : 'primary'} />
+                      <Chip 
+                        label={item.triage_level?.toUpperCase()} 
+                        size="small" 
+                        sx={{ 
+                          fontWeight: 900,
+                          bgcolor: item.triage_level === 'emergency' ? '#ef4444' : 
+                                   item.triage_level === 'urgent' ? '#f59e0b' : 
+                                   item.triage_level === 'standard' ? '#10b981' : '#64748b',
+                          color: 'white'
+                        }} 
+                      />
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>{item.patient_name}</TableCell>
                     <TableCell align="right">
@@ -1292,8 +1761,8 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
                   <Box>
                     <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>Section 1 — Clinical Assessment</Typography>
                     <ClinicalAssessmentPanel 
-                      data={consultData.clinicalAssessment} 
-                      onChange={(val) => setConsultData({ ...consultData, clinicalAssessment: val })} 
+                      data={consultData.assessment} 
+                      onChange={(val) => setConsultData(prev => ({ ...prev, assessment: val }))} 
                     />
                   </Box>
 
@@ -1304,8 +1773,8 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
                     <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>Section 2 — Symptoms / Notes</Typography>
                     <TextField 
                       fullWidth multiline rows={3} variant="outlined" 
-                      value={consultData.notes} 
-                      onChange={(e) => setConsultData({ ...consultData, notes: e.target.value })} 
+                      value={consultData.notes || ''} 
+                      onChange={(e) => setConsultData(prev => ({ ...prev, notes: e.target.value }))} 
                       placeholder="Enter symptoms..." 
                     />
                   </Box>
@@ -1326,6 +1795,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
                           "data-ctw-ino": "1",
                           autoComplete: "off"
                         }}
+                        onChange={(e) => setConsultData(prev => ({ ...prev, diagnosis: e.target.value }))}
                         placeholder="Search ICD-11 Diagnosis..." 
                         variant="outlined"
                         sx={{ 
@@ -1362,7 +1832,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
                   {/* Section 4: Prescription */}
                   <PrescriptionBuilder 
                     initialData={consultData.prescriptions} 
-                    onPrescriptionChange={(prescriptions) => setConsultData({ ...consultData, prescriptions })} 
+                    onPrescriptionChange={(prescriptions) => setConsultData(prev => ({ ...prev, prescriptions }))} 
                   />
 
                   <Divider />
@@ -1372,8 +1842,8 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
                     <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>Section 5 — Lab Investigations</Typography>
                     <Autocomplete
                       multiple options={COMMON_LABS} freeSolo
-                      value={consultData.labInvestigations}
-                      onChange={(_, newValue) => setConsultData({ ...consultData, labInvestigations: newValue })}
+                      value={consultData.labInvestigations || []}
+                      onChange={(_, newValue) => setConsultData(prev => ({ ...prev, labInvestigations: newValue }))}
                       renderInput={(params) => <TextField {...params} variant="outlined" placeholder="Select Lab Tests..." />}
                     />
                   </Box>
@@ -1396,25 +1866,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
             <Button 
               variant="outlined" 
               color="primary" 
-              onClick={async () => {
-                try {
-                  setIsFinalizing(true);
-                  await saveConsultation({ 
-                    ...consultData, 
-                    encounter_id: selectedItem.encounter_id, 
-                    patient_id: selectedItem.patient_id
-                  }, {
-                    encounter_id: selectedItem.encounter_id,
-                    patient_id: selectedItem.patient_id,
-                    prescriptions: consultData.prescriptions
-                  });
-                  notify("Progress saved locally.", "info");
-                } catch (e) {
-                  notify("Failed to save progress.", "error");
-                } finally {
-                  setIsFinalizing(false);
-                }
-              }}
+              onClick={() => handleSave({ isProgress: true })}
               disabled={isFinalizing}
             >
               Save Progress
@@ -1424,25 +1876,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
               variant="contained" 
               color="warning"
               disabled={isFinalizing || !consultData.diagnosis}
-              onClick={async () => {
-                try {
-                  setIsFinalizing(true);
-                  await saveConsultation({ 
-                    ...consultData, 
-                    encounter_id: selectedItem.encounter_id, 
-                    patient_id: selectedItem.patient_id
-                  }, {
-                    encounter_id: selectedItem.encounter_id,
-                    patient_id: selectedItem.patient_id,
-                    prescriptions: consultData.prescriptions
-                  });
-                  notify("Diagnosis marked as complete.", "success");
-                } catch (e) {
-                  notify("Failed to complete diagnosis.", "error");
-                } finally {
-                  setIsFinalizing(false);
-                }
-              }}
+              onClick={() => handleSave({ isComplete: true })}
             >
               Complete Diagnosis
             </Button>

@@ -1,6 +1,12 @@
+import * as admin from 'firebase-admin';
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { setGlobalOptions } from "firebase-functions/v2";
+import * as logger from "firebase-functions/logger";
 
 // Import lazy loaders and helpers from utils
 import { 
@@ -25,27 +31,27 @@ setGlobalOptions({
 let cachedToken: { token: string; expiry: number } | null = null;
 
 export const getIcdToken = onCall(async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "Login required.");
-  }
-
-  const now = Date.now();
-  // Reuse token if it's still valid for at least 2 minutes
-  if (cachedToken && cachedToken.expiry > now + 120000) {
-    console.log("Returning cached ICD token.");
-    return cachedToken.token;
-  }
-
-  const clientId = process.env.WHO_CLIENT_ID;
-  const clientSecret = process.env.WHO_CLIENT_SECRET;
-
-  console.log("Fetching new ICD token from WHO API...");
-  if (!clientId || !clientSecret) {
-    console.error("WHO_CLIENT_ID or WHO_CLIENT_SECRET missing in environment.");
-    throw new HttpsError("failed-precondition", "WHO ICD-11 credentials are not configured in the environment.");
-  }
-
   try {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Login required.");
+    }
+
+    const now = Date.now();
+    // Reuse token if it's still valid for at least 2 minutes
+    if (cachedToken && cachedToken.expiry > now + 120000) {
+      console.log("Returning cached ICD token.");
+      return cachedToken.token;
+    }
+
+    const clientId = process.env.WHO_CLIENT_ID;
+    const clientSecret = process.env.WHO_CLIENT_SECRET;
+
+    console.log("Fetching new ICD token from WHO API...");
+    if (!clientId || !clientSecret) {
+      console.error("WHO_CLIENT_ID or WHO_CLIENT_SECRET missing in environment.");
+      throw new HttpsError("failed-precondition", "WHO ICD-11 credentials are not configured in the environment.");
+    }
+
     const response = await fetch("https://icdaccessmanagement.who.int/connect/token", {
       method: "POST",
       headers: {
@@ -80,8 +86,13 @@ export const getIcdToken = onCall(async (request) => {
 
     return data.access_token;
   } catch (error: any) {
+    logger.error('ICD_TOKEN_FAILURE', { 
+      error: error.message, 
+      stack: error.stack,
+      response: error.response?.data 
+    });
     console.error("getIcdToken Exception:", error);
-    throw new HttpsError("internal", error.message);
+    throw new HttpsError("internal", `ICD Token retrieval failed: ${error.message}`);
   }
 });
 
@@ -285,58 +296,142 @@ export const registerPatient = onCall(async (request) => {
 
 export const saveConsultation = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
-  const { encounterId, patientId, clinicId, prescriptions, diagnosis, notes, treatment_notes, labInvestigations, referrals, assessment } = request.data;
-  const db = await getDb();
-  const admin = await getAdmin();
   
-  const userProfile = (await db.collection("users").doc(request.auth.uid).get()).data() || {};
-  const qSnap = await db.collection("queues_active").where("encounter_id", "==", encounterId).get();
+  const { 
+    encounterId, 
+    patientId, 
+    clinicId, 
+    prescriptions = [], 
+    diagnosis = "No diagnosis", 
+    notes = "", 
+    treatment_notes = "", 
+    labInvestigations = [], 
+    referrals = [], 
+    assessment = {} 
+  } = request.data;
 
-  return await db.runTransaction(async (transaction: any) => {
+  if (!encounterId || !patientId || !clinicId) {
+    console.error("HAEFA Error: Missing required identifiers in saveConsultation:", { encounterId, patientId, clinicId });
+    throw new HttpsError("invalid-argument", "Missing encounterId, patientId, or clinicId.");
+  }
+
+  console.log(`HAEFA: Starting saveConsultation for Encounter ${encounterId}, Patient ${patientId}`);
+
+  const authUid = request.auth.uid;
+
+  try {
+    const db = await getDb();
+    const admin = await getAdmin();
+    
+    // Log the sanitized input for debugging if needed (only in dev/debug)
+    console.log(`HAEFA: saveConsultation payload keys: ${Object.keys(request.data).join(', ')}`);
+
     const encounterRef = db.collection("encounters").doc(encounterId);
-    transaction.update(encounterRef, {
-      status: 'WAITING_FOR_PHARMACY',
-      diagnosis, notes,
-      last_updated: admin.firestore.FieldValue.serverTimestamp()
-    });
 
-    const diagRef = db.collection("diagnoses").doc();
-    transaction.set(diagRef, {
-      encounter_id: encounterId, patient_id: patientId, clinic_id: clinicId,
-      diagnosis, notes, treatment_notes, labInvestigations, referrals, assessment,
-      prescriber_name: userProfile.name || "Unknown Doctor",
-      prescriber_reg_no: userProfile.professional_reg_no || "N/A",
-      prescriber_body: userProfile.professional_body || "BMDC",
-      prescriber_designation: userProfile.designation || "Medical Officer",
-      created_at: admin.firestore.FieldValue.serverTimestamp()
-    });
+    // Standard Transaction Pattern: Reads first, then Writes
+    return await db.runTransaction(async (transaction: any) => {
+      console.log(`HAEFA: Transaction active for ${encounterId}`);
 
-    const presRef = db.collection("prescriptions").doc();
-    transaction.set(presRef, {
-      encounter_id: encounterId, patient_id: patientId, clinic_id: clinicId,
-      prescriptions, status: 'PENDING',
-      created_at: admin.firestore.FieldValue.serverTimestamp()
-    });
+      // 1. PERFORM ALL READS
+      const [encounterDoc, qSnap, userProfileDoc] = await Promise.all([
+        transaction.get(encounterRef),
+        transaction.get(db.collection("queues_active").where("encounter_id", "==", encounterId).limit(1)),
+        transaction.get(db.collection("users").doc(authUid))
+      ]);
 
-    for (const med of prescriptions) {
-      if (med.isRequisition) {
-        const reqRef = db.collection("requisitions").doc();
-        transaction.set(reqRef, {
-          clinic_id: clinicId, medication_name: med.medicationName,
-          dosage: `${med.dosageValue}${med.dosageUnit}`, requested_qty: med.quantity,
-          type: 'DOCTOR_ORDER_NON_STOCK', status: 'PENDING',
-          created_at: admin.firestore.FieldValue.serverTimestamp()
+      if (!encounterDoc.exists) {
+        throw new HttpsError("not-found", `Encounter ${encounterId} not found.`);
+      }
+
+      const userProfile = userProfileDoc.data() || {};
+      const serverTime = admin.firestore.FieldValue.serverTimestamp();
+
+      // 2. STAGE ALL WRITES
+      
+      // A. Update Encounter doc
+      transaction.update(encounterRef, sanitizeData({
+        status: 'WAITING_FOR_PHARMACY',
+        encounter_status: 'WAITING_FOR_PHARMACY',
+        current_station: 'pharmacy',
+        diagnosis,
+        notes,
+        last_updated: serverTime
+      }));
+
+      // B. Create Diagnosis Record
+      const diagRef = db.collection("diagnoses").doc();
+      transaction.set(diagRef, sanitizeData({
+        encounter_id: encounterId,
+        patient_id: patientId,
+        clinic_id: clinicId,
+        diagnosis,
+        notes,
+        treatment_notes,
+        labInvestigations,
+        referrals,
+        assessment,
+        prescriber_name: userProfile.name || "Unknown Doctor",
+        prescriber_reg_no: userProfile.professional_reg_no || "N/A",
+        prescriber_body: userProfile.professional_body || "BMDC",
+        prescriber_designation: userProfile.designation || "Medical Officer",
+        created_at: serverTime
+      }));
+
+      // C. Create Prescription Record
+      const presRef = db.collection("prescriptions").doc();
+      transaction.set(presRef, sanitizeData({
+        encounter_id: encounterId,
+        patient_id: patientId,
+        clinic_id: clinicId,
+        prescriptions: Array.isArray(prescriptions) ? prescriptions : [],
+        status: 'PENDING',
+        created_at: serverTime
+      }));
+
+      // D. Handle Requisitions
+      if (Array.isArray(prescriptions)) {
+        for (const med of prescriptions) {
+          if (med && med.isRequisition) {
+            const reqRef = db.collection("requisitions").doc();
+            transaction.set(reqRef, sanitizeData({
+              clinic_id: clinicId,
+              medication_name: med.medicationName,
+              dosage: `${med.dosageValue}${med.dosageUnit}`,
+              requested_qty: med.quantity,
+              type: 'DOCTOR_ORDER_NON_STOCK',
+              status: 'PENDING',
+              created_at: serverTime
+            }));
+          }
+        }
+      }
+
+      // E. Update Queue Entries
+      if (!qSnap.empty) {
+        qSnap.forEach((doc: any) => {
+          transaction.update(doc.ref, sanitizeData({ 
+            station: 'pharmacy',
+            status: 'WAITING_FOR_PHARMACY',
+            updated_at: serverTime 
+          }));
         });
       }
-    }
 
-    qSnap.forEach((doc: any) => transaction.update(doc.ref, { 
-      station: 'pharmacy', status: 'WAITING_FOR_PHARMACY', 
-      updated_at: admin.firestore.FieldValue.serverTimestamp() 
-    }));
-
-    return { success: true };
-  });
+      console.log(`HAEFA: Transaction commit staged for ${encounterId}`);
+      return { success: true, encounterId };
+    });
+  } catch (error: any) {
+    console.error("HAEFA Critical error in saveConsultation:", error);
+    
+    if (error instanceof HttpsError) throw error;
+    
+    // Enhanced error reporting
+    const errorMessage = error.message || "Unknown error";
+    const errorStack = error.stack || "";
+    console.error(`HAEFA Save Failure Detail: ${errorMessage}`, errorStack);
+    
+    throw new HttpsError("internal", `Consultation failed to save: ${errorMessage}`);
+  }
 });
 
 // ==========================================

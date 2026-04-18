@@ -1,0 +1,33 @@
+402:            value={value || ''}
+415:              value={value || ''} 
+425:                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+622:            value={value.status || ''} 
+635:                value={value.year || ''}
+650:                  <MenuItem key={year} value={year.toString()}>{year}</MenuItem>
+670:            value={value.status || ''} 
+685:                    value={record.year}
+694:                    {Array.from({ length: 50 }, (_, i) => new Date().getFullYear() - i).map(y => <MenuItem key={y} value={y.toString()}>{y}</MenuItem>)}
+700:                  value={record.relation} 
+743:        value={(data[section] as any)[field] || ''} 
+775:                value={complaint.date} 
+787:                value={complaint.description} 
+798:                value={complaint.duration} 
+861:              value={data.physicalExamGeneral.anemia} 
+873:              value={data.physicalExamGeneral.jaundice} 
+885:              value={data.physicalExamGeneral.edema} 
+910:                  value={data.physicalExamSystemic[system] || ''}
+961:                value={rx.name}
+971:                <TextField size="small" label="Dose" value={rx.dose} onChange={(e) => {
+1034:              <Grid size={4}><TextField fullWidth size="small" label="Gravida" value={data.reproductiveHealth.obstetric.gravida || ''} onChange={(e) => {
+1038:              <Grid size={4}><TextField fullWidth size="small" label="Para" value={data.reproductiveHealth.obstetric.para || ''} onChange={(e) => {
+1042:              <Grid size={4}><TextField fullWidth size="small" label="Still Birth" value={data.reproductiveHealth.obstetric.stillBirth || ''} onChange={(e) => {
+1046:              <Grid size={4}><TextField fullWidth size="small" label="Miscarriage" value={data.reproductiveHealth.obstetric.miscarriage || ''} onChange={(e) => {
+1050:              <Grid size={4}><TextField fullWidth size="small" label="MR" value={data.reproductiveHealth.obstetric.mr || ''} onChange={(e) => {
+1054:              <Grid size={4}><TextField fullWidth size="small" label="Live Birth (M)" value={data.reproductiveHealth.obstetric.liveMaleBirth || ''} onChange={(e) => {
+1058:              <Grid size={4}><TextField fullWidth size="small" label="Live Birth (F)" value={data.reproductiveHealth.obstetric.liveFemaleBirth || ''} onChange={(e) => {
+1066:              <Grid size={6}><TextField fullWidth type="date" size="small" label="LMP" InputLabelProps={{ shrink: true }} value={data.reproductiveHealth.menstrual.lmp || ''} onChange={(e) => {
+1070:              <Grid size={6}><TextField fullWidth size="small" label="Contraception Method" value={data.reproductiveHealth.menstrual.contraceptionMethod || ''} onChange={(e) => {
+1081:                  <Select value={data.reproductiveHealth.cervicalCancer.viaResults || ''} label="VIA Results" onChange={(e) => {
+1091:              <Grid size={6}><TextField fullWidth size="small" label="Referred To" value={data.reproductiveHealth.cervicalCancer.where || ''} onChange={(e) => {
+1776:                      value={consultData.notes} 
+1845:                      value={consultData.labInvestigations}

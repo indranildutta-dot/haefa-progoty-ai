@@ -34,7 +34,7 @@ The Clinical Assessment is divided into several subsections, each with its own s
 4.  **Cardiovascular Risk - Non Lab Based (Conditional)**: WHO 10-year risk assessment for patients aged 40-74.
 5.  **Cardiovascular Risk - Lab Based (Conditional)**: WHO 10-year risk assessment including cholesterol for patients aged 40-74.
 6.  **Physical Examination - General**: Anemia, Jaundice, Edema (Rating 0-3), and NAD switches.
-7.  **Physical Examination - Systemic**: Free-text area for systemic findings.
+7.  **Physical Examination - Systemic**: Focused free-text fields for Cardiovascular, Respiratory, Nervous, Abdominal, and Musculoskeletal systems.
 8.  **Current Rx taken**: Recording of current medications.
 9.  **Patient H/O illness**: History of chronic or acute diseases.
 10. **Family H/O illness**: Family medical history.
@@ -77,17 +77,23 @@ When active, these sections must also be marked "Complete" for the assessment to
 
 The platform implements the **WHO South Asia Cardiovascular Risk Charts** for patients aged **40 to 74 years**.
 
-### Non-Laboratory Based CRA
-*   **Auto-population**: Pulls Age, Sex, BMI, Smoking Status, Diabetes Status, and Systolic BP (prioritizing the 2nd reading if the 1st was abnormal) from previous stations.
-*   **Manual Inputs**: Doctor selects "On BP Medication" (Yes/No).
-*   **Calculation**: Uses the WHO Non-Lab chart for the South Asia region.
-*   **Output**: 10-year risk percentage and risk level (Low, Moderate, High, Very High, Critical).
+### 4.1 Clinical Validation & Integrity
+*   **Mandatory Inputs**: Both Non-Lab and Lab-based calculators strictly require all input fields to be populated with valid data before a calculation is performed. 
+*   **No Defaulting**: Missing values (e.g., Cholesterol or BMI) **MUST NOT** default to zero. If any field is missing or invalid, the result will display as `--%` and the risk category will be hidden.
+*   **BP Medication Warning**: If a patient is marked as "On Blood Pressure Medication" (Yes), a prominent **Amber Clinical Warning** is displayed: *"Clinical Warning: Risk value may be underestimated due to current antihypertensive therapy (On BP Medication)."* This adheres to WHO HEARTS guidelines regarding underestimated risk in treated patients.
 
-### Laboratory Based CRA
+### 4.2 Non-Laboratory Based CRA
+*   **Auto-population**: Pulls Age, Sex, BMI, Smoking Status, Diabetes Status (inferred from Labs), and Systolic BP from previous stations.
+*   **Field Locking**: Pre-populated fields are **locked (read-only)** by default.
+*   **Manual Override**: Doctors can click the **Edit/Override icon** next to any pre-populated field to unlock it.
+*   **Override History**: Overridden fields are tracked in the `overrides` array. A clinical alert is generated in the assessment summary if vitals were manually adjusted.
+*   **Calculation**: Uses the WHO Non-Lab chart (Age, Sex, Smoker, SBP, BMI, Diabetes).
+
+### 4.3 Laboratory Based CRA
 *   **Auto-population**: Same as Non-Lab based.
-*   **Manual Inputs**: Doctor inputs **Total Cholesterol** and **HDL Cholesterol** from lab results.
-*   **Calculation**: Uses the WHO Lab-based chart (incorporating cholesterol and diabetes status).
-*   **Output**: Independent risk calculation based on biochemical markers.
+*   **Manual Inputs**: Requires **Total Cholesterol** and **HDL Cholesterol** (Mg/Dl).
+*   **Calculation**: Uses the WHO Lab-based chart (Age, Sex, Smoker, SBP, Total Cholesterol, Diabetes).
+*   **Validation**: Calculation is bypassed if Total Cholesterol is missing or zero.
 
 ---
 
