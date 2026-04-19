@@ -247,9 +247,15 @@ export const initClinics = onCall(async (request) => {
 
 export const registerPatient = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
-  const { patientData, photoBase64, clinicId, country_id } = request.data;
+  const { patientData, photoBase64, clinicId, country_id } = request.data as {
+    patientData?: any;
+    photoBase64?: string;
+    clinicId?: string;
+    country_id?: string;
+  };
+
   if (!patientData || !clinicId || !country_id) {
-    throw new HttpsError("invalid-argument", "Missing registration data");
+    throw new HttpsError("invalid-argument", "Missing registration data: patientData, clinicId, or country_id.");
   }
   try {
     const crypto = await getCrypto();
@@ -297,10 +303,35 @@ export const registerPatient = onCall(async (request) => {
 export const saveConsultation = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
   
+  const data = request.data as {
+    encounterId?: string;
+    visitId?: string; // Support both terminologies
+    patientId?: string;
+    clinicId?: string;
+    prescriptions?: any[];
+    diagnosis?: string;
+    notes?: string;
+    treatment_notes?: string;
+    labInvestigations?: any[];
+    referrals?: any[];
+    assessment?: any;
+  };
+
+  const encounterId = data.encounterId || data.visitId;
+  const patientId = data.patientId;
+  const clinicId = data.clinicId;
+
+  if (!encounterId) {
+    throw new HttpsError("invalid-argument", "Missing encounterId (visitId).");
+  }
+  if (!patientId) {
+    throw new HttpsError("invalid-argument", "Missing patientId.");
+  }
+  if (!clinicId) {
+    throw new HttpsError("invalid-argument", "Missing clinicId.");
+  }
+
   const { 
-    encounterId, 
-    patientId, 
-    clinicId, 
     prescriptions = [], 
     diagnosis = "No diagnosis", 
     notes = "", 
@@ -308,12 +339,7 @@ export const saveConsultation = onCall(async (request) => {
     labInvestigations = [], 
     referrals = [], 
     assessment = {} 
-  } = request.data;
-
-  if (!encounterId || !patientId || !clinicId) {
-    console.error("HAEFA Error: Missing required identifiers in saveConsultation:", { encounterId, patientId, clinicId });
-    throw new HttpsError("invalid-argument", "Missing encounterId, patientId, or clinicId.");
-  }
+  } = data;
 
   console.log(`HAEFA: Starting saveConsultation for Encounter ${encounterId}, Patient ${patientId}`);
 
@@ -324,9 +350,10 @@ export const saveConsultation = onCall(async (request) => {
     const admin = await getAdmin();
     
     // Log the sanitized input for debugging if needed (only in dev/debug)
-    console.log(`HAEFA: saveConsultation payload keys: ${Object.keys(request.data).join(', ')}`);
+    console.log(`HAEFA: saveConsultation payload keys: ${Object.keys(data).join(', ')}`);
 
-    const encounterRef = db.collection("encounters").doc(encounterId);
+    // GUARD CLAUSE for visitRef (encounterRef)
+    const visitRef = db.collection("encounters").doc(encounterId);
 
     // Standard Transaction Pattern: Reads first, then Writes
     return await db.runTransaction(async (transaction: any) => {
@@ -334,7 +361,7 @@ export const saveConsultation = onCall(async (request) => {
 
       // 1. PERFORM ALL READS
       const [encounterDoc, qSnap, userProfileDoc] = await Promise.all([
-        transaction.get(encounterRef),
+        transaction.get(visitRef),
         transaction.get(db.collection("queues_active").where("encounter_id", "==", encounterId).limit(1)),
         transaction.get(db.collection("users").doc(authUid))
       ]);
@@ -349,7 +376,7 @@ export const saveConsultation = onCall(async (request) => {
       // 2. STAGE ALL WRITES
       
       // A. Update Encounter doc
-      transaction.update(encounterRef, sanitizeData({
+      transaction.update(visitRef, sanitizeData({
         status: 'WAITING_FOR_PHARMACY',
         encounter_status: 'WAITING_FOR_PHARMACY',
         current_station: 'pharmacy',
@@ -441,9 +468,9 @@ export const saveConsultation = onCall(async (request) => {
 export const dispenseMedication = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
   
-  const { clinicId, medications, encounterId, patientId } = request.data as {
-    clinicId: string;
-    medications: Array<{
+  const data = request.data as {
+    clinicId?: string;
+    medications?: Array<{
       medication_name: string;
       mode: string;
       qty: number | string;
@@ -451,14 +478,26 @@ export const dispenseMedication = onCall(async (request) => {
       substitution?: string;
       return_on?: string;
     }>;
-    encounterId: string;
-    patientId: string;
+    encounterId?: string;
+    visitId?: string;
+    patientId?: string;
   };
+
+  const clinicId = data.clinicId;
+  const medications = data.medications;
+  const encounterId = data.encounterId || data.visitId;
+  const patientId = data.patientId;
+
+  if (!clinicId || !medications || !encounterId || !patientId) {
+    throw new HttpsError("invalid-argument", "Missing clinicId, medications, encounterId, or patientId.");
+  }
   
   try {
     const db = await getDb();
     const admin = await getAdmin();
     const userProfile = (await db.collection("users").doc(request.auth.uid).get()).data() || {};
+
+    const visitRef = db.collection("encounters").doc(encounterId);
 
     return await db.runTransaction(async (transaction: any) => {
       const results: any[] = [];
@@ -527,7 +566,7 @@ export const dispenseMedication = onCall(async (request) => {
         }));
       }
 
-      transaction.update(db.collection("encounters").doc(encounterId), sanitizeData({ 
+      transaction.update(visitRef, sanitizeData({ 
         status: 'COMPLETED', last_updated: admin.firestore.FieldValue.serverTimestamp() 
       }));
       return { success: true, summary: results };
@@ -543,8 +582,15 @@ export const dispenseMedication = onCall(async (request) => {
  * BULK UPLOAD: Uses DYNAMIC IMPORT to prevent discovery timeouts
  */
 export const bulkUpload = onCall(async (request) => {
-  const { clinicId, fileBase64 } = request.data;
+  const { clinicId, fileBase64 } = request.data as {
+    clinicId?: string;
+    fileBase64?: string;
+  };
   
+  if (!clinicId || !fileBase64) {
+    throw new HttpsError("invalid-argument", "Missing clinicId or file data.");
+  }
+
   const ExcelJS = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
   
