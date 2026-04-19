@@ -151,16 +151,31 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     try {
       const dispense = httpsCallable(functions, 'dispenseMedication');
       
-      const medsToDispense = prescriptions.map(med => ({
-        medication_name: med.medicationName,
-        mode: dispensingModes[med.id],
-        qty: dispensingModes[med.id] === 'SUBSTITUTE' && substitutionQty[med.id] ? Number(substitutionQty[med.id]) : med.quantity,
-        substitution: dispensingModes[med.id] === 'SUBSTITUTE' ? substitutionMeds[med.id] : null,
-        substitution_reason: dispensingModes[med.id] === 'SUBSTITUTE' ? substitutionReasons[med.id] : null,
-        return_on: (dispensingModes[med.id] === 'PARTIAL' || dispensingModes[med.id] === 'OUT_OF_STOCK') 
-          ? returnDates[med.id]?.toISOString() 
-          : null
-      }));
+      const medsToDispense = prescriptions.map(med => {
+        const mode = dispensingModes[med.id];
+        let inventoryId: string | undefined = undefined;
+
+        if (mode === 'SUBSTITUTE') {
+          inventoryId = substitutionMeds[med.id] || undefined;
+        } else if (mode === 'FULL' || mode === 'PARTIAL') {
+          // Find first matching batch in inventory for the prescribed medication
+          const medNameLower = med.medicationName.toLowerCase().replace(/\s+/g, '');
+          const match = inventory.find(i => i.medication_id.toLowerCase().replace(/\s+/g, '') === medNameLower);
+          inventoryId = match?.id;
+        }
+
+        return {
+          medication_name: med.medicationName,
+          mode,
+          qty: mode === 'SUBSTITUTE' && substitutionQty[med.id] ? Number(substitutionQty[med.id]) : med.quantity,
+          inventoryId,
+          substitution: mode === 'SUBSTITUTE' ? inventory.find(i => i.id === substitutionMeds[med.id])?.medication_id : null,
+          substitution_reason: mode === 'SUBSTITUTE' ? substitutionReasons[med.id] : null,
+          return_on: (mode === 'PARTIAL' || mode === 'OUT_OF_STOCK') 
+            ? returnDates[med.id]?.toISOString() 
+            : null
+        };
+      });
 
       await dispense({
         clinicId: selectedClinic?.id,
@@ -414,13 +429,13 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                             <Stack spacing={2} sx={{ mt: 2, p: 2, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
                               <Typography variant="subtitle2" fontWeight="800" color="primary">Substitute Medication Details</Typography>
                               <Autocomplete
-                                options={inventory.filter(i => i.quantity > 0).map(i => i.medication_id)}
-                                value={substitutionMeds[med.id] || null}
+                                options={inventory.filter(i => i.quantity > 0)}
+                                getOptionLabel={(option) => `${option.medication_id} (${option.dosage}) - Stock: ${option.quantity}`}
+                                value={inventory.find(i => i.id === substitutionMeds[med.id]) || null}
                                 onChange={(_, newValue) => {
-                                  setSubstitutionMeds(prev => ({ ...prev, [med.id]: newValue || null }));
-                                  const found = inventory.find(i => i.medication_id === newValue);
-                                  if (found) {
-                                    setSubstitutionDosage(prev => ({ ...prev, [med.id]: found.dosage || '' }));
+                                  setSubstitutionMeds(prev => ({ ...prev, [med.id]: newValue ? newValue.id : null }));
+                                  if (newValue) {
+                                    setSubstitutionDosage(prev => ({ ...prev, [med.id]: newValue.dosage || '' }));
                                   } else {
                                     setSubstitutionDosage(prev => ({ ...prev, [med.id]: '' }));
                                   }

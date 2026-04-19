@@ -441,7 +441,19 @@ export const saveConsultation = onCall(async (request) => {
 export const dispenseMedication = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
   
-  const { clinicId, medications, encounterId, patientId } = request.data;
+  const { clinicId, medications, encounterId, patientId } = request.data as {
+    clinicId: string;
+    medications: Array<{
+      medication_name: string;
+      mode: string;
+      qty: number | string;
+      inventoryId?: string;
+      substitution?: string;
+      return_on?: string;
+    }>;
+    encounterId: string;
+    patientId: string;
+  };
   
   try {
     const db = await getDb();
@@ -451,38 +463,40 @@ export const dispenseMedication = onCall(async (request) => {
     return await db.runTransaction(async (transaction: any) => {
       const results: any[] = [];
 
-      for (const med of medications) {
-        logger.info('Processing Medication:', { medication: med });
+      for (const medication of medications) {
+        logger.info('Processing Medication:', { medication });
         
-        const { medication_name, mode, qty, substitution, return_on } = med;
+        const { medication_name, mode, qty, substitution, return_on, inventoryId } = medication;
         const targetMedName = (mode === 'SUBSTITUTE' && substitution) ? substitution : medication_name;
-        const medIdLower = (targetMedName || "").toLowerCase().replace(/\s+/g, '');
         
         let actualDeducted = 0;
 
         if (mode !== 'OUT_OF_STOCK') {
-          const inventoryRef = db.collection(`clinics/${clinicId}/inventory`);
-          const q = inventoryRef.where("med_id_lower", "==", medIdLower);
-          const snapshot = await transaction.get(q);
+          // GUARD CLAUSE: Ensure inventoryId is provided for dispensing operations
+          if (!inventoryId) {
+            throw new HttpsError("invalid-argument", `Medication ${medication_name} is missing inventoryId.`);
+          }
 
-          let remaining = Number(qty);
-          for (const doc of snapshot.docs) {
-            if (remaining <= 0) break;
-            const available = Number(doc.data().quantity) || 0;
-            const toTake = Math.min(available, remaining);
-            const newQty = available - toTake;
-            
-            transaction.update(doc.ref, sanitizeData({ quantity: newQty }));
-            actualDeducted += toTake;
-            remaining -= toTake;
+          const inventoryRef = db.collection('clinics').doc(clinicId).collection('inventory').doc(inventoryId);
+          const inventoryDoc = await transaction.get(inventoryRef);
 
-            if (newQty < REQUISITION_THRESHOLD) {
-              transaction.set(db.collection("requisitions").doc(), sanitizeData({
-                clinic_id: clinicId, medication_name: targetMedName,
-                current_stock: newQty, type: 'LOW_STOCK_ALERT', status: 'PENDING',
-                created_at: admin.firestore.FieldValue.serverTimestamp()
-              }));
-            }
+          if (!inventoryDoc.exists) {
+            throw new HttpsError("not-found", `Inventory record ${inventoryId} not found in clinic ${clinicId}.`);
+          }
+
+          const available = Number(inventoryDoc.data()?.quantity) || 0;
+          const toTake = Math.min(available, Number(qty));
+          const newQty = available - toTake;
+          
+          transaction.update(inventoryRef, sanitizeData({ quantity: newQty }));
+          actualDeducted = toTake;
+
+          if (newQty < REQUISITION_THRESHOLD) {
+            transaction.set(db.collection("requisitions").doc(), sanitizeData({
+              clinic_id: clinicId, medication_name: targetMedName,
+              current_stock: newQty, type: 'LOW_STOCK_ALERT', status: 'PENDING',
+              created_at: admin.firestore.FieldValue.serverTimestamp()
+            }));
           }
         }
 
