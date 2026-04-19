@@ -4,6 +4,8 @@ import {
   TableCell, TableContainer, TableHead, TableRow, Paper, Divider, 
   Stack, Chip, CircularProgress, Alert
 } from '@mui/material';
+import QRCode from 'react-qr-code';
+import dayjs from 'dayjs';
 import { 
   getEncounterById, 
   getVitalsByEncounter, 
@@ -19,6 +21,7 @@ import {
   PrescriptionRecord 
 } from '../types';
 import { useAppStore } from '../store/useAppStore';
+import { calculateAgeDisplay } from '../utils/patient';
 
 interface PrescriptionPrintTemplateProps {
   encounterId: string;
@@ -89,18 +92,78 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
     }
   };
 
+  const formattedDate = (ts: any) => {
+    if (!ts) return '-';
+    try {
+      // 1. Native dayjs/Date
+      if (dayjs.isDayjs(ts)) return ts.format('DD MMM YYYY, hh:mm A');
+      if (ts instanceof Date) return dayjs(ts).format('DD MMM YYYY, hh:mm A');
+
+      // 2. Specialized parsing
+      let date: Date | null = null;
+      
+      if (ts && typeof ts === 'object') {
+        if (typeof ts.toDate === 'function') {
+          date = ts.toDate();
+        } else if (typeof ts.toMillis === 'function') {
+          date = new Date(ts.toMillis());
+        } else if (ts.seconds !== undefined) {
+          date = new Date(ts.seconds * 1000);
+        } else if (ts._seconds !== undefined) {
+          date = new Date(ts._seconds * 1000);
+        } else if (ts.seconds_ !== undefined) { // Common in some serialization
+          date = new Date(ts.seconds_ * 1000);
+        }
+      } else if (typeof ts === 'number') {
+        date = new Date(ts);
+      } else if (typeof ts === 'string') {
+        const d = new Date(ts);
+        if (!isNaN(d.getTime())) date = d;
+      }
+
+      if (date && !isNaN(date.getTime())) {
+        return dayjs(date).format('DD MMM YYYY, hh:mm A');
+      }
+
+      // 3. Fallback to general dayjs
+      const parsed = dayjs(ts);
+      if (parsed.isValid() && parsed.year() > 1900) {
+        return parsed.format('DD MMM YYYY, hh:mm A');
+      }
+
+      return '-';
+    } catch (e) {
+      console.error("Format Date Error:", e, ts);
+      return '-';
+    }
+  };
+
   return (
     <Box id="prescription-print-area" sx={{ p: 4, bgcolor: 'white', minHeight: '297mm', width: '210mm', mx: 'auto', color: 'black' }}>
       {/* Header: Trust Signals */}
       <Grid container spacing={2} alignItems="center" sx={{ mb: 3 }}>
         <Grid size={{ xs: 2 }}>
-          <Box sx={{ width: 80, height: 80, bgcolor: '#f1f5f9', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Typography variant="h4" fontWeight="900" color="primary">H</Typography>
+          <Box sx={{ width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <QRCode value={patient.id} size={80} style={{ width: '100%', height: '100%' }} />
           </Box>
         </Grid>
         <Grid size={{ xs: 7 }} sx={{ textAlign: 'center' }}>
-          <Typography variant="h5" fontWeight="900" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
-            {selectedClinic?.name || "HAEFA Clinical Registry"}
+          <Typography 
+            variant="h6" 
+            fontWeight="900" 
+            sx={{ 
+              textTransform: 'uppercase', 
+              letterSpacing: '-0.03em', 
+              color: '#800000', 
+              whiteSpace: 'nowrap',
+              fontSize: '1.15rem',
+              lineHeight: 1.1
+            }}
+          >
+            HEALTH AND EDUCATION FOR ALL
+          </Typography>
+          <Typography variant="body2" color="text.secondary" fontWeight="700">
+            Clinic: {selectedClinic?.name || "Dhaka"}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {selectedClinic?.address || "Rural Health Center, Bangladesh"}
@@ -121,30 +184,21 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
       <Card variant="outlined" sx={{ mb: 3, borderRadius: 3, bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}>
         <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
           <Grid container spacing={2} alignItems="center">
-            <Grid size={{ xs: 4 }}>
+            <Grid size={{ xs: 5 }}>
               <Typography variant="caption" fontWeight="900" color="text.secondary">PATIENT NAME</Typography>
               <Typography variant="h6" fontWeight="900">{patient.given_name} {patient.family_name}</Typography>
             </Grid>
-            <Grid size={{ xs: 2 }}>
+            <Grid size={{ xs: 3 }}>
               <Typography variant="caption" fontWeight="900" color="text.secondary">AGE / SEX</Typography>
               <Typography variant="body1" fontWeight="700">
-                {patient.age_years || 0}Y / {patient.gender?.toUpperCase().charAt(0)}
+                {calculateAgeDisplay(patient)} / {patient.gender?.toUpperCase().charAt(0)}
               </Typography>
             </Grid>
-            <Grid size={{ xs: 3 }}>
-              <Typography variant="caption" fontWeight="900" color="text.secondary">PATIENT CODE</Typography>
-              <Typography variant="body1" fontWeight="700">{patient.national_id || patient.fcn_number || "N/A"}</Typography>
-            </Grid>
-            <Grid size={{ xs: 3 }} sx={{ textAlign: 'right' }}>
-              <Chip 
-                label={encounter.triage_level?.toUpperCase() || "STANDARD"} 
-                sx={{ 
-                  bgcolor: getTriageColor(encounter.triage_level), 
-                  color: 'white', 
-                  fontWeight: 900,
-                  borderRadius: 1.5
-                }} 
-              />
+            <Grid size={{ xs: 4 }} sx={{ textAlign: 'right' }}>
+              <Typography variant="caption" fontWeight="900" color="text.secondary" sx={{ display: 'block' }}>DATE / TIME</Typography>
+              <Typography variant="body2" fontWeight="700">
+                {formattedDate(prescription?.created_at || (prescription as any)?.createdAt || encounter.created_at || (encounter as any)?.createdAt)}
+              </Typography>
             </Grid>
           </Grid>
         </CardContent>
@@ -160,7 +214,7 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
               <strong>O/E:</strong> 
               {vitals ? ` BP: ${vitals.systolic}/${vitals.diastolic} mmHg, HR: ${vitals.heartRate} bpm, Temp: ${vitals.temperature}°C, SpO2: ${vitals.oxygenSaturation}%` : " No vitals recorded"}
             </Typography>
-            {vitals?.blood_sugar && (
+            {!!vitals?.blood_sugar && (
               <Typography variant="body2"><strong>Blood Sugar:</strong> {vitals.blood_sugar} mg/dL</Typography>
             )}
           </Paper>
@@ -228,7 +282,19 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
         </Grid>
         <Grid size={{ xs: 5 }}>
           <Box sx={{ mt: 4, textAlign: 'center' }}>
-            <Box sx={{ borderBottom: '1px solid black', width: '80%', mx: 'auto', mb: 1, height: 40 }} />
+            <Box sx={{ borderBottom: '1px solid black', width: '80%', mx: 'auto', mb: 1, height: 40, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+              <Typography 
+                variant="h5" 
+                color="primary"
+                sx={{ 
+                  fontFamily: '"Caveat", "Brush Script MT", "Lucida Handwriting", cursive', 
+                  transform: 'rotate(-2deg) translateY(4px)',
+                  fontWeight: 700 
+                }}
+              >
+                {diagnosis?.prescriber_name || "Medical Officer"}
+              </Typography>
+            </Box>
             <Typography variant="body2" fontWeight="900">{diagnosis?.prescriber_name || "Medical Officer"}</Typography>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
               {diagnosis?.prescriber_designation || "Medical Officer"}
@@ -264,7 +330,8 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
                       </TableCell>
                       <TableCell>{item.dispensed}</TableCell>
                       <TableCell>
-                        {item.substitution && <Typography variant="caption" display="block">Sub: {item.substitution}</Typography>}
+                        {item.substitution && <Typography variant="caption" display="block"><b>Sub:</b> {item.substitution}</Typography>}
+                        {item.substitution_reason && <Typography variant="caption" display="block"><b>Reason:</b> {item.substitution_reason}</Typography>}
                         {item.return_on && <Typography variant="caption" color="error" fontWeight="900">Return on: {new Date(item.return_on).toLocaleDateString()}</Typography>}
                       </TableCell>
                     </TableRow>
@@ -274,9 +341,9 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
               
               <Grid container spacing={2} sx={{ mt: 3 }}>
                 <Grid size={{ xs: 7 }}>
-                   <Typography variant="body2" color="text.secondary">
-                     Dispensed at: {prescription.updated_at ? new Date(prescription.updated_at.toMillis()).toLocaleString() : "N/A"}
-                   </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Dispensed at: {formattedDate(prescription.updated_at || (prescription as any)?.updatedAt)}
+                  </Typography>
                 </Grid>
                 <Grid size={{ xs: 5 }} sx={{ textAlign: 'center' }}>
                   <Box sx={{ borderBottom: '1px solid black', width: '80%', mx: 'auto', mb: 1, height: 30 }} />

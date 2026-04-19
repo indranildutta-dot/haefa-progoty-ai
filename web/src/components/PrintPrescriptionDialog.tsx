@@ -6,6 +6,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import PrintIcon from '@mui/icons-material/Print';
 import PrescriptionPrintTemplate from './PrescriptionPrintTemplate';
+import { useReactToPrint } from 'react-to-print';
 
 interface PrintPrescriptionDialogProps {
   open: boolean;
@@ -14,42 +15,12 @@ interface PrintPrescriptionDialogProps {
 }
 
 const PrintPrescriptionDialog: React.FC<PrintPrescriptionDialogProps> = ({ open, onClose, encounterId }) => {
-  const printRef = useRef<HTMLDivElement>(null);
+  const componentRef = useRef<HTMLDivElement>(null);
 
-  const handlePrint = () => {
-    const printContent = document.getElementById('prescription-print-area');
-    if (!printContent) return;
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Prescription - ${encounterId}</title>
-          <style>
-            @media print {
-              body { margin: 0; padding: 0; }
-              @page { size: A4; margin: 0; }
-              #prescription-print-area { width: 210mm; min-height: 297mm; padding: 20mm; box-sizing: border-box; }
-            }
-            body { font-family: 'Inter', sans-serif; }
-          </style>
-          <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
-        </head>
-        <body>
-          ${printContent.outerHTML}
-          <script>
-            window.onload = () => {
-              window.print();
-              window.onafterprint = () => window.close();
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
+  const handlePrint = useReactToPrint({
+    contentRef: componentRef,
+    documentTitle: `Prescription-${encounterId}`,
+  });
 
   return (
     <Dialog 
@@ -71,7 +42,9 @@ const PrintPrescriptionDialog: React.FC<PrintPrescriptionDialogProps> = ({ open,
       <DialogContent dividers sx={{ p: 0, bgcolor: '#f1f5f9' }}>
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
           <Paper elevation={4} sx={{ borderRadius: 0 }}>
-            <PrescriptionPrintTemplate encounterId={encounterId} />
+            <div ref={componentRef}>
+              <PrescriptionPrintTemplate encounterId={encounterId} />
+            </div>
           </Paper>
         </Box>
       </DialogContent>
@@ -80,7 +53,10 @@ const PrintPrescriptionDialog: React.FC<PrintPrescriptionDialogProps> = ({ open,
           Close
         </Button>
         <Button 
-          onClick={handlePrint} 
+          onClick={() => {
+            console.log("Print button clicked. handlePrint is function:", typeof handlePrint === 'function');
+            handlePrint();
+          }} 
           variant="contained" 
           startIcon={<PrintIcon />}
           sx={{ borderRadius: 2, fontWeight: 900, px: 4 }}

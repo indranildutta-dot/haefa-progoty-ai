@@ -61,6 +61,8 @@ import {
 import { 
   saveConsultation, 
   getVitalsByEncounter, 
+  getLatestVitals,
+  getPatientHistory,
   updateEncounterStatus 
 } from '../services/encounterService';
 import { getPatientById } from '../services/patientService';
@@ -1413,6 +1415,23 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
   const [highlightedPatientIds, setHighlightedPatientIds] = useState<string[]>([]);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [lastEncounterId, setLastEncounterId] = useState<string | null>(null);
+
+  const handleReprint = async (patientId: string) => {
+    try {
+      const history = await getPatientHistory(patientId);
+      for (const enc of history) {
+        if (enc.status === 'COMPLETED' || enc.status === 'WAITING_FOR_PHARMACY' || enc.encounter_status === 'COMPLETED' || enc.encounter_status === 'WAITING_FOR_PHARMACY') {
+           setLastEncounterId(enc.id);
+           setShowPrintDialog(true);
+           return;
+        }
+      }
+      notify("No past prescription found to reprint.", "warning");
+    } catch (e) {
+      console.error(e);
+      notify("Failed to fetch prescription history.", "error");
+    }
+  };
   
   const [consultData, setConsultData] = useState<ConsultationData>({ 
     diagnosis: '', 
@@ -1527,10 +1546,14 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
   const handleOpenConsult = async (item: any) => {
     try {
       setSelectedItem(item);
-      const [patient, vitals] = await Promise.all([
-        getPatientById(item.patient_id), 
-        getVitalsByEncounter(item.encounter_id)
-      ]);
+      const patient = await getPatientById(item.patient_id);
+      let vitals = await getVitalsByEncounter(item.encounter_id);
+      
+      // If patient skipped vitals (Add to Queue directly), fetch last visit's vitals
+      if (!vitals) {
+        vitals = await getLatestVitals(item.patient_id);
+      }
+      
       setCurrentVitals(vitals);
       setSelectedPatient({ ...patient, currentVitals: vitals, triage_level: item.triage_level });
       await updateQueueStatus(item.id, 'IN_CONSULTATION' as any);
@@ -1694,6 +1717,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
             waitingList={waitingList}
             highlightedPatientIds={highlightedPatientIds}
             setHighlightedPatientIds={setHighlightedPatientIds}
+            onReprint={handleReprint}
           />
 
           <TableContainer component={Paper} elevation={0} sx={{ p: 2, borderRadius: 4, border: '1px solid #e2e8f0' }}>
@@ -1732,9 +1756,16 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>{item.patient_name}</TableCell>
                     <TableCell align="right">
-                      <Button variant="contained" onClick={() => handleOpenConsult(item)} sx={{ borderRadius: 2, fontWeight: 700 }}>
-                        Start Consultation
-                      </Button>
+                      <Stack direction="row" spacing={1} justifyContent="flex-end">
+                        <Button variant="contained" onClick={() => handleOpenConsult(item)} sx={{ borderRadius: 2, fontWeight: 700 }}>
+                          Start Consultation
+                        </Button>
+                        <Tooltip title="Remove patient from queue">
+                          <IconButton onClick={() => setCancelTarget(item)} color="error" size="small" sx={{ bgcolor: '#fee2e2', '&:hover': { bgcolor: '#fecaca' } }}>
+                            <CancelIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 ))}

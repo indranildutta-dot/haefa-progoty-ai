@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Typography, Box, Paper, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Button, Chip, Stack, Card, CardContent, Container, Alert, Divider, Grid,
-  IconButton, Tooltip, Tabs, Tab, TextField, ToggleButtonGroup, ToggleButton, CircularProgress
+  IconButton, Tooltip, Tabs, Tab, TextField, ToggleButtonGroup, ToggleButton, CircularProgress, Autocomplete
 } from '@mui/material';
 import WarningIcon from '@mui/icons-material/Warning';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -53,8 +53,10 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   // Dispensing State
   const [dispensingModes, setDispensingModes] = useState<Record<string, string>>({});
   const [returnDates, setReturnDates] = useState<Record<string, Dayjs | null>>({});
-  const [substitutionMeds, setSubstitutionMeds] = useState<Record<string, string>>({});
+  const [substitutionMeds, setSubstitutionMeds] = useState<Record<string, string | null>>({});
   const [substitutionReasons, setSubstitutionReasons] = useState<Record<string, string>>({});
+  const [substitutionDosage, setSubstitutionDosage] = useState<Record<string, string>>({});
+  const [substitutionQty, setSubstitutionQty] = useState<Record<string, number | ''>>({});
   
   // Inventory State
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -66,7 +68,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   }, [selectedClinic]);
 
   useEffect(() => {
-    if (!selectedClinic || activeTab !== 1) return;
+    if (!selectedClinic) return;
     
     setIsInventoryLoading(true);
     const inventoryRef = collection(db, `clinics/${selectedClinic.id}/inventory`);
@@ -82,7 +84,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     });
     
     return () => unsubscribe();
-  }, [selectedClinic, activeTab]);
+  }, [selectedClinic]);
 
   const formatWaitTime = (createdAt: any) => {
     if (!createdAt) return '0m';
@@ -106,20 +108,26 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       // Initialize dispensing modes
       const initialModes: Record<string, string> = {};
       const initialDates: Record<string, Dayjs | null> = {};
-      const initialSubMeds: Record<string, string> = {};
+      const initialSubMeds: Record<string, string | null> = {};
       const initialSubReasons: Record<string, string> = {};
+      const initialSubDosages: Record<string, string> = {};
+      const initialSubQty: Record<string, number | ''> = {};
       
       meds.forEach(m => {
         initialModes[m.id!] = 'FULL';
         initialDates[m.id!] = null;
-        initialSubMeds[m.id!] = '';
+        initialSubMeds[m.id!] = null;
         initialSubReasons[m.id!] = '';
+        initialSubDosages[m.id!] = '';
+        initialSubQty[m.id!] = '';
       });
       
       setDispensingModes(initialModes);
       setReturnDates(initialDates);
       setSubstitutionMeds(initialSubMeds);
       setSubstitutionReasons(initialSubReasons);
+      setSubstitutionDosage(initialSubDosages);
+      setSubstitutionQty(initialSubQty);
     } catch (e) { 
       notify("Error loading dispensing data", "error"); 
     }
@@ -129,8 +137,10 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     // Validation
     for (const med of prescriptions) {
       const mode = dispensingModes[med.id];
-      if (mode === 'SUBSTITUTE' && (!substitutionMeds[med.id] || !substitutionReasons[med.id])) {
-        return notify(`Please provide substitute medication and reason for ${med.medicationName}`, "warning");
+      if (mode === 'SUBSTITUTE') {
+        if (!substitutionMeds[med.id] || !substitutionReasons[med.id] || !substitutionQty[med.id]) {
+          return notify(`Please provide substitute medication, quantity, and reason for ${med.medicationName}`, "warning");
+        }
       }
       if ((mode === 'PARTIAL' || mode === 'OUT_OF_STOCK') && !returnDates[med.id]) {
         return notify(`Please provide a return date for ${med.medicationName}`, "warning");
@@ -144,8 +154,9 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       const medsToDispense = prescriptions.map(med => ({
         medication_name: med.medicationName,
         mode: dispensingModes[med.id],
-        qty: med.quantity,
+        qty: dispensingModes[med.id] === 'SUBSTITUTE' && substitutionQty[med.id] ? Number(substitutionQty[med.id]) : med.quantity,
         substitution: dispensingModes[med.id] === 'SUBSTITUTE' ? substitutionMeds[med.id] : null,
+        substitution_reason: dispensingModes[med.id] === 'SUBSTITUTE' ? substitutionReasons[med.id] : null,
         return_on: (dispensingModes[med.id] === 'PARTIAL' || dispensingModes[med.id] === 'OUT_OF_STOCK') 
           ? returnDates[med.id]?.toISOString() 
           : null
@@ -350,7 +361,10 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                     <CardContent>
                       <Grid container spacing={3}>
                         <Grid size={{ xs: 12, md: 6 }}>
-                          <Typography variant="h6" color="primary" fontWeight="900">{med.medicationName}</Typography>
+                          <Typography variant="caption" fontWeight="900" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>Prescribed By Doctor</Typography>
+                          <Typography variant="h6" color="primary" fontWeight="900" mt={0.5}>
+                            {med.medicationName || "Unspecified"}
+                          </Typography>
                           <Typography variant="body1" fontWeight="700">
                             {med.dosageValue}{med.dosageUnit} x {med.quantity} Total
                           </Typography>
@@ -397,21 +411,48 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                           )}
 
                           {dispensingModes[med.id] === 'SUBSTITUTE' && (
-                            <Stack spacing={2} sx={{ mt: 2 }}>
-                              <TextField
-                                label="Substitute Medication Name"
-                                fullWidth
-                                required
-                                value={substitutionMeds[med.id]}
-                                onChange={(e) => setSubstitutionMeds(prev => ({ ...prev, [med.id]: e.target.value }))}
+                            <Stack spacing={2} sx={{ mt: 2, p: 2, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+                              <Typography variant="subtitle2" fontWeight="800" color="primary">Substitute Medication Details</Typography>
+                              <Autocomplete
+                                options={inventory.filter(i => i.quantity > 0).map(i => i.medication_id)}
+                                value={substitutionMeds[med.id] || null}
+                                onChange={(_, newValue) => {
+                                  setSubstitutionMeds(prev => ({ ...prev, [med.id]: newValue || null }));
+                                  const found = inventory.find(i => i.medication_id === newValue);
+                                  if (found) {
+                                    setSubstitutionDosage(prev => ({ ...prev, [med.id]: found.dosage || '' }));
+                                  } else {
+                                    setSubstitutionDosage(prev => ({ ...prev, [med.id]: '' }));
+                                  }
+                                }}
+                                renderInput={(params) => <TextField {...params} label="Select Substitute from Inventory" size="small" required />}
                               />
+                              <Stack direction="row" spacing={2}>
+                                <TextField
+                                  label="Dosage"
+                                  size="small"
+                                  value={substitutionDosage[med.id] || ''}
+                                  fullWidth
+                                  disabled
+                                />
+                                <TextField
+                                  label="Dispensing Qty"
+                                  type="number"
+                                  size="small"
+                                  fullWidth
+                                  value={substitutionQty[med.id] || ''}
+                                  onChange={(e) => setSubstitutionQty(prev => ({ ...prev, [med.id]: e.target.value === '' ? '' : Number(e.target.value) }))}
+                                  required
+                                />
+                              </Stack>
                               <TextField
                                 label="Reason for Substitution"
                                 fullWidth
+                                size="small"
                                 required
                                 multiline
                                 rows={2}
-                                value={substitutionReasons[med.id]}
+                                value={substitutionReasons[med.id] || ''}
                                 onChange={(e) => setSubstitutionReasons(prev => ({ ...prev, [med.id]: e.target.value }))}
                               />
                             </Stack>
@@ -427,7 +468,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
               
               <Box sx={{ mt: 8, pt: 4, borderTop: '2px dashed #e2e8f0' }}>
                 <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
                     <Button 
                       fullWidth variant="outlined" color="inherit" size="large" 
                       onClick={() => setSelectedItem(null)}
@@ -436,32 +477,24 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                       Cancel
                     </Button>
                   </Grid>
-                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <Button 
-                      fullWidth variant="outlined" color="primary" size="large" 
-                      onClick={() => notify("Progress saved locally", "info")}
-                      sx={{ height: 60, borderRadius: 3, fontWeight: 800 }}
-                    >
-                      Save Progress
-                    </Button>
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <Button 
-                      fullWidth variant="contained" color="info" size="large" 
-                      onClick={() => notify("Collection completed", "info")}
-                      sx={{ height: 60, borderRadius: 3, fontWeight: 800 }}
-                    >
-                      Complete Collection
-                    </Button>
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
                     <Button 
                       fullWidth variant="contained" color="primary" size="large" 
                       onClick={handleFinalize}
-                      disabled={isFinalizing}
+                      disabled={isFinalizing || prescriptions.some(med => dispensingModes[med.id] === 'PARTIAL' || dispensingModes[med.id] === 'OUT_OF_STOCK')}
                       sx={{ height: 60, borderRadius: 3, fontWeight: 900 }}
                     >
-                      {isFinalizing ? <CircularProgress size={24} color="inherit" /> : "Finalize & Close"}
+                      {isFinalizing ? <CircularProgress size={24} color="inherit" /> : "Dispense"}
+                    </Button>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <Button 
+                      fullWidth variant="contained" color="warning" size="large" 
+                      onClick={handleFinalize}
+                      disabled={isFinalizing || !prescriptions.some(med => dispensingModes[med.id] === 'PARTIAL' || dispensingModes[med.id] === 'OUT_OF_STOCK')}
+                      sx={{ height: 60, borderRadius: 3, fontWeight: 900 }}
+                    >
+                      {isFinalizing ? <CircularProgress size={24} color="inherit" /> : "IOU"}
                     </Button>
                   </Grid>
                 </Grid>

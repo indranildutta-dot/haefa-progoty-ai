@@ -281,6 +281,25 @@ export const getVitalsByEncounter = async (encounterId: string): Promise<VitalsR
   return null;
 };
 
+export const getLatestVitals = async (patientId: string): Promise<VitalsRecord | null> => {
+  try {
+    const q = query(
+      collection(db, VITALS_COLLECTION),
+      where("patient_id", "==", patientId),
+      orderBy("created_at", "desc"),
+      limit(1)
+    );
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      const doc = querySnapshot.docs[0];
+      return { id: doc.id, ...doc.data() } as VitalsRecord;
+    }
+  } catch (err) {
+    console.error("Could not fetch latest vitals. Possible missing index.", err);
+  }
+  return null;
+};
+
 export const getDiagnosisByEncounter = async (encounterId: string): Promise<DiagnosisRecord | null> => {
   const q = query(
     collection(db, DIAGNOSES_COLLECTION),

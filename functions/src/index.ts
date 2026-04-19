@@ -440,78 +440,89 @@ export const saveConsultation = onCall(async (request) => {
 
 export const dispenseMedication = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
+  
   const { clinicId, medications, encounterId, patientId } = request.data;
-  const db = await getDb();
-  const admin = await getAdmin();
+  
+  try {
+    const db = await getDb();
+    const admin = await getAdmin();
+    const userProfile = (await db.collection("users").doc(request.auth.uid).get()).data() || {};
 
-  const userProfile = (await db.collection("users").doc(request.auth.uid).get()).data() || {};
+    return await db.runTransaction(async (transaction: any) => {
+      const results: any[] = [];
 
-  return await db.runTransaction(async (transaction: any) => {
-    const results: any[] = [];
+      for (const med of medications) {
+        logger.info('Processing Medication:', { medication: med });
+        
+        const { medication_name, mode, qty, substitution, return_on } = med;
+        const targetMedName = (mode === 'SUBSTITUTE' && substitution) ? substitution : medication_name;
+        const medIdLower = (targetMedName || "").toLowerCase().replace(/\s+/g, '');
+        
+        let actualDeducted = 0;
 
-    for (const med of medications) {
-      const { medication_name, mode, qty, substitution, return_on } = med;
-      const targetMedName = (mode === 'SUBSTITUTE' && substitution) ? substitution : medication_name;
-      const medIdLower = targetMedName.toLowerCase().replace(/\s+/g, '');
-      
-      let actualDeducted = 0;
+        if (mode !== 'OUT_OF_STOCK') {
+          const inventoryRef = db.collection(`clinics/${clinicId}/inventory`);
+          const q = inventoryRef.where("med_id_lower", "==", medIdLower);
+          const snapshot = await transaction.get(q);
 
-      if (mode !== 'OUT_OF_STOCK') {
-        const inventoryRef = db.collection(`clinics/${clinicId}/inventory`);
-        const q = inventoryRef.where("med_id_lower", "==", medIdLower);
-        const snapshot = await transaction.get(q);
+          let remaining = Number(qty);
+          for (const doc of snapshot.docs) {
+            if (remaining <= 0) break;
+            const available = Number(doc.data().quantity) || 0;
+            const toTake = Math.min(available, remaining);
+            const newQty = available - toTake;
+            
+            transaction.update(doc.ref, sanitizeData({ quantity: newQty }));
+            actualDeducted += toTake;
+            remaining -= toTake;
 
-        let remaining = Number(qty);
-        for (const doc of snapshot.docs) {
-          if (remaining <= 0) break;
-          const available = Number(doc.data().quantity) || 0;
-          const toTake = Math.min(available, remaining);
-          const newQty = available - toTake;
-          
-          transaction.update(doc.ref, { quantity: newQty });
-          actualDeducted += toTake;
-          remaining -= toTake;
-
-          if (newQty < REQUISITION_THRESHOLD) {
-            transaction.set(db.collection("requisitions").doc(), {
-              clinic_id: clinicId, medication_name: targetMedName,
-              current_stock: newQty, type: 'LOW_STOCK_ALERT', status: 'PENDING',
-              created_at: admin.firestore.FieldValue.serverTimestamp()
-            });
+            if (newQty < REQUISITION_THRESHOLD) {
+              transaction.set(db.collection("requisitions").doc(), sanitizeData({
+                clinic_id: clinicId, medication_name: targetMedName,
+                current_stock: newQty, type: 'LOW_STOCK_ALERT', status: 'PENDING',
+                created_at: admin.firestore.FieldValue.serverTimestamp()
+              }));
+            }
           }
         }
+
+        if (mode === 'PARTIAL' || mode === 'OUT_OF_STOCK') {
+          transaction.set(db.collection("requisitions").doc(), sanitizeData({
+            clinic_id: clinicId, patient_id: patientId, medication_name: medication_name,
+            type: 'PATIENT_IOU_SHORTFALL', status: 'WAITING_FOR_STOCK',
+            return_date: return_on || null, encounter_id: encounterId,
+            created_at: admin.firestore.FieldValue.serverTimestamp()
+          }));
+        }
+        results.push(sanitizeData({ medication: medication_name, dispensed: actualDeducted, mode, substitution: substitution || null, return_on: return_on || null }));
       }
 
-      if (mode === 'PARTIAL' || mode === 'OUT_OF_STOCK') {
-        transaction.set(db.collection("requisitions").doc(), {
-          clinic_id: clinicId, patient_id: patientId, medication_name: medication_name,
-          type: 'PATIENT_IOU_SHORTFALL', status: 'WAITING_FOR_STOCK',
-          return_date: return_on || null, encounter_id: encounterId,
-          created_at: admin.firestore.FieldValue.serverTimestamp()
-        });
+      // Update prescriptions record for this encounter
+      const presQuery = db.collection("prescriptions").where("encounter_id", "==", encounterId).limit(1);
+      const presSnap = await transaction.get(presQuery);
+      if (!presSnap.empty) {
+        const existingPres = presSnap.docs[0].data();
+        transaction.update(presSnap.docs[0].ref, sanitizeData({
+          status: 'DISPENSED',
+          dispensedDate: existingPres.dispensedDate || admin.firestore.FieldValue.serverTimestamp(),
+          dispenser_name: userProfile.name || "Unknown Pharmacist",
+          dispenser_reg_no: userProfile.professional_reg_no || "N/A",
+          dispenser_body: userProfile.professional_body || "PCB",
+          dispensation_details: results,
+          updated_at: admin.firestore.FieldValue.serverTimestamp()
+        }));
       }
-      results.push({ medication: medication_name, dispensed: actualDeducted, mode, substitution, return_on });
-    }
 
-    // Update prescriptions record for this encounter
-    const presQuery = db.collection("prescriptions").where("encounter_id", "==", encounterId).limit(1);
-    const presSnap = await transaction.get(presQuery);
-    if (!presSnap.empty) {
-      transaction.update(presSnap.docs[0].ref, {
-        status: 'DISPENSED',
-        dispenser_name: userProfile.name || "Unknown Pharmacist",
-        dispenser_reg_no: userProfile.professional_reg_no || "N/A",
-        dispenser_body: userProfile.professional_body || "PCB",
-        dispensation_details: results,
-        updated_at: admin.firestore.FieldValue.serverTimestamp()
-      });
-    }
-
-    transaction.update(db.collection("encounters").doc(encounterId), { 
-      status: 'COMPLETED', last_updated: admin.firestore.FieldValue.serverTimestamp() 
+      transaction.update(db.collection("encounters").doc(encounterId), sanitizeData({ 
+        status: 'COMPLETED', last_updated: admin.firestore.FieldValue.serverTimestamp() 
+      }));
+      return { success: true, summary: results };
     });
-    return { success: true, summary: results };
-  });
+  } catch (error: any) {
+    logger.error("HAEFA Critical error in dispenseMedication:", error);
+    const errorMessage = error.message || "Unknown error";
+    throw new HttpsError("internal", `Dispensing failed: ${errorMessage}`);
+  }
 });
 
 /**
@@ -540,7 +551,7 @@ export const bulkUpload = onCall(async (request) => {
     const docRef = db.collection(`clinics/${clinicId}/inventory`).doc();
     batch.set(docRef, { 
       medication_id: medId, 
-      med_id_lower: medId.toLowerCase().replace(/\s+/g, ''), 
+      med_id_lower: (medId || "").toLowerCase().replace(/\s+/g, ''), 
       dosage, quantity: qty, 
       created_at: admin.firestore.FieldValue.serverTimestamp() 
     });

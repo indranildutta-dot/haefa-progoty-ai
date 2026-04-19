@@ -11,7 +11,8 @@ import {
   Stack,
   Avatar,
   Chip,
-  Tooltip
+  Tooltip,
+  Button
 } from '@mui/material';
 import { 
   Search as SearchIcon, 
@@ -34,6 +35,7 @@ interface StationSearchHeaderProps {
   waitingList: QueueItem[];
   highlightedPatientIds: string[];
   setHighlightedPatientIds: (ids: string[]) => void;
+  onReprint?: (patientId: string) => void;
 }
 
 const StationSearchHeader: React.FC<StationSearchHeaderProps> = ({ 
@@ -41,7 +43,8 @@ const StationSearchHeader: React.FC<StationSearchHeaderProps> = ({
   onPatientFound, 
   waitingList,
   highlightedPatientIds,
-  setHighlightedPatientIds
+  setHighlightedPatientIds,
+  onReprint
 }) => {
   const [loading, setLoading] = useState(false);
   const [options, setOptions] = useState<Patient[]>([]);
@@ -249,11 +252,39 @@ const StationSearchHeader: React.FC<StationSearchHeaderProps> = ({
                   {option.gender} • {option.age_years}y • {option.national_id || option.rohingya_number || 'No ID'}
                 </Typography>
               </Box>
-              {waitingList.some(item => item.patient_id === option.id) ? (
-                <Chip label="In Queue" size="small" color="success" variant="outlined" />
-              ) : (
-                <Chip label="Add to Queue" size="small" color="primary" icon={<AddIcon />} />
-              )}
+              
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                {onReprint && (
+                  <Button 
+                    variant="outlined" 
+                    size="small" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onReprint(option.id);
+                    }}
+                    sx={{ textTransform: 'none', borderRadius: 2 }}
+                  >
+                    Reprint Rx
+                  </Button>
+                )}
+                
+                {waitingList.some(item => item.patient_id === option.id) ? (
+                  <Chip label="In Queue" size="small" color="success" variant="outlined" />
+                ) : (
+                  <Button 
+                    variant="contained" 
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectPatient(option);
+                    }}
+                    sx={{ textTransform: 'none', borderRadius: 2 }}
+                    startIcon={<AddIcon />}
+                  >
+                    Add to Queue
+                  </Button>
+                )}
+              </Box>
             </Stack>
           </Box>
         )}
