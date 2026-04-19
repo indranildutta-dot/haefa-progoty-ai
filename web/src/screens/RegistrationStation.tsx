@@ -229,8 +229,8 @@ const HealthCardPrint: React.FC<{ badgeData: any }> = ({ badgeData }) => {
         pageBreakInside: 'avoid',
         m: 0,
         boxShadow: 'none',
-        '-webkit-print-color-adjust': 'exact',
-        'print-color-adjust': 'exact'
+        WebkitPrintColorAdjust: 'exact',
+        printColorAdjust: 'exact'
       }
     }}>
       <Box sx={{ 
@@ -685,6 +685,10 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
   const handlePrint = useReactToPrint({
     contentRef: badgeRef,
     documentTitle: badgeData ? `HealthCard-${badgeData.patientId.slice(0, 8)}` : 'HealthCard',
+    onPrintError: (error) => {
+      console.error("HAEFA: High-fidelity print failed, falling back to basic print.", error);
+      window.print();
+    }
   });
 
   const renderStepContent = (step: number) => {
@@ -1317,15 +1321,39 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
       </Modal>
 
       {/* Hidden high-fidelity printable badge */}
-      <Box sx={{ display: 'none' }}>
-        <div ref={badgeRef}>
+      <Box sx={{ 
+        position: 'fixed',
+        top: '-1000px',
+        left: '-1000px',
+        '@media print': {
+           position: 'static',
+           display: 'block'
+        }
+      }}>
+        <div ref={badgeRef} id="health-card-print-area">
            <style>{`
              @page {
                size: 3.63in 2.37in;
                margin: 0;
              }
              @media print {
-               body { margin: 0; }
+               body { 
+                 visibility: hidden; 
+                 background: white !important;
+                 margin: 0;
+                 padding: 0;
+               }
+               #health-card-print-area, #health-card-print-area * { 
+                 visibility: visible; 
+               }
+               #health-card-print-area { 
+                 position: absolute; 
+                 left: 0; 
+                 top: 0; 
+                 width: 3.63in;
+                 height: 2.37in;
+                 display: block !important;
+               }
              }
            `}</style>
            <HealthCardPrint badgeData={badgeData} />
