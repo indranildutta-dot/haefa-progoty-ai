@@ -93,7 +93,8 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
   };
 
   const formattedDate = (ts: any) => {
-    if (!ts) return '-';
+    // Robust Fallback: Fallback to current local date if no timestamp is provided
+    if (!ts) return dayjs().format('DD MMM YYYY, hh:mm A');
     try {
       // 1. Native dayjs/Date
       if (dayjs.isDayjs(ts)) return ts.format('DD MMM YYYY, hh:mm A');
@@ -139,7 +140,47 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
   };
 
   return (
-    <Box id="prescription-print-area" sx={{ p: 4, bgcolor: 'white', minHeight: '297mm', width: '210mm', mx: 'auto', color: 'black' }}>
+    <Box id="prescription-print-area" sx={{ 
+      p: 4, 
+      bgcolor: 'white', 
+      minHeight: '297mm', 
+      width: '210mm', 
+      mx: 'auto', 
+      color: 'black',
+      '@media print': {
+        p: 0,
+        m: 0,
+        width: '100%',
+        minHeight: 'auto',
+        boxShadow: 'none',
+        '.MuiBox-root': { boxShadow: 'none' }
+      }
+    }}>
+      <style>
+        {`
+          @media print {
+            body { 
+              visibility: hidden; 
+              background: white !important;
+            }
+            #prescription-print-area, #prescription-print-area * { 
+              visibility: visible; 
+            }
+            #prescription-print-area { 
+              position: absolute; 
+              left: 0; 
+              top: 0; 
+              width: 100%;
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+            @page {
+              size: auto;
+              margin: 15mm;
+            }
+          }
+        `}
+      </style>
       {/* Header: Trust Signals */}
       <Grid container spacing={2} alignItems="center" sx={{ mb: 3 }}>
         <Grid size={{ xs: 2 }}>

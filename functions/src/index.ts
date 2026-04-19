@@ -317,19 +317,14 @@ export const saveConsultation = onCall(async (request) => {
     assessment?: any;
   };
 
-  const encounterId = data.encounterId || data.visitId;
-  const patientId = data.patientId;
-  const clinicId = data.clinicId;
-
-  if (!encounterId) {
-    throw new HttpsError("invalid-argument", "Missing encounterId (visitId).");
-  }
-  if (!patientId) {
-    throw new HttpsError("invalid-argument", "Missing patientId.");
-  }
-  if (!clinicId) {
-    throw new HttpsError("invalid-argument", "Missing clinicId.");
-  }
+  const vId = data.encounterId || data.visitId;
+  if (!vId) throw new HttpsError("invalid-argument", "Missing encounterId (visitId).");
+  
+  const pId = data.patientId;
+  if (!pId) throw new HttpsError("invalid-argument", "Missing patientId.");
+  
+  const cId = data.clinicId;
+  if (!cId) throw new HttpsError("invalid-argument", "Missing clinicId.");
 
   const { 
     prescriptions = [], 
@@ -341,7 +336,7 @@ export const saveConsultation = onCall(async (request) => {
     assessment = {} 
   } = data;
 
-  console.log(`HAEFA: Starting saveConsultation for Encounter ${encounterId}, Patient ${patientId}`);
+  console.log(`HAEFA: Starting saveConsultation for Encounter ${vId}, Patient ${pId}`);
 
   const authUid = request.auth.uid;
 
@@ -352,22 +347,22 @@ export const saveConsultation = onCall(async (request) => {
     // Log the sanitized input for debugging if needed (only in dev/debug)
     console.log(`HAEFA: saveConsultation payload keys: ${Object.keys(data).join(', ')}`);
 
-    // GUARD CLAUSE for visitRef (encounterRef)
-    const visitRef = db.collection("encounters").doc(encounterId);
+    // GUARD CLAUSE for visitRef (encounterRef) - Local Narrowing Applied
+    const visitRef = db.collection("encounters").doc(vId);
 
     // Standard Transaction Pattern: Reads first, then Writes
     return await db.runTransaction(async (transaction: any) => {
-      console.log(`HAEFA: Transaction active for ${encounterId}`);
+      console.log(`HAEFA: Transaction active for ${vId}`);
 
       // 1. PERFORM ALL READS
       const [encounterDoc, qSnap, userProfileDoc] = await Promise.all([
         transaction.get(visitRef),
-        transaction.get(db.collection("queues_active").where("encounter_id", "==", encounterId).limit(1)),
+        transaction.get(db.collection("queues_active").where("encounter_id", "==", vId).limit(1)),
         transaction.get(db.collection("users").doc(authUid))
       ]);
 
       if (!encounterDoc.exists) {
-        throw new HttpsError("not-found", `Encounter ${encounterId} not found.`);
+        throw new HttpsError("not-found", `Encounter ${vId} not found.`);
       }
 
       const userProfile = userProfileDoc.data() || {};
@@ -388,9 +383,9 @@ export const saveConsultation = onCall(async (request) => {
       // B. Create Diagnosis Record
       const diagRef = db.collection("diagnoses").doc();
       transaction.set(diagRef, sanitizeData({
-        encounter_id: encounterId,
-        patient_id: patientId,
-        clinic_id: clinicId,
+        encounter_id: vId,
+        patient_id: pId,
+        clinic_id: cId,
         diagnosis,
         notes,
         treatment_notes,
@@ -407,9 +402,9 @@ export const saveConsultation = onCall(async (request) => {
       // C. Create Prescription Record
       const presRef = db.collection("prescriptions").doc();
       transaction.set(presRef, sanitizeData({
-        encounter_id: encounterId,
-        patient_id: patientId,
-        clinic_id: clinicId,
+        encounter_id: vId,
+        patient_id: pId,
+        clinic_id: cId,
         prescriptions: Array.isArray(prescriptions) ? prescriptions : [],
         status: 'PENDING',
         created_at: serverTime
@@ -421,7 +416,7 @@ export const saveConsultation = onCall(async (request) => {
           if (med && med.isRequisition) {
             const reqRef = db.collection("requisitions").doc();
             transaction.set(reqRef, sanitizeData({
-              clinic_id: clinicId,
+              clinic_id: cId,
               medication_name: med.medicationName,
               dosage: `${med.dosageValue}${med.dosageUnit}`,
               requested_qty: med.quantity,
@@ -444,8 +439,8 @@ export const saveConsultation = onCall(async (request) => {
         });
       }
 
-      console.log(`HAEFA: Transaction commit staged for ${encounterId}`);
-      return { success: true, encounterId };
+      console.log(`HAEFA: Transaction commit staged for ${vId}`);
+      return { success: true, encounterId: vId };
     });
   } catch (error: any) {
     console.error("HAEFA Critical error in saveConsultation:", error);
@@ -483,12 +478,12 @@ export const dispenseMedication = onCall(async (request) => {
     patientId?: string;
   };
 
-  const clinicId = data.clinicId;
-  const medications = data.medications;
-  const encounterId = data.encounterId || data.visitId;
-  const patientId = data.patientId;
+  const cId = data.clinicId;
+  const meds = data.medications;
+  const vId = data.encounterId || data.visitId;
+  const pId = data.patientId;
 
-  if (!clinicId || !medications || !encounterId || !patientId) {
+  if (!cId || !meds || !vId || !pId) {
     throw new HttpsError("invalid-argument", "Missing clinicId, medications, encounterId, or patientId.");
   }
   
@@ -497,26 +492,28 @@ export const dispenseMedication = onCall(async (request) => {
     const admin = await getAdmin();
     const userProfile = (await db.collection("users").doc(request.auth.uid).get()).data() || {};
 
-    const visitRef = db.collection("encounters").doc(encounterId);
+    const visitRef = db.collection("encounters").doc(vId);
 
     return await db.runTransaction(async (transaction: any) => {
       const results: any[] = [];
 
-      for (const medication of medications) {
+      for (const medication of meds) {
         logger.info('Processing Medication:', { medication });
         
-        const { medication_name, mode, qty, substitution, return_on, inventoryId } = medication;
+        const { medication_name, mode, qty, substitution, return_on } = medication;
+        const invId = medication.inventoryId; // Local Variable Narrowing
+        
         const targetMedName = (mode === 'SUBSTITUTE' && substitution) ? substitution : medication_name;
         
         let actualDeducted = 0;
 
         if (mode !== 'OUT_OF_STOCK') {
-          // GUARD CLAUSE: Ensure inventoryId is provided for dispensing operations
-          if (!inventoryId) {
+          // GUARD CLAUSE: Ensure invId is provided for dispensing operations
+          if (!invId) {
             throw new HttpsError("invalid-argument", `Medication ${medication_name} is missing inventoryId.`);
           }
 
-          const inventoryRef = db.collection('clinics').doc(clinicId).collection('inventory').doc(inventoryId);
+          const inventoryRef = db.collection('clinics').doc(cId).collection('inventory').doc(invId);
           const inventoryDoc = await transaction.get(inventoryRef);
 
           if (!inventoryDoc.exists) {
@@ -532,7 +529,7 @@ export const dispenseMedication = onCall(async (request) => {
 
           if (newQty < REQUISITION_THRESHOLD) {
             transaction.set(db.collection("requisitions").doc(), sanitizeData({
-              clinic_id: clinicId, medication_name: targetMedName,
+              clinic_id: cId, medication_name: targetMedName,
               current_stock: newQty, type: 'LOW_STOCK_ALERT', status: 'PENDING',
               created_at: admin.firestore.FieldValue.serverTimestamp()
             }));
@@ -541,9 +538,9 @@ export const dispenseMedication = onCall(async (request) => {
 
         if (mode === 'PARTIAL' || mode === 'OUT_OF_STOCK') {
           transaction.set(db.collection("requisitions").doc(), sanitizeData({
-            clinic_id: clinicId, patient_id: patientId, medication_name: medication_name,
+            clinic_id: cId, patient_id: pId, medication_name: medication_name,
             type: 'PATIENT_IOU_SHORTFALL', status: 'WAITING_FOR_STOCK',
-            return_date: return_on || null, encounter_id: encounterId,
+            return_date: return_on || null, encounter_id: vId,
             created_at: admin.firestore.FieldValue.serverTimestamp()
           }));
         }
@@ -551,7 +548,7 @@ export const dispenseMedication = onCall(async (request) => {
       }
 
       // Update prescriptions record for this encounter
-      const presQuery = db.collection("prescriptions").where("encounter_id", "==", encounterId).limit(1);
+      const presQuery = db.collection("prescriptions").where("encounter_id", "==", vId).limit(1);
       const presSnap = await transaction.get(presQuery);
       if (!presSnap.empty) {
         const existingPres = presSnap.docs[0].data();

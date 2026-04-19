@@ -20,7 +20,23 @@ const PrintPrescriptionDialog: React.FC<PrintPrescriptionDialogProps> = ({ open,
   const handlePrint = useReactToPrint({
     contentRef: componentRef,
     documentTitle: `Prescription-${encounterId}`,
+    onAfterPrint: () => console.log("Print process completed."),
+    onPrintError: (error) => {
+      console.error("Print Error:", error);
+      // Fallback to window.print() if react-to-print fails
+      window.print();
+    }
   });
+
+  const onPrintClick = () => {
+    console.log("HAEFA: Initiating print for encounter:", encounterId);
+    if (typeof handlePrint === 'function') {
+      handlePrint();
+    } else {
+      console.warn("HAEFA: handlePrint not ready, falling back to window.print()");
+      window.print();
+    }
+  };
 
   return (
     <Dialog 
@@ -28,7 +44,7 @@ const PrintPrescriptionDialog: React.FC<PrintPrescriptionDialogProps> = ({ open,
       onClose={onClose} 
       maxWidth="md" 
       fullWidth
-      PaperProps={{ sx: { borderRadius: 4, overflow: 'hidden' } }}
+      PaperProps={{ id: 'print-dialog-content', sx: { borderRadius: 4, overflow: 'hidden' } }}
     >
       <DialogTitle sx={{ m: 0, p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: '#f8fafc' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -42,7 +58,7 @@ const PrintPrescriptionDialog: React.FC<PrintPrescriptionDialogProps> = ({ open,
       <DialogContent dividers sx={{ p: 0, bgcolor: '#f1f5f9' }}>
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
           <Paper elevation={4} sx={{ borderRadius: 0 }}>
-            <div ref={componentRef}>
+            <div ref={componentRef} id="printable-prescription-content">
               <PrescriptionPrintTemplate encounterId={encounterId} />
             </div>
           </Paper>
@@ -53,10 +69,7 @@ const PrintPrescriptionDialog: React.FC<PrintPrescriptionDialogProps> = ({ open,
           Close
         </Button>
         <Button 
-          onClick={() => {
-            console.log("Print button clicked. handlePrint is function:", typeof handlePrint === 'function');
-            handlePrint();
-          }} 
+          onClick={onPrintClick} 
           variant="contained" 
           startIcon={<PrintIcon />}
           sx={{ borderRadius: 2, fontWeight: 900, px: 4 }}

@@ -100,12 +100,28 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
         getDocs(query(collection(db, "prescriptions"), where("encounter_id", "==", item.encounter_id))),
         getVitalsByEncounter(item.encounter_id)
       ]);
-      setPatientVitals(vitals);
-      const meds = medsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setSelectedPatient({ ...patient, currentVitals: vitals, triage_level: item.triage_level });
-      setPrescriptions(meds);
+      const vitalsResult = await getVitalsByEncounter(item.encounter_id);
+      setPatientVitals(vitalsResult);
+
+      const allMeds: any[] = [];
+      medsSnapshot.forEach(presDoc => {
+        const presData = presDoc.data();
+        if (Array.isArray(presData.prescriptions)) {
+          presData.prescriptions.forEach((med: any, index: number) => {
+            allMeds.push({
+              ...med,
+              id: `${presDoc.id}-${index}`, // Unique key for local state
+              presDocId: presDoc.id,
+              originalIndex: index
+            });
+          });
+        }
+      });
+
+      setSelectedPatient({ ...patient, currentVitals: vitalsResult, triage_level: item.triage_level });
+      setPrescriptions(allMeds);
       
-      // Initialize dispensing modes
+      // Initialize dispensing modes for each individual medication
       const initialModes: Record<string, string> = {};
       const initialDates: Record<string, Dayjs | null> = {};
       const initialSubMeds: Record<string, string | null> = {};
@@ -113,13 +129,13 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       const initialSubDosages: Record<string, string> = {};
       const initialSubQty: Record<string, number | ''> = {};
       
-      meds.forEach(m => {
-        initialModes[m.id!] = 'FULL';
-        initialDates[m.id!] = null;
-        initialSubMeds[m.id!] = null;
-        initialSubReasons[m.id!] = '';
-        initialSubDosages[m.id!] = '';
-        initialSubQty[m.id!] = '';
+      allMeds.forEach(m => {
+        initialModes[m.id] = 'FULL';
+        initialDates[m.id] = null;
+        initialSubMeds[m.id] = null;
+        initialSubReasons[m.id] = '';
+        initialSubDosages[m.id] = '';
+        initialSubQty[m.id] = '';
       });
       
       setDispensingModes(initialModes);
@@ -158,10 +174,15 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
         if (mode === 'SUBSTITUTE') {
           inventoryId = substitutionMeds[med.id] || undefined;
         } else if (mode === 'FULL' || mode === 'PARTIAL') {
-          // Find first matching batch in inventory for the prescribed medication
-          const medNameLower = med.medicationName.toLowerCase().replace(/\s+/g, '');
-          const match = inventory.find(i => i.medication_id.toLowerCase().replace(/\s+/g, '') === medNameLower);
-          inventoryId = match?.id;
+          // Priority 1: Use medicationId directly from Doctor's selection in PrescriptionBuilder
+          inventoryId = med.medicationId;
+          
+          // Priority 2: Fallback to matching medication name in inventory (for older or custom entries)
+          if (!inventoryId) {
+            const medNameLower = med.medicationName.toLowerCase().replace(/\s+/g, '');
+            const match = inventory.find(i => i.medication_id.toLowerCase().replace(/\s+/g, '') === medNameLower);
+            inventoryId = match?.id;
+          }
         }
 
         return {
