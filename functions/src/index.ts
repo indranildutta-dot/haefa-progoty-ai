@@ -517,7 +517,7 @@ export const dispenseMedication = onCall(async (request) => {
           const inventoryDoc = await transaction.get(inventoryRef);
 
           if (!inventoryDoc.exists) {
-            throw new HttpsError("not-found", `Inventory record ${inventoryId} not found in clinic ${clinicId}.`);
+            throw new HttpsError("not-found", `Inventory record ${invId} not found in clinic ${cId}.`);
           }
 
           const available = Number(inventoryDoc.data()?.quantity) || 0;

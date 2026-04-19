@@ -1616,7 +1616,12 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
     const prescriptionPayload = {
       encounter_id: selectedItem.encounter_id,
       patient_id: selectedItem.patient_id,
-      prescriptions: consultData.prescriptions
+      prescriptions: (consultData.prescriptions || []).map((p: any) => ({
+        ...p,
+        status: 'Pending',
+        dispensedQuantity: 0,
+        remainingQuantity: p.quantity || 0
+      }))
     };
 
     // The Permanent Shield: Global Sanitizer

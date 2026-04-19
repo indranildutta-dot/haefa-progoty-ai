@@ -181,6 +181,10 @@ export interface Prescription {
   dosage?: string;
   frequency?: string;
   duration?: string;
+  // Added for Pharmacy Contract Consistency
+  status?: string;
+  dispensedQuantity?: number;
+  remainingQuantity?: number;
 }
 
 export interface VitalsRecord {

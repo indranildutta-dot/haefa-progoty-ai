@@ -58,7 +58,7 @@ const PrintPrescriptionDialog: React.FC<PrintPrescriptionDialogProps> = ({ open,
       <DialogContent dividers sx={{ p: 0, bgcolor: '#f1f5f9' }}>
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
           <Paper elevation={4} sx={{ borderRadius: 0 }}>
-            <div ref={componentRef} id="printable-prescription-content">
+            <div ref={componentRef} id="prescription-content">
               <PrescriptionPrintTemplate encounterId={encounterId} />
             </div>
           </Paper>

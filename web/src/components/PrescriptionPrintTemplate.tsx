@@ -93,8 +93,11 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
   };
 
   const formattedDate = (ts: any) => {
-    // Robust Fallback: Fallback to current local date if no timestamp is provided
-    if (!ts) return dayjs().format('DD MMM YYYY, hh:mm A');
+    // Robust Fallback: default to new Date().toLocaleDateString() and new Date().toLocaleTimeString()
+    if (!ts) {
+      const now = new Date();
+      return `${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
+    }
     try {
       // 1. Native dayjs/Date
       if (dayjs.isDayjs(ts)) return ts.format('DD MMM YYYY, hh:mm A');
@@ -132,15 +135,18 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
         return parsed.format('DD MMM YYYY, hh:mm A');
       }
 
-      return '-';
+      // Final Failover: Use current local time to avoid dash (-)
+      const now = new Date();
+      return `${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
     } catch (e) {
       console.error("Format Date Error:", e, ts);
-      return '-';
+      const now = new Date();
+      return `${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
     }
   };
 
   return (
-    <Box id="prescription-print-area" sx={{ 
+    <Box id="prescription-content" sx={{ 
       p: 4, 
       bgcolor: 'white', 
       minHeight: '297mm', 
@@ -163,10 +169,10 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
               visibility: hidden; 
               background: white !important;
             }
-            #prescription-print-area, #prescription-print-area * { 
+            #prescription-content, #prescription-content * { 
               visibility: visible; 
             }
-            #prescription-print-area { 
+            #prescription-content { 
               position: absolute; 
               left: 0; 
               top: 0; 
@@ -215,7 +221,7 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
         </Grid>
         <Grid size={{ xs: 3 }} sx={{ textAlign: 'right' }}>
           <Typography variant="caption" fontWeight="900" color="text.secondary" sx={{ display: 'block' }}>ENCOUNTER ID</Typography>
-          <Typography variant="h6" fontWeight="900" color="primary">#{encounterId.slice(-8).toUpperCase()}</Typography>
+          <Typography variant="h6" fontWeight="900" sx={{ color: '#2563eb' }}>#{encounterId.slice(-8).toUpperCase()}</Typography>
         </Grid>
       </Grid>
 
@@ -248,7 +254,7 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
       {/* Clinical Summary */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid size={{ xs: 12, md: 6 }}>
-          <Typography variant="subtitle2" fontWeight="900" color="primary" sx={{ mb: 1, textTransform: 'uppercase' }}>Clinical Assessment</Typography>
+          <Typography variant="subtitle2" fontWeight="900" sx={{ mb: 1, textTransform: 'uppercase', color: '#2563eb' }}>Clinical Assessment</Typography>
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, minHeight: 120 }}>
             <Typography variant="body2" sx={{ mb: 1 }}><strong>Complaints:</strong> {diagnosis?.chief_complaint || diagnosis?.notes || "None recorded"}</Typography>
             <Typography variant="body2" sx={{ mb: 1 }}>
@@ -261,7 +267,7 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
           </Paper>
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
-          <Typography variant="subtitle2" fontWeight="900" color="primary" sx={{ mb: 1, textTransform: 'uppercase' }}>Provisional Diagnosis</Typography>
+          <Typography variant="subtitle2" fontWeight="900" sx={{ mb: 1, textTransform: 'uppercase', color: '#2563eb' }}>Provisional Diagnosis</Typography>
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, minHeight: 120, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', bgcolor: '#fff7ed' }}>
             <Typography variant="h6" fontWeight="900" color="#9a3412" sx={{ textAlign: 'center' }}>
               {diagnosis?.diagnosis || "Pending Finalization"}
@@ -272,7 +278,7 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
 
       {/* Medication Table */}
       <Box sx={{ mb: 4 }}>
-        <Typography variant="subtitle2" fontWeight="900" color="primary" sx={{ mb: 1, textTransform: 'uppercase' }}>Prescribed Medications (Rx)</Typography>
+        <Typography variant="subtitle2" fontWeight="900" sx={{ mb: 1, textTransform: 'uppercase', color: '#2563eb' }}>Prescribed Medications (Rx)</Typography>
         <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3 }}>
           <Table size="small">
             <TableHead sx={{ bgcolor: '#f1f5f9' }}>
@@ -307,7 +313,7 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
       {/* Footer Sections */}
       <Grid container spacing={4} sx={{ mb: 6 }}>
         <Grid size={{ xs: 7 }}>
-          <Typography variant="subtitle2" fontWeight="900" color="primary" sx={{ mb: 1, textTransform: 'uppercase' }}>Advice & Referrals</Typography>
+          <Typography variant="subtitle2" fontWeight="900" sx={{ mb: 1, textTransform: 'uppercase', color: '#2563eb' }}>Advice & Referrals</Typography>
           <Box sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: 3, border: '1px solid #e2e8f0', minHeight: 100 }}>
             <Typography variant="body2" sx={{ mb: 1 }}><strong>Treatment Notes:</strong> {diagnosis?.treatment_notes || "Follow standard care."}</Typography>
             {diagnosis?.referrals && diagnosis.referrals.length > 0 && (
@@ -326,11 +332,11 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
             <Box sx={{ borderBottom: '1px solid black', width: '80%', mx: 'auto', mb: 1, height: 40, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
               <Typography 
                 variant="h5" 
-                color="primary"
                 sx={{ 
                   fontFamily: '"Caveat", "Brush Script MT", "Lucida Handwriting", cursive', 
                   transform: 'rotate(-2deg) translateY(4px)',
-                  fontWeight: 700 
+                  fontWeight: 700,
+                  color: '#2563eb'
                 }}
               >
                 {diagnosis?.prescriber_name || "Medical Officer"}
