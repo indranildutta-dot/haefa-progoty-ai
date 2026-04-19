@@ -76,6 +76,7 @@ import {
   getDocs
 } from 'firebase/firestore';
 import QRCode from 'qrcode';
+import { useReactToPrint } from 'react-to-print';
 import { 
   getCountryConfig 
 } from '../config/useCountry';
@@ -201,7 +202,100 @@ const PatientSearchResultItem: React.FC<{
 };
 
 // =============================================================================
-// REGISTRATION STATION (Sacred UI Architecture v2.1)
+// PATIENT ID CARD PRINT COMPONENT (CR90 Size: 3.63" x 2.37")
+// =============================================================================
+const HealthCardPrint: React.FC<{ badgeData: any }> = ({ badgeData }) => {
+  if (!badgeData) return null;
+  
+  return (
+    <Box sx={{ 
+      width: '3.63in', 
+      height: '2.37in', 
+      bgcolor: 'white', 
+      color: 'black', 
+      p: '15px', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      position: 'relative',
+      boxSizing: 'border-box',
+      border: '2px solid #004d40',
+      borderRadius: '12px',
+      overflow: 'hidden',
+      fontFamily: '"Inter", sans-serif',
+      // Force exact dimensions for printing
+      '@media print': {
+        width: '3.63in',
+        height: '2.37in',
+        pageBreakInside: 'avoid',
+        m: 0,
+        boxShadow: 'none',
+        '-webkit-print-color-adjust': 'exact',
+        'print-color-adjust': 'exact'
+      }
+    }}>
+      <Box sx={{ 
+        borderBottom: '2.5px solid #004d40', 
+        pb: '8px', 
+        textAlign: 'center',
+        mb: '6px'
+      }}>
+        <Typography sx={{ fontSize: '10pt', fontWeight: 900, textTransform: 'uppercase', color: '#111', lineHeight: 1.1 }}>
+          HEALTH AND EDUCATION FOR ALL, USA
+        </Typography>
+      </Box>
+      
+      <Typography sx={{ fontSize: '16pt', fontWeight: 900, color: '#00796b', textAlign: 'center', mb: '6px', letterSpacing: '1px' }}>
+        Health Card
+      </Typography>
+      
+      <Stack direction="row" spacing={2} sx={{ flex: 1, alignItems: 'center' }}>
+        <Box sx={{ 
+          width: '1.2in', 
+          height: '1.4in', 
+          border: '2.5px solid #004d40', 
+          borderRadius: '8px', 
+          overflow: 'hidden',
+          bgcolor: '#f8fafc'
+        }}>
+          {badgeData.photoUrl ? (
+            <img 
+              src={badgeData.photoUrl} 
+              alt="Patient" 
+              referrerPolicy="no-referrer"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+            />
+          ) : (
+            <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+               <Typography variant="caption" sx={{ fontSize: '8pt', fontWeight: 800 }}>NO PHOTO</Typography>
+            </Box>
+          )}
+        </Box>
+        
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
+          <Typography noWrap sx={{ fontSize: '10.5pt', fontWeight: 800, color: '#334155', mb: '4px', lineHeight: 1.1 }}>
+             {badgeData.clinicName || 'Clinic Name'}
+          </Typography>
+          <Typography sx={{ fontSize: '15pt', fontWeight: 900, color: '#1e3a8a', mb: '6px', lineHeight: 1.1, wordBreak: 'break-word', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            {badgeData.name}
+          </Typography>
+          <Typography sx={{ fontSize: '12pt', fontWeight: 800, color: '#475569' }}>
+            ID: {badgeData.patientId.slice(0, 12).toUpperCase()}
+          </Typography>
+        </Box>
+        
+        <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', ml: 'auto' }}>
+          <Box component="img" src={badgeData.qrCode} sx={{ width: '55pt', height: '55pt', border: '1px solid #e2e8f0', p: '2px', bgcolor: 'white' }} />
+          <Typography sx={{ fontSize: '6.5pt', fontWeight: 800, mt: '4px', textTransform: 'uppercase', color: '#64748b' }}>
+            VERIFY
+          </Typography>
+        </Box>
+      </Stack>
+    </Box>
+  );
+};
+
+// =============================================================================
+// REGISTRATION STATION (Sacred UI Architecture v2.2)
 // =============================================================================
 
 interface RegistrationStationProps {
@@ -212,6 +306,8 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
   countryId 
 }) => {
   const countryConfig = getCountryConfig(countryId);
+  const badgeRef = React.useRef<HTMLDivElement>(null);
+  
   const { 
     notify, 
     selectedClinic, 
@@ -586,13 +682,10 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
     }
   };
 
-  const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow || !badgeData) return;
-    const html = `<html><head><title>Health Card</title><style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap'); body { font-family: 'Inter', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f2f5; } .card { width: 85.6mm; height: 54mm; background: white; border: 1px solid #004d40; border-radius: 4px; padding: 8px; box-sizing: border-box; display: flex; flex-direction: column; position: relative; } .header { border-bottom: 1.5px solid #004d40; padding-bottom: 4px; text-align: center; font-size: 9px; font-weight: 900; } .card-title { font-size: 14px; font-weight: 900; color: #00796b; margin: 2px 0; text-align: center; } .card-content { display: flex; gap: 12px; flex: 1; align-items: center; } .photo { width: 20mm; height: 24mm; border: 1px solid #004d40; object-fit: cover; } .info { flex: 1; } .patient-name { font-size: 13px; font-weight: 900; color: #1a237e; } .id-no { font-size: 11px; font-weight: 800; } .qr { position: absolute; bottom: 6px; right: 6px; width: 14mm; height: 14mm; }</style></head><body><div class="card"><div class="header">HEALTH AND EDUCATION FOR ALL, USA</div><div class="card-title">Health Card</div><div class="card-content"><img class="photo" src="${badgeData.photoUrl || ''}" /><div class="info"><div class="patient-name">${badgeData.name}</div><div class="id-no">ID: ${badgeData.patientId.slice(0, 12).toUpperCase()}</div></div></div><img src="${badgeData.qrCode}" class="qr" /></div><script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();};</script></body></html>`;
-    printWindow.document.write(html);
-    printWindow.document.close();
-  };
+  const handlePrint = useReactToPrint({
+    contentRef: badgeRef,
+    documentTitle: badgeData ? `HealthCard-${badgeData.patientId.slice(0, 8)}` : 'HealthCard',
+  });
 
   const renderStepContent = (step: number) => {
     switch (step) {
@@ -1222,6 +1315,22 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
           </Stack>
         </Box>
       </Modal>
+
+      {/* Hidden high-fidelity printable badge */}
+      <Box sx={{ display: 'none' }}>
+        <div ref={badgeRef}>
+           <style>{`
+             @page {
+               size: 3.63in 2.37in;
+               margin: 0;
+             }
+             @media print {
+               body { margin: 0; }
+             }
+           `}</style>
+           <HealthCardPrint badgeData={badgeData} />
+        </div>
+      </Box>
     </StationLayout>
   );
 };
