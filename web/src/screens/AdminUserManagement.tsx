@@ -10,6 +10,8 @@ import { countries } from '../config/countries';
 import { useAppStore } from '../store/useAppStore';
 import { deleteUser } from '../services/adminService';
 
+import StationLayout from '../components/StationLayout';
+
 const AdminUserManagement = () => {
   const navigate = useNavigate();
   const { userProfile } = useAppStore();
@@ -119,15 +121,8 @@ const AdminUserManagement = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <IconButton onClick={() => navigate('/admin')} sx={{ mr: 2 }}>
-          <ArrowBackIcon />
-        </IconButton>
-        <Typography variant="h4">User Management</Typography>
-      </Box>
-      
-      <Box sx={{ mb: 4, p: 2, border: '1px solid #ccc', borderRadius: 2 }}>
+    <StationLayout title="User Management" stationName="Admin">
+      <Box>
         <Typography variant="h6">Invite/Update Staff</Typography>
         <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} fullWidth margin="normal" />
         
@@ -268,7 +263,7 @@ const AdminUserManagement = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </StationLayout>
   );
 };
 

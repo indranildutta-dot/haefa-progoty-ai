@@ -25,7 +25,7 @@ Each result displays:
 ### Available Actions
 - **REPRINT**: Opens a badge modal to reprint the patient's Health Card (Badge).
 - **EDIT**: Loads the patient's data into the registration form for updates.
-- **START VISIT**: Creates a new encounter and adds the patient to the **Vitals Station** queue.
+- **START VISIT**: Creates a new encounter and adds the patient to the **Body Measures** queue.
 
 ---
 

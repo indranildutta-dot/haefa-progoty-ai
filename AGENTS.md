@@ -51,7 +51,7 @@ The Doctor Station is the final point of clinical assessment and prescription.
   - **Professional IDs**: Always display `professional_reg_no` and `professional_body` on prescriptions (Doctor Station) and dispensing labels (Pharmacy Station).
   - **Designation**: Include the user's `designation` in the prescriber identification block.
   - **RBAC**: Ensure `doctor` and `nurse` roles have access to all clinical stations for their assigned clinics to support rural practitioner workflows.
-  - **Missing Info Warning**: Maintain the amber warning on the dashboard if `professional_reg_no` is missing for clinical staff.
+  - **Missing Info Warning**: Maintain the amber warning on the **Operations** station (`/dashboard`) if `professional_reg_no` is missing for clinical staff.
 
 ## 7. Sacred Section Strategy (Regression Prevention)
 To ensure that existing features, thresholds, and clinical logic are never lost during code updates, all agents MUST follow this protocol:
@@ -73,7 +73,7 @@ To ensure that existing features, thresholds, and clinical logic are never lost 
 - **BP Medication Warning**: Always display a prominent Amber Clinical Warning if `onBPMedication` is "Yes", as risk may be underestimated.
 - **CRA Locking & Overrides**: All pre-populated CRA fields (Age, Sex, BMI, SBP, Smoker, Diabetes) MUST be locked by default. Manual overrides must be recorded in the `overrides` array of the clinical assessment record.
 - **Pharmacy**: Inventory-coupled dispensing, Substitution/Return-Later logic, Professional ID stamps on labels.
-- **Operations Dashboard**: Real-time KPI aggregation, Bottleneck analysis, Triage distribution charts.
+- **Operations**: Real-time KPI aggregation, Bottleneck analysis, Triage distribution charts.
 
 ### Documentation as Source of Truth
 If a feature is implemented in code but missing from the `.md` file, the agent MUST update the `.md` file first to register it as a "Sacred Feature".

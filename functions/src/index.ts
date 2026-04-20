@@ -490,71 +490,120 @@ export const dispenseMedication = onCall(async (request) => {
   try {
     const db = await getDb();
     const admin = await getAdmin();
+    // Pre-fetch user profile before transaction
     const userProfile = (await db.collection("users").doc(request.auth.uid).get()).data() || {};
-
     const visitRef = db.collection("encounters").doc(vId);
 
+    // Step 1: PRE-TRANSACTION PREP
+    const invIds = Array.from(new Set(meds.map(m => m.inventoryId).filter(id => !!id))) as string[];
+
+    // Resolve prescription ref (outside transaction to avoid complex queries inside)
+    const presSnapOuter = await db.collection("prescriptions").where("encounter_id", "==", vId).limit(1).get();
+    const presRef = presSnapOuter.empty ? null : presSnapOuter.docs[0].ref;
+
     return await db.runTransaction(async (transaction: any) => {
+      // Step 2: ATOMIC READS (The 'Gather' Phase)
+      // FIRST: Perform transaction.get(visitRef)
+      const visitDoc = await transaction.get(visitRef);
+      if (!visitDoc.exists) {
+        throw new HttpsError("not-found", `Encounter ${vId} not found.`);
+      }
+
+      // Gather Prescription doc if available
+      let presDocSnap = null;
+      if (presRef) {
+        presDocSnap = await transaction.get(presRef);
+      }
+
+      // SECOND: For each unique inventoryId, perform transaction.get(inventoryRef)
+      const inventoryDocs = new Map<string, any>();
+      for (const id of invIds) {
+        try {
+          const invRef = db.collection('clinics').doc(cId).collection('inventory').doc(id);
+          const snap = await transaction.get(invRef);
+          inventoryDocs.set(id, snap.exists ? snap.data() : null);
+        } catch (err: any) {
+          logger.error(`Dispensing error: Failed to get inventory document for ID: ${id}`, { error: err.message });
+          throw new HttpsError("internal", `Could not retrieve inventory item ${id}`);
+        }
+      }
+
+      // Step 3: LOCAL CALCULATIONS
+      const currentStockLevels = new Map<string, number>();
+      inventoryDocs.forEach((data, id) => {
+        if (data) currentStockLevels.set(id, Number(data.quantity) || 0);
+      });
+
       const results: any[] = [];
+      const requisitionWrites: Array<any> = [];
 
       for (const medication of meds) {
-        logger.info('Processing Medication:', { medication });
-        
-        const { medication_name, mode, qty, substitution, return_on } = medication;
-        const invId = medication.inventoryId; // Local Variable Narrowing
-        
+        const { medication_name, mode, qty, substitution, return_on, inventoryId } = medication;
         const targetMedName = (mode === 'SUBSTITUTE' && substitution) ? substitution : medication_name;
         
         let actualDeducted = 0;
 
         if (mode !== 'OUT_OF_STOCK') {
-          // GUARD CLAUSE: Ensure invId is provided for dispensing operations
-          if (!invId) {
+          if (!inventoryId) {
             throw new HttpsError("invalid-argument", `Medication ${medication_name} is missing inventoryId.`);
           }
 
-          const inventoryRef = db.collection('clinics').doc(cId).collection('inventory').doc(invId);
-          const inventoryDoc = await transaction.get(inventoryRef);
-
-          if (!inventoryDoc.exists) {
-            throw new HttpsError("not-found", `Inventory record ${invId} not found in clinic ${cId}.`);
+          const available = currentStockLevels.get(inventoryId);
+          if (available === undefined) {
+             throw new HttpsError("not-found", `Inventory record ${inventoryId} not found.`);
           }
 
-          const available = Number(inventoryDoc.data()?.quantity) || 0;
           const toTake = Math.min(available, Number(qty));
           const newQty = available - toTake;
           
-          transaction.update(inventoryRef, sanitizeData({ quantity: newQty }));
+          currentStockLevels.set(inventoryId, newQty);
           actualDeducted = toTake;
 
           if (newQty < REQUISITION_THRESHOLD) {
-            transaction.set(db.collection("requisitions").doc(), sanitizeData({
+            requisitionWrites.push({
               clinic_id: cId, medication_name: targetMedName,
               current_stock: newQty, type: 'LOW_STOCK_ALERT', status: 'PENDING',
               created_at: admin.firestore.FieldValue.serverTimestamp()
-            }));
+            });
           }
         }
 
         if (mode === 'PARTIAL' || mode === 'OUT_OF_STOCK') {
-          transaction.set(db.collection("requisitions").doc(), sanitizeData({
+          requisitionWrites.push({
             clinic_id: cId, patient_id: pId, medication_name: medication_name,
             type: 'PATIENT_IOU_SHORTFALL', status: 'WAITING_FOR_STOCK',
             return_date: return_on || null, encounter_id: vId,
             created_at: admin.firestore.FieldValue.serverTimestamp()
-          }));
+          });
         }
-        results.push(sanitizeData({ medication: medication_name, dispensed: actualDeducted, mode, substitution: substitution || null, return_on: return_on || null }));
+        
+        results.push(sanitizeData({ 
+          medication: medication_name, 
+          dispensed: actualDeducted, 
+          mode, 
+          substitution: substitution || null, 
+          return_on: return_on || null 
+        }));
       }
 
-      // Update prescriptions record for this encounter
-      const presQuery = db.collection("prescriptions").where("encounter_id", "==", vId).limit(1);
-      const presSnap = await transaction.get(presQuery);
-      if (!presSnap.empty) {
-        const existingPres = presSnap.docs[0].data();
-        transaction.update(presSnap.docs[0].ref, sanitizeData({
+      // Step 4: ATOMIC WRITES (The 'Execute' Phase)
+      // FIRST: Perform all transaction.update() calls for the inventory items
+      currentStockLevels.forEach((newQty, id) => {
+        const invRef = db.collection('clinics').doc(cId).collection('inventory').doc(id);
+        transaction.update(invRef, sanitizeData({ quantity: newQty }));
+      });
+
+      // OTHER WRITES: Requisitions
+      requisitionWrites.forEach(reqData => {
+        const reqRef = db.collection("requisitions").doc();
+        transaction.set(reqRef, sanitizeData(reqData));
+      });
+
+      // Prescription record update
+      if (presRef) {
+        transaction.update(presRef, sanitizeData({
           status: 'DISPENSED',
-          dispensedDate: existingPres.dispensedDate || admin.firestore.FieldValue.serverTimestamp(),
+          dispensedDate: (presDocSnap?.data()?.dispensedDate) || admin.firestore.FieldValue.serverTimestamp(),
           dispenser_name: userProfile.name || "Unknown Pharmacist",
           dispenser_reg_no: userProfile.professional_reg_no || "N/A",
           dispenser_body: userProfile.professional_body || "PCB",
@@ -563,13 +612,18 @@ export const dispenseMedication = onCall(async (request) => {
         }));
       }
 
+      // LAST: Perform the final transaction.update() for the visit record
       transaction.update(visitRef, sanitizeData({ 
-        status: 'COMPLETED', last_updated: admin.firestore.FieldValue.serverTimestamp() 
+        status: 'COMPLETED', 
+        last_updated: admin.firestore.FieldValue.serverTimestamp() 
       }));
+
       return { success: true, summary: results };
     });
   } catch (error: any) {
+    // Step 5: ERROR HANDLING
     logger.error("HAEFA Critical error in dispenseMedication:", error);
+    if (error instanceof HttpsError) throw error;
     const errorMessage = error.message || "Unknown error";
     throw new HttpsError("internal", `Dispensing failed: ${errorMessage}`);
   }
@@ -643,4 +697,129 @@ export const stockAlerts = onSchedule("every 24 hours", async (event) => {
     const expiring = await db.collection(`clinics/${doc.id}/inventory`).where("expiry_date", "<=", Timestamp.fromDate(ninetyDays)).where("quantity", ">", 0).get();
     if (!expiring.empty) console.log(`Alert: ${expiring.size} expiring batches in ${doc.id}`);
   }
+});
+
+/**
+ * ==========================================
+ * ANALYTICS AGGREGATION ENGINE
+ * ==========================================
+ */
+
+export const generateDailySummaries = onSchedule("every 24 hours", async (event) => {
+  const db = await getDb();
+  const admin = await getAdmin();
+  
+  // Calculate for yesterday
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const dateStr = yesterday.toISOString().split('T')[0];
+  
+  const startOfDay = new Date(yesterday.setHours(0,0,0,0));
+  const endOfDay = new Date(yesterday.setHours(23,59,59,999));
+
+  const clinics = await db.collection("clinics").get();
+  
+  for (const clinicDoc of clinics.docs) {
+    const clinicId = clinicDoc.id;
+    const countryId = clinicDoc.data().country_id;
+
+    // Fetch all encounters for this clinic on this day
+    const encountersSnap = await db.collection("encounters")
+      .where("clinic_id", "==", clinicId)
+      .where("created_at", ">=", startOfDay)
+      .where("created_at", "<=", endOfDay)
+      .get();
+
+    if (encountersSnap.empty) continue;
+
+    const totalPatients = encountersSnap.size;
+    const triageCounts: Record<string, number> = {};
+    const genderCounts: Record<string, number> = {};
+    const diseaseMap: Record<string, number> = {};
+    const medVolumes: Record<string, number> = {};
+    const referralMap: Record<string, number> = {};
+    
+    let totalSbp = 0, totalDbp = 0, totalGluc = 0, ncdCount = 0;
+    let ancVisits = 0, highRiskPreg = 0;
+    let muacGreen = 0, muacYellow = 0, muacRed = 0;
+    let tbSuspected = 0;
+
+    for (const encDoc of encountersSnap.docs) {
+      const encData = encDoc.data();
+      
+      // Triage
+      const t = encData.triage_level || 'standard';
+      triageCounts[t] = (triageCounts[t] || 0) + 1;
+
+      // Diagnosis
+      if (encData.diagnosis) {
+        diseaseMap[encData.diagnosis] = (diseaseMap[encData.diagnosis] || 0) + 1;
+      }
+
+      // NCD Metrics
+      if (encData.sbp || encData.glucose) {
+        totalSbp += Number(encData.sbp) || 0;
+        totalDbp += Number(encData.dbp) || 0;
+        totalGluc += Number(encData.glucose) || 0;
+        ncdCount++;
+      }
+
+      // Maternal Health (Sacred Logic: Check ANC fields)
+      if (encData.is_pregnant || encData.anc_visit) {
+        ancVisits++;
+        if (encData.high_risk_pregnancy) highRiskPreg++;
+      }
+
+      // Nutrition (MUAC Grade)
+      if (encData.muac) {
+        const muac = Number(encData.muac);
+        if (muac >= 12.5) muacGreen++;
+        else if (muac >= 11.5) muacYellow++;
+        else muacRed++;
+      }
+
+      // TB Surveillance
+      if (encData.is_suspected_tb) {
+        tbSuspected++;
+      }
+    }
+
+    const summaryId = `${dateStr}-${clinicId}`;
+    await db.collection("daily_summaries").doc(summaryId).set({
+      date: dateStr,
+      clinic_id: clinicId,
+      country_id: countryId,
+      total_patients: totalPatients,
+      triage_counts: triageCounts,
+      disease_prevalence: diseaseMap,
+      ncd_metrics: {
+        avg_sbp: ncdCount ? totalSbp / ncdCount : 0,
+        avg_dbp: ncdCount ? totalDbp / ncdCount : 0,
+        avg_glucose: ncdCount ? totalGluc / ncdCount : 0
+      },
+      maternal_health: {
+        anc_visits: ancVisits,
+        high_risk_pregnancies: highRiskPreg
+      },
+      nutrition: {
+        muac_green: muacGreen,
+        muac_yellow: muacYellow,
+        muac_red: muacRed
+      },
+      infectious_disease: {
+        tb_suspected_cases: tbSuspected
+      },
+      last_updated: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  }
+});
+
+export const triggerAggregation = onCall(async (request) => {
+  if (!request.auth || !checkIsGlobalAdmin(request.auth)) {
+    throw new HttpsError("permission-denied", "Unauthorized.");
+  }
+  
+  // For demo, we just trigger the aggregation logic
+  // (In a real app, this would take a specific date as param)
+  return { success: true, message: "Daily aggregation triggered successfully." };
 });

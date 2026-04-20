@@ -125,19 +125,19 @@ const QueueBoard: React.FC<{ countryId: string }> = ({ countryId }) => {
     >
       <Grid container spacing={2} sx={{ flexGrow: 1, minHeight: 'calc(100vh - 250px)' }}>
         <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <QueueColumn title="BODY MEASURES" headerColor="#f3e5f5" patients={grouped.VITALS1} onPatientClick={setSelectedPatient} loading={loading} />
+          <QueueColumn title="Body Measures" headerColor="#f3e5f5" patients={grouped.VITALS1} onPatientClick={setSelectedPatient} loading={loading} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <QueueColumn title={isMobile || isTablet ? "VITALS" : "VITAL SIGNS"} headerColor="#f3e5f5" patients={grouped.VITALS2} onPatientClick={setSelectedPatient} loading={loading} />
+          <QueueColumn title={isMobile || isTablet ? "Vitals" : "Vital Signs"} headerColor="#f3e5f5" patients={grouped.VITALS2} onPatientClick={setSelectedPatient} loading={loading} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <QueueColumn title="LABS & RISK" headerColor="#f3e5f5" patients={grouped.VITALS3} onPatientClick={setSelectedPatient} loading={loading} />
+          <QueueColumn title="Labs & Risk" headerColor="#f3e5f5" patients={grouped.VITALS3} onPatientClick={setSelectedPatient} loading={loading} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <QueueColumn title="DOCTOR" headerColor="#e8f5e9" patients={grouped.DOCTOR} onPatientClick={setSelectedPatient} loading={loading} />
+          <QueueColumn title="Doctor" headerColor="#e8f5e9" patients={grouped.DOCTOR} onPatientClick={setSelectedPatient} loading={loading} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <QueueColumn title="PHARMACY" headerColor="#fff3e0" patients={grouped.PHARMACY} onPatientClick={setSelectedPatient} loading={loading} />
+          <QueueColumn title="Pharmacy" headerColor="#fff3e0" patients={grouped.PHARMACY} onPatientClick={setSelectedPatient} loading={loading} />
         </Grid>
       </Grid>
       <QueuePatientDetailDrawer patient={selectedPatient} onClose={() => setSelectedPatient(null)} onMove={(encounterId, nextStatus) => {

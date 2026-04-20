@@ -15,7 +15,12 @@ import {
   LocalHospital as LocalHospitalIcon,
   Medication as MedicationIcon,
   Dashboard as DashboardIcon,
-  Assignment as AssignmentIcon
+  Assignment as AssignmentIcon,
+  Straighten as StraightenIcon,
+  MonitorHeart as MonitorHeartIcon,
+  Science as ScienceIcon,
+  AssignmentInd as AssignmentIndIcon,
+  ViewQuilt as ViewQuiltIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import TopNavigation from './TopNavigation';
@@ -64,11 +69,11 @@ const StationLayout: React.FC<StationLayoutProps> = ({
   // Navigation Items including the Queue overview
   const navItems = [
     { label: 'Reg', to: '/registration', icon: <PersonAddIcon /> },
-    { label: 'Queue', to: '/queue', icon: <DashboardIcon /> },
-    { label: 'Body Measures', to: '/vitals-1', icon: <LocalHospitalIcon /> },
-    { label: 'Vitals', to: '/vitals-2', icon: <LocalHospitalIcon /> },
-    { label: 'Labs', to: '/labs-and-risk', icon: <LocalHospitalIcon /> },
-    { label: 'Doc', to: '/doctor', icon: <AssignmentIcon /> },
+    { label: 'Queue', to: '/queue', icon: <ViewQuiltIcon /> },
+    { label: 'Body Measures', to: '/vitals-1', icon: <StraightenIcon /> },
+    { label: 'Vital Signs', to: '/vitals-2', icon: <MonitorHeartIcon /> },
+    { label: 'Labs', to: '/labs-and-risk', icon: <ScienceIcon /> },
+    { label: 'Doc', to: '/doctor', icon: <AssignmentIndIcon /> },
     { label: 'Pharmacy', to: '/pharmacy', icon: <MedicationIcon /> },
   ];
 
@@ -114,7 +119,6 @@ const StationLayout: React.FC<StationLayoutProps> = ({
                       fontWeight: 900, 
                       color: '#0f172a',
                       fontSize: isMobile ? '1.5rem' : '2rem',
-                      textTransform: 'uppercase',
                       letterSpacing: '-0.02em'
                     }}
                   >

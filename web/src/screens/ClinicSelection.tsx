@@ -59,16 +59,6 @@ const ClinicSelection: React.FC<ClinicSelectionProps> = ({ selectedCountry, onSe
         <Button onClick={onBack} startIcon={<ArrowBack />} variant="outlined" sx={{ borderRadius: 2, fontWeight: 700 }}>
           Back
         </Button>
-        {userProfile?.role === 'global_admin' && (
-          <Button 
-            onClick={() => navigate('/admin')} 
-            variant="contained" 
-            color="secondary"
-            sx={{ borderRadius: 2, fontWeight: 700 }}
-          >
-            Admin Dashboard
-          </Button>
-        )}
         <Box sx={{ flexGrow: 1 }}>
           <Typography variant="h4" fontWeight={900} color="primary">Select Clinic</Typography>
           <Typography variant="subtitle1" color="text.secondary" fontWeight={700}>

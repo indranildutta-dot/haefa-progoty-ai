@@ -17,21 +17,73 @@ Every user has a profile in the `users` collection in Firestore.
   - `designation`: Official job title (e.g., Senior Nurse Practitioner).
 
 ## 2. Role Definitions & Permissions
-The system uses a flat role structure with clinic-based scoping.
+The system uses a tiered Role-Based Access Control (RBAC) structure. Permissions are scoped by Clinic, Country, or Global level.
 
-### Global Admin
-- **Access**: Full access to all countries, all clinics, and the User Management Dashboard.
-- **Identifiers**: Hardcoded emails (`indranil_dutta@haefa.org`, `ruhul_abid@haefa.org`) or `role: 'global_admin'`.
+### 2.1 Global Admin (`global_admin`)
+- **Primary Objective**: System-wide oversight and configuration.
+- **Capabilities**:
+  - Full access to the **User Management** dashboard (`/users`) to manage all staff across the entire system.
+  - Full access to **Advanced Reporting** (`/analytics`) with global aggregation capabilities.
+  - Can access any clinic operations without restriction.
+  - Can delete users permanently from the system.
+- **Access Scope**: System-wide (All countries, all clinics).
 
-### Country Admin
-- **Access**: Full access to all clinics within their `assignedCountries`.
-- **User Management**: Can manage users within their assigned countries.
+### 2.2 Country Admin (`country_admin`)
+- **Primary Objective**: Regional management and reporting.
+- **Capabilities**:
+  - Access to the **User Management** dashboard (`/users`) but restricted to managing users within their `assignedCountries`.
+  - Access to **Advanced Reporting** (`/analytics`) aggregated for their assigned countries.
+  - Full access to all clinical stations and **Operations** for clinics within their assigned countries.
+- **Access Scope**: Restricted to `assignedCountries`.
 
-### Clinical Roles (Doctor, Nurse, Pharmacy, Registration)
-- **Access**: Full access to all clinical stations (Registration, Vitals, Doctor, Pharmacy, Queue Board, Dashboard) for any clinic listed in their `assignedClinics`.
-- **Rural Clinic Logic**: In rural settings, nurses often act as practitioners. Therefore, clinical roles are not strictly siloed by station in the UI; any approved staff member assigned to a clinic can access any station within that clinic session.
+### 2.3 Doctor (`doctor`)
+- **Primary Objective**: Clinical assessment, diagnosis, and prescription.
+- **Capabilities**:
+  - Full access to **Doctor Station** for diagnostic assessment.
+  - Access to **Vitals Station** (Body Measures, Vital Signs, Labs & Risk) to review or input patient data.
+  - Access to **Registration** and **Pharmacy** stations to support clinic flow.
+  - Access to the **Operations** dashboard for real-time triage awareness.
+- **Access Scope**: Restricted to `assignedClinics`.
 
-## 3. Professional Identification Requirements
+### 2.4 Nurse (`nurse`)
+- **Primary Objective**: Triage, vitals collection, and primary care support.
+- **Capabilities**:
+  - Primary operator of **Vitals Station** (Body Measures, Vital Signs, Labs & Risk).
+  - High-level access to **Doctor Station** (Act as practitioners in rural settings where doctors may be unavailable).
+  - Full access to **Registration** and **Queue Board**.
+  - Access to **Operations** dashboard for flow monitoring.
+- **Access Scope**: Restricted to `assignedClinics`.
+
+### 2.5 Pharmacist (`pharmacist`)
+- **Primary Objective**: Medication dispensing and inventory management.
+- **Capabilities**:
+  - Full access to **Pharmacy** station for dispensing and inventory tracking.
+  - Can view clinical assessments in the **Doctor Station** to verify prescriptions.
+  - Access to **Queue Board** and **Operations**.
+- **Access Scope**: Restricted to `assignedClinics`.
+
+### 2.6 Registration (`registration`)
+- **Primary Objective**: Patient intake, identification, and card printing.
+- **Capabilities**:
+  - Full access to **Registration Station**.
+  - Access to **Queue Board** to monitor patient arrivals.
+- **Access Scope**: Restricted to `assignedClinics`.
+
+## 3. Station Visibility Matrix
+| Station | Global Admin | Country Admin | Doctor | Nurse | Pharmacist | Registration |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| User Management (`/users`) | ✅ | ✅ (Scoped) | ❌ | ❌ | ❌ | ❌ |
+| Advanced Reporting (`/analytics`) | ✅ | ✅ (Scoped) | ❌ | ❌ | ❌ | ❌ |
+| Operations (`/dashboard`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Registration | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Vitals Stations | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Doctor Station | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Pharmacy & Inventory | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Queue Board | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+*Note: Clinical staff (`doctor`, `nurse`, `pharmacist`, `registration`) must have `isApproved: true` and be checked into an `assignedClinic` to access the clinical stations.*
+
+## 4. Professional Identification Requirements
 To ensure legal validity of clinical outputs:
 - **Prescriptions**: Must include the prescriber's name, designation, and registration number.
 - **Dispensing Labels**: Must include the pharmacist's name and registration number.

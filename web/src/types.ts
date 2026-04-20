@@ -389,3 +389,62 @@ export interface PatientAllergy {
   medicationName?: string;
   notes?: string;
 }
+
+export interface DailySummary {
+  id?: string;
+  date: string;
+  clinic_id: string;
+  country_id: string;
+  total_patients: number;
+  new_patients: number;
+  triage_counts: Record<string, number>;
+  gender_counts: Record<string, number>;
+  age_group_counts: {
+    pediatric: number;
+    adult: number;
+    geriatric: number;
+  };
+  disease_prevalence: Record<string, number>;
+  avg_wait_times: {
+    reg_to_vitals: number;
+    vitals_to_doc: number;
+    doc_to_pharmacy: number;
+  };
+  medication_volumes: Record<string, number>;
+  referral_reasons: Record<string, number>;
+  ncd_metrics: {
+    avg_sbp: number;
+    avg_dbp: number;
+    avg_glucose: number;
+  };
+  maternal_health?: {
+    anc_visits: number;
+    high_risk_pregnancies: number;
+  };
+  nutrition?: {
+    muac_green: number;
+    muac_yellow: number;
+    muac_red: number;
+  };
+  infectious_disease?: {
+    tb_suspected_cases: number;
+  };
+  provider_metrics?: {
+    consultations_per_doctor: Record<string, number>;
+    screenings_per_nurse: Record<string, number>;
+    dispensations_per_pharmacist: Record<string, number>;
+  };
+  clinical_outcomes?: {
+    bp_controlled_rate: number; // % of patients with BP < 140/90
+    glucose_controlled_rate: number; // % of patients with controlled glucose
+  };
+  operational_efficiency?: {
+    hourly_visit_distribution: Record<string, number>; // "08": 15, "09": 22, etc.
+    avg_session_duration: Record<string, number>; // doctor: 8, pharmacy: 3
+  };
+  cv_risk_metrics?: {
+    lab_based: Record<string, number>; // "<5%": 10, "5-10%": 5, etc.
+    non_lab_based: Record<string, number>;
+  };
+  last_updated: Timestamp;
+}

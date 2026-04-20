@@ -27,7 +27,13 @@ import {
   PersonAdd as PersonAddIcon,
   LocalHospital as LocalHospitalIcon,
   Medication as MedicationIcon,
-  People as PeopleIcon
+  People as PeopleIcon,
+  Assessment as AssessmentIcon,
+  Straighten as StraightenIcon,
+  MonitorHeart as MonitorHeartIcon,
+  Science as ScienceIcon,
+  AssignmentInd as AssignmentIndIcon,
+  ViewQuilt as ViewQuiltIcon
 } from '@mui/icons-material';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
@@ -51,18 +57,18 @@ const TopNavigation: React.FC = () => {
   const isAdmin = userProfile?.role === 'global_admin' || userProfile?.role === 'country_admin';
 
   const navItems = [
-    ...(isAdmin ? [{ label: 'Operations', to: '/admin', icon: <DashboardIcon /> }] : []),
+    ...(isAdmin ? [{ label: 'Advanced Reporting', to: '/analytics', icon: <AssessmentIcon /> }] : []),
     ...(selectedClinic ? [
-      { label: 'Dashboard', to: '/dashboard', icon: <DashboardIcon /> },
+      { label: 'Operations', to: '/dashboard', icon: <DashboardIcon /> },
       { label: 'Registration', to: '/registration', icon: <PersonAddIcon /> },
-      { label: 'Body Measures', to: '/vitals-1', icon: <LocalHospitalIcon /> },
-      { label: 'Vital Signs', to: '/vitals-2', icon: <LocalHospitalIcon /> },
-      { label: 'Labs & Risk', to: '/labs-and-risk', icon: <LocalHospitalIcon /> },
-      { label: 'Doctor', to: '/doctor', icon: <MedicationIcon /> },
+      { label: 'Body Measures', to: '/vitals-1', icon: <StraightenIcon /> },
+      { label: 'Vital Signs', to: '/vitals-2', icon: <MonitorHeartIcon /> },
+      { label: 'Labs & Risk', to: '/labs-and-risk', icon: <ScienceIcon /> },
+      { label: 'Doctor', to: '/doctor', icon: <AssignmentIndIcon /> },
       { label: 'Pharmacy', to: '/pharmacy', icon: <MedicationIcon /> },
-      { label: 'Queue Board', to: '/queue', icon: <PeopleIcon /> },
+      { label: 'Queue Board', to: '/queue', icon: <ViewQuiltIcon /> },
     ] : []),
-    ...(isAdmin ? [{ label: 'Users', to: '/admin/users', icon: <PeopleIcon /> }] : []),
+    ...(isAdmin ? [{ label: 'User Management', to: '/users', icon: <PeopleIcon /> }] : []),
   ];
 
   const toggleDrawer = (open: boolean) => (event: React.KeyboardEvent | React.MouseEvent) => {

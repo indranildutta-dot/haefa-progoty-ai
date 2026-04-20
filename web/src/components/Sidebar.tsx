@@ -113,6 +113,42 @@ const Sidebar: React.FC<SidebarProps> = ({ user, mobileOpen, onClose }) => {
             </ListItem>
           ))}
         </List>
+
+        {user?.isApproved && (
+          <>
+            <Divider sx={{ my: 1 }} />
+            <Toolbar sx={{ px: 2, minHeight: '48px !important' }}>
+              <Typography variant="caption" color="text.secondary" fontWeight={900} sx={{ letterSpacing: 1 }}>
+                INSIGHTS & REPORTS
+              </Typography>
+            </Toolbar>
+            <List sx={{ px: 1 }}>
+              <ListItem disablePadding sx={{ mb: 0.5 }}>
+                <ListItemButton 
+                  component={NavLink}
+                  to="/analytics"
+                  onClick={onClose}
+                  sx={{ 
+                    borderRadius: 2,
+                    '&.active': {
+                      backgroundColor: 'primary.main',
+                      '& .MuiListItemIcon-root, & .MuiListItemText-primary': { color: 'primary.contrastText' }
+                    },
+                    '&:hover': { backgroundColor: 'primary.light', '& .MuiListItemIcon-root, & .MuiListItemText-primary': { color: 'primary.contrastText' } }
+                  }}
+                >
+                  <ListItemIcon sx={{ color: 'primary.main', minWidth: 40 }}>
+                    <AssessmentIcon />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Advanced Analytics" 
+                    primaryTypographyProps={{ variant: 'body2', fontWeight: 'medium' }} 
+                  />
+                </ListItemButton>
+              </ListItem>
+            </List>
+          </>
+        )}
       </Box>
       <Divider />
       <Box sx={{ p: 2, textAlign: 'center' }}>

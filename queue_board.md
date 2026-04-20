@@ -8,7 +8,7 @@ The Live Station Queue Board provides a real-time, high-density overview of all 
 ## 2. Visual Architecture
 The board is organized into five functional columns representing the clinical workflow:
 1. **Body Measures**: Initial registration and physical measurements.
-2. **Vitals**: Vital signs collection (BP, HR, Temp, etc.).
+2. **Vitals**: Vital signs collection (BP, HR, Temp, etc.). Displays as "Vital Signs" on larger screens.
 3. **Labs & Risk**: Laboratory investigations and clinical risk assessments.
 4. **Doctor**: Consultation with the medical officer.
 5. **Pharmacy**: Medication dispensing and counseling.
@@ -63,11 +63,10 @@ Waiting time is calculated as the difference between the patient's `created_at` 
 - **Interface**: `QueuePatient` (defined in `src/types.ts`).
 - **Collection**: `queue` (Firestore).
 - **Status Mapping**:
-  - `REGISTERED` -> Body Measures
-  - `WAITING_FOR_VITALS` -> Vitals
-  - `WAITING_FOR_VITALS_2` -> Labs & Risk
-  - `WAITING_FOR_VITALS_3` -> Doctor
-  - `READY_FOR_DOCTOR` / `IN_CONSULTATION` -> Doctor
+  - `REGISTERED` or `WAITING_FOR_VITALS` -> Body Measures
+  - `WAITING_FOR_VITALS_2` -> Vitals
+  - `WAITING_FOR_VITALS_3` -> Labs & Risk
+  - `READY_FOR_DOCTOR` or `IN_CONSULTATION` -> Doctor
   - `WAITING_FOR_PHARMACY` -> Pharmacy
 
 ### Components

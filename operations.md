@@ -1,9 +1,9 @@
-# Clinic Operations Dashboard Documentation
+# Operations Documentation
 
-This document serves as the definitive reference for the **Clinic Operations Dashboard** implementation. It details the administrative overview, performance metrics, and bottleneck analysis tools.
+This document serves as the definitive reference for the **Operations** station (formerly Clinic Operations Dashboard). It details the administrative overview, performance metrics, and bottleneck analysis tools.
 
 ## 1. Overview
-The Operations Dashboard is the "Command Center" for clinic managers and admins. It provides a real-time summary of patient volume, staff performance, and clinical bottlenecks.
+The Operations station is the "Command Center" for clinic managers and staff. It provides a real-time summary of patient volume, staff performance, and clinical bottlenecks.
 
 ## 2. Dashboard Scopes
 Admins can toggle between multiple views:

@@ -55,9 +55,9 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                   mode === 2 ? 'WAITING_FOR_VITALS_2' : 'WAITING_FOR_VITALS_3';
 
   // Title logic based on mode and device
-  const stationTitle = mode === 1 ? 'BODY MEASURES' :
-                       mode === 2 ? (isMobile || isTablet ? 'VITALS' : 'VITAL SIGNS') : 
-                       'LABS & RISK';
+  const stationTitle = mode === 1 ? 'Body Measures' :
+                       mode === 2 ? (isMobile || isTablet ? 'Vitals' : 'Vital Signs') : 
+                       'Labs & Risk';
 
   const stationName = mode === 1 ? 'Body Measures' : 
                       mode === 2 ? (isMobile || isTablet ? 'Vitals' : 'Vital Signs') : 

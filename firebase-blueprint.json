@@ -88,12 +88,43 @@
         "clinic_id": { "type": "string" }
       },
       "required": ["user_id", "type", "qty", "timestamp", "medication_id", "clinic_id"]
+    },
+    "DailySummary": {
+      "title": "DailySummary",
+      "description": "Aggregated daily clinical and operational metrics",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "clinic_id": { "type": "string" },
+        "country_id": { "type": "string" },
+        "total_patients": { "type": "number" },
+        "new_patients": { "type": "number" },
+        "triage_counts": { "type": "object" },
+        "gender_counts": { "type": "object" },
+        "disease_prevalence": { "type": "object" },
+        "avg_wait_times": { "type": "object" },
+        "medication_volumes": { "type": "object" },
+        "referral_reasons": { "type": "object" },
+        "ncd_metrics": { "type": "object" },
+        "maternal_health": { "type": "object" },
+        "nutrition": { "type": "object" },
+        "infectious_disease": { "type": "object" },
+        "provider_metrics": { "type": "object" },
+        "clinical_outcomes": { "type": "object" },
+        "operational_efficiency": { "type": "object" },
+        "last_updated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["date", "clinic_id", "country_id", "total_patients"]
     }
   },
   "firestore": {
     "patients": {
       "schema": "Patient",
       "description": "Collection of patients"
+    },
+    "daily_summaries": {
+      "schema": "DailySummary",
+      "description": "Aggregated daily clinical and operational metrics for the Advanced Analytics portal"
     },
     "clinic_metrics": {
       "schema": "object",
