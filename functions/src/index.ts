@@ -491,11 +491,13 @@ export const dispenseMedication = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "Missing clinicId, medications, encounterId, or patientId.");
   }
   
+  const authUid = request.auth.uid;
+  
   try {
     const db = await getDb();
     const admin = await getAdmin();
     // Pre-fetch user profile before transaction
-    const userProfile = (await db.collection("users").doc(request.auth.uid).get()).data() || {};
+    const userProfile = (await db.collection("users").doc(authUid).get()).data() || {};
     const visitRef = db.collection("encounters").doc(vId);
 
     // Step 1: PRE-TRANSACTION PREP
