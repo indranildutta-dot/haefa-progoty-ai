@@ -33,7 +33,8 @@ import {
   MonitorHeart as MonitorHeartIcon,
   Science as ScienceIcon,
   AssignmentInd as AssignmentIndIcon,
-  ViewQuilt as ViewQuiltIcon
+  ViewQuilt as ViewQuiltIcon,
+  History as HistoryIcon
 } from '@mui/icons-material';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
@@ -66,6 +67,7 @@ const TopNavigation: React.FC = () => {
       { label: 'Labs & Risk', to: '/labs-and-risk', icon: <ScienceIcon /> },
       { label: 'Doctor', to: '/doctor', icon: <AssignmentIndIcon /> },
       { label: 'Pharmacy', to: '/pharmacy', icon: <MedicationIcon /> },
+      { label: 'Patient History', to: '/patient-history', icon: <HistoryIcon /> },
       { label: 'Queue Board', to: '/queue', icon: <ViewQuiltIcon /> },
     ] : [])
   ];

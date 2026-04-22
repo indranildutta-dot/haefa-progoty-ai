@@ -371,3 +371,29 @@ export const getEncountersByPatient = async (patientId: string, includeArchived:
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Encounter[];
 };
+
+/**
+ * Fetches all related data for a patient's entire visit history.
+ */
+export const getPatientFullHistory = async (patientId: string) => {
+  try {
+    const [encounters, vitals, diagnoses, prescriptions, dispensations] = await Promise.all([
+      getPatientHistory(patientId),
+      getDocs(query(collection(db, "vitals"), where("patient_id", "==", patientId), orderBy("created_at", "desc"))),
+      getDocs(query(collection(db, "diagnoses"), where("patient_id", "==", patientId), orderBy("created_at", "desc"))),
+      getDocs(query(collection(db, "prescriptions"), where("patient_id", "==", patientId), orderBy("created_at", "desc"))),
+      getDocs(query(collection(db, "dispensations"), where("patient_id", "==", patientId), orderBy("created_at", "desc")))
+    ]);
+
+    return {
+      encounters,
+      vitals: vitals.docs.map(d => ({ id: d.id, ...d.data() })),
+      diagnoses: diagnoses.docs.map(d => ({ id: d.id, ...d.data() })),
+      prescriptions: prescriptions.docs.map(d => ({ id: d.id, ...d.data() })),
+      dispensations: dispensations.docs.map(d => ({ id: d.id, ...d.data() }))
+    };
+  } catch (error) {
+    console.error("Error fetching full patient history:", error);
+    throw error;
+  }
+};

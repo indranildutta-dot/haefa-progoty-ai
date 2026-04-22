@@ -689,6 +689,36 @@ export const dispenseMedication = onCall(async (request) => {
         transaction.set(newPresRef, cleanPresData);
       }
 
+      // SACRED ADDITION: Create a dedicated dispensation event record for history timeline
+      const dispEventRef = db.collection("dispensations").doc();
+      transaction.set(dispEventRef, sanitizeData({
+        encounter_id: vId,
+        patient_id: pId,
+        clinic_id: cId,
+        items: results,
+        dispenser_name: userProfile.name || "Unknown Pharmacist",
+        dispenser_reg_no: userProfile.professional_reg_no || "N/A",
+        dispenser_body: userProfile.professional_body || "PCB",
+        created_at: admin.firestore.FieldValue.serverTimestamp()
+      }));
+
+      // SACRED ADDITION: Create inventory logs
+      for (const res of results) {
+        if (res.dispensed > 0) {
+          const invLogRef = db.collection("inventory_logs").doc();
+          transaction.set(invLogRef, sanitizeData({
+            clinic_id: cId,
+            medication_name: res.medication,
+            type: 'dispense',
+            qty: res.dispensed,
+            user_id: authUid,
+            encounter_id: vId,
+            patient_id: pId,
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+          }));
+        }
+      }
+
       // LAST: Perform the final transaction.update() for the visit record
       const cleanVisitData = sanitizeData({ 
         status: 'COMPLETED', 

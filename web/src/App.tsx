@@ -12,6 +12,7 @@ import RegistrationStation from './screens/RegistrationStation';
 import VitalsStation from './screens/VitalsStation';
 import DoctorStation from './screens/DoctorStation';
 import PharmacyStation from './screens/PharmacyStation';
+import PatientHistory from './screens/PatientHistory';
 import QueueBoard from './screens/QueueBoard';
 import AdminUserManagement from './screens/AdminUserManagement';
 import AdminDashboard from './screens/AdminDashboard';
@@ -135,6 +136,10 @@ const App: React.FC = () => {
 
       <Route path="/pharmacy" element={
         isAuthorized() && selectedClinic ? <PharmacyStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+      } />
+
+      <Route path="/patient-history" element={
+        isAuthorized() && selectedClinic ? <PatientHistory /> : <Navigate to="/clinic-selection" />
       } />
 
       <Route path="/queue" element={
