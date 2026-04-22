@@ -487,6 +487,18 @@ exports.dispenseMedication = (0, https_1.onCall)(async (request) => {
                         return_date: return_on || null, encounter_id: vId,
                         created_at: admin.firestore.FieldValue.serverTimestamp()
                     });
+                    requisitionWrites.push({
+                        clinic_id: cId, patient_id: pId, medication_name: medication_name,
+                        type: 'PROCUREMENT_NEEDED', status: 'PENDING', encounter_id: vId,
+                        created_at: admin.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+                else if (!inventoryId) {
+                    requisitionWrites.push({
+                        clinic_id: cId, patient_id: pId, medication_name: medication_name,
+                        type: 'PROCUREMENT_NEEDED', status: 'PENDING', encounter_id: vId,
+                        created_at: admin.firestore.FieldValue.serverTimestamp()
+                    });
                 }
                 results.push((0, utils_1.sanitizeData)({
                     medication: medication_name,

@@ -222,35 +222,15 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
         medications: medsToDispense
       });
 
-      // Automated Requisitions for PROCUREMENT_NEEDED as requested
-      // We check if medicine is in inventory or if partial/out of stock
-      for (const med of prescriptions) {
-        const mode = dispensingModes[med.id];
-        const medNameLower = med.medicationName.toLowerCase().replace(/\s+/g, '');
-        const inStock = inventory.some(i => i.medication_id.toLowerCase().replace(/\s+/g, '') === medNameLower);
-        
-        if (!inStock || mode === 'PARTIAL' || mode === 'OUT_OF_STOCK') {
-          await addDoc(collection(db, "requisitions"), {
-            clinic_id: selectedClinic?.id,
-            patient_id: selectedItem.patient_id,
-            medication_name: med.medicationName,
-            type: 'PROCUREMENT_NEEDED',
-            status: 'PENDING',
-            encounter_id: selectedItem.encounter_id,
-            created_at: serverTimestamp()
-          });
-        }
-      }
-
       setLastEncounterId(selectedItem.encounter_id);
       setShowPrintDialog(true);
 
       notify("Patient visit finalized. Medications dispensed.", "success");
       setSelectedItem(null);
       setSelectedPatient(null);
-    } catch (e) { 
-      console.error("Dispensing error:", e);
-      notify("Error finalizing dispensing session", "error"); 
+    } catch (e: any) { 
+      console.error("Dispensing error completely captured:", e);
+      notify(`Error finalizing dispensing session: ${e.message}`, "error"); 
     } finally {
       setIsFinalizing(false);
     }

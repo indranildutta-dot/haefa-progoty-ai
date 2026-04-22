@@ -1795,7 +1795,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {/* Section 1: Assessment */}
                   <Box>
-                    <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>Section 1 — Clinical Assessment</Typography>
+                    <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>Section 1 — Required Clinical Assessment</Typography>
                     <ClinicalAssessmentPanel 
                       data={consultData.assessment} 
                       onChange={(val) => setConsultData(prev => ({ ...prev, assessment: val }))} 
@@ -1806,12 +1806,12 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
 
                   {/* Section 2: Notes */}
                   <Box>
-                    <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>Section 2 — Symptoms / Notes</Typography>
+                    <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>Section 2 — Optional Additional Notes</Typography>
                     <TextField 
                       fullWidth multiline rows={3} variant="outlined" 
                       value={consultData.notes || ''} 
                       onChange={(e) => setConsultData(prev => ({ ...prev, notes: e.target.value }))} 
-                      placeholder="Enter symptoms..." 
+                      placeholder="Enter optional additional notes..." 
                     />
                   </Box>
 
