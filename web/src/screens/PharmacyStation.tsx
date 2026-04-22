@@ -14,7 +14,7 @@ import InventoryIcon from '@mui/icons-material/Inventory';
 import HistoryIcon from '@mui/icons-material/History';
 import SearchIcon from '@mui/icons-material/Search';
 import LocalPharmacyIcon from '@mui/icons-material/LocalPharmacy';
-import { collection, query, where, getDocs, doc, addDoc, serverTimestamp, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, addDoc, serverTimestamp, onSnapshot, orderBy } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
 import { subscribeToQueue, updateQueueStatus, cancelQueueItem } from '../services/queueService';
@@ -282,9 +282,10 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       const start = historyFromDate.startOf('day').toDate();
       const end = historyToDate.endOf('day').toDate();
       
-      // Query prescriptions within the date range (in-memory filter for status to bypass composite index req)
+      // Query prescriptions that have been dispensed within the date range
       const q = query(
         collection(db, "prescriptions"),
+        where("status", "==", "DISPENSED"),
         where("updated_at", ">=", start),
         where("updated_at", "<=", end)
       );
@@ -292,9 +293,8 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       const snapshot = await getDocs(q);
       const records: any[] = [];
       
-      for (const doc of snapshot.docs) {
-        const data = doc.data();
-        if (data.status !== "DISPENSED") continue;
+      for (const d of snapshot.docs) {
+        const data = d.data();
         
         // Since we need to show patient name, we need to fetch the patient or use existing data if available
         // To be safe we fetch the patient name if it's not readily available.
@@ -311,7 +311,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
           data.dispensation_details.forEach((detail: any) => {
              records.push({
                ...detail,
-               id: `${doc.id}-${records.length}`,
+               id: `${d.id}-${records.length}`,
                date: data.updated_at?.toDate(),
                patientName,
                pharmacist: data.dispenser_name,
@@ -330,6 +330,35 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       notify("Failed to fetch dispensing history", "error");
     } finally {
       setIsHistoryLoading(false);
+    }
+  };
+
+  const repairLostTimestamps = async () => {
+    try {
+      const q = query(
+        collection(db, "prescriptions"),
+        where("status", "==", "DISPENSED")
+      );
+      const snapshot = await getDocs(q);
+      let count = 0;
+      for (const d of snapshot.docs) {
+        const data = d.data();
+        const isBad = !data.updated_at || (typeof data.updated_at === 'object' && Object.keys(data.updated_at).length === 0);
+        if (isBad) {
+            await updateDoc(doc(db, "prescriptions", d.id), {
+                updated_at: serverTimestamp()
+            });
+            count++;
+        }
+      }
+      if (count > 0) {
+        notify(`Repaired ${count} missing timestamps. You can now search!`, "success");
+      } else {
+        notify(`No missing timestamps found.`, "info");
+      }
+    } catch (err) {
+      console.error("Repair failed", err);
+      notify("Failed to repair timestamps", "error");
     }
   };
 
@@ -729,16 +758,28 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
             </LocalizationProvider>
           </Grid>
           <Grid size={{ xs: 12, md: 4 }}>
-            <Button 
-              variant="contained" 
-              size="large" 
-              startIcon={<SearchIcon />}
-              onClick={fetchDispensingHistory}
-              disabled={isHistoryLoading || !historyFromDate || !historyToDate}
-              sx={{ height: 56, width: '100%', fontWeight: 700 }}
-            >
-              Search History
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button 
+                variant="contained" 
+                size="large" 
+                startIcon={<SearchIcon />}
+                onClick={fetchDispensingHistory}
+                disabled={isHistoryLoading || !historyFromDate || !historyToDate}
+                sx={{ height: 56, flex: 1, fontWeight: 700 }}
+              >
+                Search History
+              </Button>
+              <Tooltip title="If records from before to this update are missing, click this to repair their invisible timestamps.">
+                <Button 
+                  variant="outlined" 
+                  color="warning"
+                  onClick={repairLostTimestamps}
+                  sx={{ height: 56, minWidth: '40px' }}
+                >
+                  <WarningIcon />
+                </Button>
+              </Tooltip>
+            </Box>
           </Grid>
         </Grid>
       </Paper>

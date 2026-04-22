@@ -69,8 +69,10 @@ export const deepSanitize = (data: any): any => {
   if (typeof data === 'object') {
     // IMPROVED: Safely check for Firestore FieldValue
     const constructorName = data.constructor?.name;
-    const isFieldValue = constructorName === 'FieldValue' || 
+    const isFieldValue = (data instanceof admin.firestore.FieldValue) ||
+                         constructorName === 'FieldValue' || 
                          constructorName === 'FirestoreFieldValue' ||
+                         constructorName?.endsWith('Transform') ||
                          (typeof data._methodName === 'string') ||
                          (data._sentinel !== undefined);
     

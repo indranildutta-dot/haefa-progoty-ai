@@ -87,8 +87,10 @@ const deepSanitize = (data) => {
     }
     if (typeof data === 'object') {
         const constructorName = data.constructor?.name;
-        const isFieldValue = constructorName === 'FieldValue' ||
+        const isFieldValue = (data instanceof admin.firestore.FieldValue) ||
+            constructorName === 'FieldValue' ||
             constructorName === 'FirestoreFieldValue' ||
+            constructorName?.endsWith('Transform') ||
             (typeof data._methodName === 'string') ||
             (data._sentinel !== undefined);
         if (isFieldValue) {

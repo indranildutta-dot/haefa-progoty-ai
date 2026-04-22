@@ -411,6 +411,8 @@ exports.dispenseMedication = (0, https_1.onCall)(async (request) => {
         const invIds = Array.from(new Set(meds.map(m => m.inventoryId).filter(id => !!id)));
         const presSnapOuter = await db.collection("prescriptions").where("encounter_id", "==", vId).limit(1).get();
         const presRef = presSnapOuter.empty ? null : presSnapOuter.docs[0].ref;
+        const qSnapOuter = await db.collection("queues_active").where("encounter_id", "==", vId).limit(1).get();
+        const qRef = qSnapOuter.empty ? null : qSnapOuter.docs[0].ref;
         return await db.runTransaction(async (transaction) => {
             console.log("[TX] Starting transaction");
             let phase = "READ";
@@ -438,6 +440,11 @@ exports.dispenseMedication = (0, https_1.onCall)(async (request) => {
             if (inventoryRefs.length > 0) {
                 logStep("READ", `getAll inventoryRefs count=${inventoryRefs.length}`);
                 inventorySnaps = await transaction.getAll(...inventoryRefs);
+            }
+            let queueDocSnap = null;
+            if (qRef) {
+                logStep("READ", `get ${qRef.path}`);
+                queueDocSnap = await transaction.get(qRef);
             }
             inventorySnaps.forEach((snap, idx) => {
                 inventoryDocs.set(invIds[idx], snap.exists ? snap.data() : null);
@@ -525,6 +532,14 @@ exports.dispenseMedication = (0, https_1.onCall)(async (request) => {
             phase = "WRITE";
             logStep("WRITE", `update encounter ${visitRef.path}`);
             transaction.update(visitRef, cleanVisitData);
+            if (qRef && queueDocSnap?.exists) {
+                phase = "WRITE";
+                logStep("WRITE", `update queue ${qRef.path} to COMPLETED`);
+                transaction.update(qRef, (0, utils_1.sanitizeData)({
+                    status: 'COMPLETED',
+                    updated_at: admin.firestore.FieldValue.serverTimestamp()
+                }));
+            }
             console.log("[TX] Transaction completed successfully");
             return { success: true, summary: results };
         });
