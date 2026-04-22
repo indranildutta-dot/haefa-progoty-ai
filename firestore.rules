@@ -2,15 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // ===============================================================
-    // Analytics & Reporting Tier (Top Priority)
-    // ===============================================================
-    match /daily_summaries/{summaryId} {
-      // Organization-wide analytical transparency
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
-    }
-
-    // ===============================================================
     // Helper Functions
     // ===============================================================
 
@@ -133,6 +124,18 @@ service cloud.firestore {
     // ===============================================================
     // Collection Rules
     // ===============================================================
+
+    match /daily_summaries/{summaryId} {
+      // Analytical data access restricted to staff and admins
+      allow read: if isApproved() && (
+        isGlobalAdmin() ||
+        resource.data.country_id in getUserData().get('assignedCountries', []) ||
+        resource.data.clinic_id in getUserData().get('assignedClinics', [])
+      );
+      // Aggregation is handled by server-side Cloud Functions (Admin SDK)
+      // Only Global Admins can manually correct metrics
+      allow write: if isGlobalAdmin();
+    }
 
     match /patients/{patientId} {
       allow read: if isApproved() && (

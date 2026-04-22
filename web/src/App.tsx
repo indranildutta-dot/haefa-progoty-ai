@@ -14,6 +14,7 @@ import DoctorStation from './screens/DoctorStation';
 import PharmacyStation from './screens/PharmacyStation';
 import QueueBoard from './screens/QueueBoard';
 import AdminUserManagement from './screens/AdminUserManagement';
+import AdminDashboard from './screens/AdminDashboard';
 import AdvancedAnalytics from './screens/AdvancedAnalytics';
 
 import { CircularProgress, Box, Typography, Container, Paper } from '@mui/material';
@@ -146,6 +147,10 @@ const App: React.FC = () => {
 
       <Route path="/analytics" element={
         isAuthorized() ? <AdvancedAnalytics /> : <Navigate to="/" />
+      } />
+
+      <Route path="/admin" element={
+        userProfile?.role === 'global_admin' || userProfile?.role === 'country_admin' ? <AdminDashboard /> : <Navigate to="/" />
       } />
 
       {/* CATCH-ALL REDIRECT */}

@@ -57,7 +57,7 @@ const TopNavigation: React.FC = () => {
   const isAdmin = userProfile?.role === 'global_admin' || userProfile?.role === 'country_admin';
 
   const navItems = [
-    ...(isAdmin ? [{ label: 'Advanced Reporting', to: '/analytics', icon: <AssessmentIcon /> }] : []),
+    ...(isAdmin ? [{ label: 'Admin Dashboard', to: '/admin', icon: <AssessmentIcon /> }] : []),
     ...(selectedClinic ? [
       { label: 'Operations', to: '/dashboard', icon: <DashboardIcon /> },
       { label: 'Registration', to: '/registration', icon: <PersonAddIcon /> },
@@ -67,8 +67,7 @@ const TopNavigation: React.FC = () => {
       { label: 'Doctor', to: '/doctor', icon: <AssignmentIndIcon /> },
       { label: 'Pharmacy', to: '/pharmacy', icon: <MedicationIcon /> },
       { label: 'Queue Board', to: '/queue', icon: <ViewQuiltIcon /> },
-    ] : []),
-    ...(isAdmin ? [{ label: 'User Management', to: '/users', icon: <PeopleIcon /> }] : []),
+    ] : [])
   ];
 
   const toggleDrawer = (open: boolean) => (event: React.KeyboardEvent | React.MouseEvent) => {

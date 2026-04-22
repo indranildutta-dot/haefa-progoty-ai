@@ -472,6 +472,7 @@ export const dispenseMedication = onCall(async (request) => {
       medication_name: string;
       mode: string;
       qty: number | string;
+      prescribed_qty?: number | string;
       inventoryId?: string;
       substitution?: string;
       return_on?: string;
@@ -568,10 +569,11 @@ export const dispenseMedication = onCall(async (request) => {
       const requisitionWrites: Array<any> = [];
 
       for (const medication of meds) {
-        const { medication_name, mode, qty, substitution, return_on, inventoryId } = medication;
+        const { medication_name, mode, qty, prescribed_qty, substitution, return_on, inventoryId } = medication;
         const targetMedName = (mode === 'SUBSTITUTE' && substitution) ? substitution : medication_name;
         
         let actualDeducted = 0;
+        let shortfall = Number(prescribed_qty) || Number(qty) || 0;
 
         if (mode !== 'OUT_OF_STOCK') {
           if (!inventoryId) {
@@ -588,6 +590,7 @@ export const dispenseMedication = onCall(async (request) => {
           
           currentStockLevels.set(inventoryId, newQty);
           actualDeducted = toTake;
+          shortfall = Math.max(0, shortfall - actualDeducted);
 
           if (newQty < REQUISITION_THRESHOLD) {
             requisitionWrites.push({
@@ -602,6 +605,7 @@ export const dispenseMedication = onCall(async (request) => {
           requisitionWrites.push({
             clinic_id: cId, patient_id: pId, medication_name: medication_name,
             type: 'PATIENT_IOU_SHORTFALL', status: 'WAITING_FOR_STOCK',
+            required_quantity: shortfall,
             return_date: return_on || null, encounter_id: vId,
             created_at: admin.firestore.FieldValue.serverTimestamp()
           });
@@ -609,12 +613,14 @@ export const dispenseMedication = onCall(async (request) => {
           requisitionWrites.push({
             clinic_id: cId, patient_id: pId, medication_name: medication_name,
             type: 'PROCUREMENT_NEEDED', status: 'PENDING', encounter_id: vId,
+            required_quantity: shortfall,
             created_at: admin.firestore.FieldValue.serverTimestamp()
           });
         } else if (!inventoryId) {
           requisitionWrites.push({
             clinic_id: cId, patient_id: pId, medication_name: medication_name,
             type: 'PROCUREMENT_NEEDED', status: 'PENDING', encounter_id: vId,
+            required_quantity: shortfall,
             created_at: admin.firestore.FieldValue.serverTimestamp()
           });
         }
@@ -662,6 +668,25 @@ export const dispenseMedication = onCall(async (request) => {
         phase = "WRITE";
         logStep("WRITE", `update prescription ${presRef.path}`);
         transaction.update(presRef, cleanPresData);
+      } else {
+        const newPresRef = db.collection("prescriptions").doc();
+        const cleanPresData = sanitizeData({
+          encounter_id: vId,
+          patient_id: pId,
+          clinic_id: cId,
+          status: 'DISPENSED',
+          dispensedDate: admin.firestore.FieldValue.serverTimestamp(),
+          dispenser_name: userProfile.name || "Unknown Pharmacist",
+          dispenser_reg_no: userProfile.professional_reg_no || "N/A",
+          dispenser_body: userProfile.professional_body || "PCB",
+          dispensation_details: results,
+          prescriptions: [],
+          created_at: admin.firestore.FieldValue.serverTimestamp(),
+          updated_at: admin.firestore.FieldValue.serverTimestamp()
+        });
+        phase = "WRITE";
+        logStep("WRITE", `create new prescription ${newPresRef.path}`);
+        transaction.set(newPresRef, cleanPresData);
       }
 
       // LAST: Perform the final transaction.update() for the visit record
@@ -717,6 +742,8 @@ export const bulkUpload = onCall(async (request) => {
   const admin = await getAdmin();
   const batch = db.batch();
   
+  const incomingStock = new Map<string, number>();
+
   worksheet?.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return;
     const medId = row.getCell(1).value?.toString().trim() || "";
@@ -725,14 +752,57 @@ export const bulkUpload = onCall(async (request) => {
     
     if (!medId || medId.toUpperCase().includes('EXAMPLE')) return;
     
+    const medLower = medId.toLowerCase().replace(/\s+/g, '');
+    incomingStock.set(medLower, (incomingStock.get(medLower) || 0) + qty);
+
     const docRef = db.collection(`clinics/${clinicId}/inventory`).doc();
     batch.set(docRef, { 
       medication_id: medId, 
-      med_id_lower: (medId || "").toLowerCase().replace(/\s+/g, ''), 
+      med_id_lower: medLower, 
       dosage, quantity: qty, 
       created_at: admin.firestore.FieldValue.serverTimestamp() 
     });
   });
+
+  // Automatically reconcile the incoming stock with pending procurement requests / shortfalls
+  const openReqsSnap = await db.collection("requisitions")
+     .where("clinic_id", "==", clinicId)
+     .where("status", "in", ["PENDING", "WAITING_FOR_STOCK"])
+     .get();
+
+  // Sort natively in JS to prioritize oldest requests first
+  const openReqs = openReqsSnap.docs
+     .map(d => ({ docSnap: d, data: d.data() }))
+     .sort((a, b) => (a.data.created_at?.toMillis() || 0) - (b.data.created_at?.toMillis() || 0));
+
+  for (const { docSnap, data } of openReqs) {
+     const medLower = (data.medication_name || "").toLowerCase().replace(/\s+/g, '');
+     if (incomingStock.has(medLower)) {
+        let remainingStock = incomingStock.get(medLower)!;
+        let reqQty = data.required_quantity || 0;
+        
+        if (remainingStock > 0 && reqQty > 0) {
+            let fulfilled = Math.min(remainingStock, reqQty);
+            let newReqQty = reqQty - fulfilled;
+            let newStock = remainingStock - fulfilled;
+            
+            incomingStock.set(medLower, newStock);
+            
+            batch.update(docSnap.ref, {
+               required_quantity: newReqQty,
+               status: newReqQty <= 0 ? 'FULFILLED' : data.status,
+               updated_at: admin.firestore.FieldValue.serverTimestamp()
+            });
+        } else if (remainingStock > 0 && data.type === 'LOW_STOCK_ALERT') {
+            // Fulfill the low stock alert if stock is now > 0
+            batch.update(docSnap.ref, {
+               status: 'FULFILLED',
+               updated_at: admin.firestore.FieldValue.serverTimestamp()
+            });
+        }
+     }
+  }
+
   await batch.commit();
   return { success: true };
 });

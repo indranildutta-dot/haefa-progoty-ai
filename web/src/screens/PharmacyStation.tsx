@@ -14,7 +14,9 @@ import InventoryIcon from '@mui/icons-material/Inventory';
 import HistoryIcon from '@mui/icons-material/History';
 import SearchIcon from '@mui/icons-material/Search';
 import LocalPharmacyIcon from '@mui/icons-material/LocalPharmacy';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc, serverTimestamp, onSnapshot, orderBy } from 'firebase/firestore';
+import * as XLSX from 'xlsx';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
 import { subscribeToQueue, updateQueueStatus, cancelQueueItem } from '../services/queueService';
@@ -71,6 +73,10 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [isInventoryLoading, setIsInventoryLoading] = useState(false);
 
+  // Procurement State
+  const [procurementRecords, setProcurementRecords] = useState<any[]>([]);
+  const [isProcurementLoading, setIsProcurementLoading] = useState(false);
+
   useEffect(() => {
     if (!selectedClinic) return;
     return subscribeToQueue('WAITING_FOR_PHARMACY' as any, setWaitingList, (err) => console.error(err));
@@ -104,10 +110,10 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const handleSelectPatient = async (item: any) => {
     try {
       setSelectedItem(item);
-      const [patient, medsSnapshot, vitals] = await Promise.all([
+      const [patient, medsSnapshot, pastMedsSnapshot] = await Promise.all([
         getPatientById(item.patient_id),
         getDocs(query(collection(db, "prescriptions"), where("encounter_id", "==", item.encounter_id))),
-        getVitalsByEncounter(item.encounter_id)
+        getDocs(query(collection(db, "prescriptions"), where("patient_id", "==", item.patient_id)))
       ]);
       const vitalsResult = await getVitalsByEncounter(item.encounter_id);
       setPatientVitals(vitalsResult);
@@ -116,16 +122,60 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       medsSnapshot.forEach(presDoc => {
         const presData = presDoc.data() as any;
         if (Array.isArray(presData.prescriptions)) {
+          // If the prescription doc is NOT already dispensed (unless we want to allow re-dispensing?)
+          // Usually we just show the array if it's there
           presData.prescriptions.forEach((med: any, index: number) => {
             allMeds.push({
               ...med,
               id: `${presDoc.id}-${index}`, // Unique key for local state
               presDocId: presDoc.id,
-              originalIndex: index
+              originalIndex: index,
+              isOwed: false
             });
           });
         }
       });
+      
+      // Calculate missing/owed meds from previous encounters
+      const owedMedsTracked = new Set<string>();
+      
+      // Sort in descending order to process the most recent past encounter first
+      const pastPres = pastMedsSnapshot.docs
+        .map(d => ({ id: d.id, ...d.data() } as any))
+        .filter(p => p.encounter_id !== item.encounter_id)
+        .sort((a, b) => (b.created_at?.toMillis() || 0) - (a.created_at?.toMillis() || 0));
+        
+      for (const pastDoc of pastPres) {
+        if (pastDoc.status === 'DISPENSED' && Array.isArray(pastDoc.dispensation_details)) {
+          for (const detail of pastDoc.dispensation_details) {
+            if ((detail.mode === 'PARTIAL' || detail.mode === 'OUT_OF_STOCK') && !owedMedsTracked.has(detail.medication)) {
+              owedMedsTracked.add(detail.medication);
+              
+              const originalPres = (pastDoc.prescriptions || []).find((p: any) => p.medicationName === detail.medication);
+              const originalQty = originalPres ? Number(originalPres.quantity) : 0;
+              const dispensedSoFar = Number(detail.dispensed) || 0;
+              const owedQty = Math.max(0, originalQty - dispensedSoFar);
+              
+              if (owedQty > 0) {
+                allMeds.push({
+                  medicationName: detail.medication,
+                  dosageValue: originalPres?.dosageValue || '',
+                  dosageUnit: originalPres?.dosageUnit || '',
+                  instructions: `[PREVIOUSLY OWED from ${new Date(pastDoc.created_at?.toMillis() || Date.now()).toLocaleDateString()}] Originally ordered: ${originalQty}, Dispensed earlier: ${dispensedSoFar}`,
+                  quantity: owedQty, // Current payload wants the owed qty
+                  isOwed: true,
+                  id: `owed-${pastDoc.id}-${detail.medication.replace(/\s+/g,'-')}`,
+                  presDocId: pastDoc.id,
+                  originalIndex: -1
+                });
+              }
+            } else if ((detail.mode === 'FULL' || detail.mode === 'SUBSTITUTE') && !owedMedsTracked.has(detail.medication)) {
+               // If we see it was eventually FULLY dispensed in another past encounter, mark it so we don't show it as owed anymore
+               owedMedsTracked.add(detail.medication);
+            }
+          }
+        }
+      }
 
       setSelectedPatient({ ...patient, currentVitals: vitalsResult, triage_level: item.triage_level });
       setPrescriptions(allMeds);
@@ -206,6 +256,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
           medication_name: med.medicationName,
           mode,
           qty: mode === 'SUBSTITUTE' && substitutionQty[med.id] ? Number(substitutionQty[med.id]) : (mode === 'PARTIAL' && partialQty[med.id] ? Number(partialQty[med.id]) : med.quantity),
+          prescribed_qty: Number(med.quantity) || 0,
           inventoryId,
           substitution: mode === 'SUBSTITUTE' ? inventory.find(i => i.id === substitutionMeds[med.id])?.medication_id : null,
           substitution_reason: mode === 'SUBSTITUTE' ? substitutionReasons[med.id] : null,
@@ -340,6 +391,54 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       console.error("Repair failed", err);
       notify("Failed to repair timestamps", "error");
     }
+  };
+
+  const fetchProcurementReport = async () => {
+    if (!selectedClinic) return;
+    setIsProcurementLoading(true);
+    try {
+      const qRef = query(collection(db, "requisitions"), where("clinic_id", "==", selectedClinic.id));
+      const snapshot = await getDocs(qRef);
+      // Filter out FULFILLED records to keep the report clean, or show everything
+      const records = snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.status !== 'FULFILLED');
+      records.sort((a: any, b: any) => (b.created_at?.toMillis() || 0) - (a.created_at?.toMillis() || 0));
+      setProcurementRecords(records);
+    } catch (e) {
+      console.error("Error fetching requisitions:", e);
+      notify("Error loading procurement report", "error");
+    } finally {
+      setIsProcurementLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 3 && procurementRecords.length === 0) {
+      fetchProcurementReport();
+    }
+  }, [activeTab, selectedClinic]);
+
+  const handleDownloadExcel = () => {
+    if (!procurementRecords.length) return;
+    
+    const formattedData = procurementRecords.map(r => ({
+      'Date': r.created_at ? dayjs(r.created_at.toDate()).format('DD/MM/YYYY HH:mm') : 'N/A',
+      'Medication Name': r.medication_name || 'Unknown',
+      'Requirement Type': r.type === 'LOW_STOCK_ALERT' ? 'Low Stock Warning' : 
+                          r.type === 'PATIENT_IOU_SHORTFALL' ? 'Patient Dispense Shortfall (IOU)' : 
+                          'Procurement Needed / New Med',
+      'Quantity Needed': r.required_quantity || 'N/A',
+      'Status': r.status || '',
+      'Current Stock Configured': r.current_stock || 0,
+      'Associated Patient ID': r.patient_id || 'N/A',
+      'Encounter ID': r.encounter_id || 'N/A'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(formattedData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Procurement_Needs");
+    
+    // Generate Excel file using xlsx package
+    XLSX.writeFile(workbook, `Procurement_Report_${dayjs().format('YYYY-MM-DD')}.xlsx`);
   };
 
   const handleBulkUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -823,6 +922,102 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     </Box>
   );
 
+  const renderProcurementReport = () => (
+    <Box>
+      <Paper sx={{ p: 4, mb: 4, borderRadius: 5 }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Box>
+             <Typography variant="h6" fontWeight="bold">Procurement & Over-prescribed Report</Typography>
+             <Typography variant="body2" color="text.secondary" mt={0.5}>
+               Tracks medicines that are low on stock, missing, or newly prescribed by doctors outside the existing inventory catalog.
+             </Typography>
+          </Box>
+          <Stack direction="row" spacing={2}>
+            <Button 
+              variant="outlined" 
+              onClick={fetchProcurementReport}
+              disabled={isProcurementLoading}
+            >
+              Refresh
+            </Button>
+            <Button 
+              variant="contained" 
+              color="success"
+              startIcon={<DownloadIcon />}
+              onClick={handleDownloadExcel}
+              disabled={procurementRecords.length === 0 || isProcurementLoading}
+            >
+              Download .xlsx
+            </Button>
+          </Stack>
+        </Stack>
+      </Paper>
+
+      <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 4, border: '1px solid #e2e8f0' }}>
+        <Table>
+          <TableHead sx={{ bgcolor: '#f8fafc' }}>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Medication</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', align: 'center' }}>Deficit Qty</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Linked Patient</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {isProcurementLoading ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                  <CircularProgress />
+                </TableCell>
+              </TableRow>
+            ) : procurementRecords.length > 0 ? (
+              procurementRecords.map((item) => (
+                <TableRow key={item.id} hover>
+                  <TableCell>
+                    {item.created_at ? dayjs(item.created_at.toDate()).format('DD/MM/YY HH:mm') : 'N/A'}
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{item.medication_name || 'Unknown'}</TableCell>
+                  <TableCell>
+                     <Chip 
+                        size="small"
+                        label={
+                          item.type === 'LOW_STOCK_ALERT' ? 'Low Stock' : 
+                          item.type === 'PATIENT_IOU_SHORTFALL' ? 'Patient Shortfall' : 
+                          'Procurement Needed'
+                        }
+                        color={
+                          item.type === 'LOW_STOCK_ALERT' ? 'warning' : 
+                          item.type === 'PATIENT_IOU_SHORTFALL' ? 'error' : 
+                          'info'
+                        }
+                     />
+                  </TableCell>
+                  <TableCell align="center">
+                    <Typography fontWeight="bold" color="error">{item.required_quantity || '-'}</Typography>
+                  </TableCell>
+                  <TableCell>{item.status}</TableCell>
+                  <TableCell>
+                    {item.patient_id ? (
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{item.patient_id.substring(0,8)}...</Typography>
+                    ) : '-'}
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                  <Typography color="text.secondary">No open procurement requisitions found.</Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Box>
+  );
+
   return (
     <StationLayout title="Pharmacy & Inventory" stationName="Pharmacy" showPatientContext={!!selectedItem}>
       <Container maxWidth="xl" sx={{ py: 3 }}>
@@ -836,11 +1031,12 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
               <Tab icon={<LocalPharmacyIcon />} label="Dispensing Queue" iconPosition="start" />
               <Tab icon={<InventoryIcon />} label="Medicine Inventory" iconPosition="start" />
               <Tab icon={<HistoryIcon />} label="Dispensing History" iconPosition="start" />
+              <Tab icon={<ShoppingCartIcon />} label="Procurement Report" iconPosition="start" />
             </Tabs>
           </Box>
         )}
 
-        {activeTab === 0 ? renderDispensingView() : activeTab === 1 ? renderInventoryView() : renderHistoryView()}
+        {activeTab === 0 ? renderDispensingView() : activeTab === 1 ? renderInventoryView() : activeTab === 2 ? renderHistoryView() : renderProcurementReport()}
       </Container>
 
       <CancelQueueDialog 
