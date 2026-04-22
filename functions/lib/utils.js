@@ -33,21 +33,13 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sanitizeData = exports.generateId = exports.checkIsGlobalAdmin = exports.REQUISITION_THRESHOLD = exports.SUPER_ADMIN_EMAILS = exports.getCrypto = exports.getDb = exports.getAdmin = void 0;
-let adminCache = null;
-const getAdmin = async () => {
-    if (!adminCache) {
-        adminCache = await Promise.resolve().then(() => __importStar(require("firebase-admin")));
-        if (!adminCache.apps.length) {
-            adminCache.initializeApp();
-        }
-    }
-    return adminCache;
-};
+exports.sanitizeData = exports.deepSanitize = exports.generateId = exports.checkIsGlobalAdmin = exports.REQUISITION_THRESHOLD = exports.SUPER_ADMIN_EMAILS = exports.getCrypto = exports.getDb = exports.getAdmin = void 0;
+const admin = __importStar(require("firebase-admin"));
+const getAdmin = async () => admin;
 exports.getAdmin = getAdmin;
 const getDb = async () => {
-    const admin = await (0, exports.getAdmin)();
-    return admin.firestore();
+    const db = admin.firestore();
+    return db;
 };
 exports.getDb = getDb;
 const getCrypto = async () => {
@@ -77,19 +69,44 @@ const generateId = async () => {
     }
 };
 exports.generateId = generateId;
-const sanitizeData = (data) => {
-    if (!data || typeof data !== 'object')
-        return {};
-    const sanitized = {};
-    for (const key in data) {
-        if (Object.prototype.hasOwnProperty.call(data, key)) {
-            const value = data[key];
-            if (value !== undefined && value !== null) {
-                sanitized[key] = value;
+const deepSanitize = (data) => {
+    if (data === undefined)
+        return null;
+    if (data === null)
+        return null;
+    if (typeof data === 'number') {
+        if (isNaN(data) || !isFinite(data))
+            return null;
+        return data;
+    }
+    if (data instanceof Date) {
+        return data;
+    }
+    if (Array.isArray(data)) {
+        return data.map(v => (0, exports.deepSanitize)(v));
+    }
+    if (typeof data === 'object') {
+        const constructorName = data.constructor?.name;
+        const isFieldValue = constructorName === 'FieldValue' ||
+            constructorName === 'FirestoreFieldValue' ||
+            (typeof data._methodName === 'string') ||
+            (data._sentinel !== undefined);
+        if (isFieldValue) {
+            return data;
+        }
+        const sanitized = {};
+        for (const key in data) {
+            if (Object.prototype.hasOwnProperty.call(data, key)) {
+                sanitized[key] = (0, exports.deepSanitize)(data[key]);
             }
         }
+        return sanitized;
     }
-    return sanitized;
+    return data;
+};
+exports.deepSanitize = deepSanitize;
+const sanitizeData = (data) => {
+    return (0, exports.deepSanitize)(data);
 };
 exports.sanitizeData = sanitizeData;
 //# sourceMappingURL=utils.js.map

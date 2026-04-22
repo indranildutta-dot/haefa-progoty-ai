@@ -350,22 +350,27 @@ export const saveConsultation = onCall(async (request) => {
     // GUARD CLAUSE for visitRef (encounterRef) - Local Narrowing Applied
     const visitRef = db.collection("encounters").doc(vId);
 
+    // Resolve queue ref (outside transaction to avoid complex queries inside)
+    const qSnapOuter = await db.collection("queues_active").where("encounter_id", "==", vId).limit(1).get();
+    const qRef = qSnapOuter.empty ? null : qSnapOuter.docs[0].ref;
+
     // Standard Transaction Pattern: Reads first, then Writes
     return await db.runTransaction(async (transaction: any) => {
       console.log(`HAEFA: Transaction active for ${vId}`);
 
       // 1. PERFORM ALL READS
-      const [encounterDoc, qSnap, userProfileDoc] = await Promise.all([
-        transaction.get(visitRef),
-        transaction.get(db.collection("queues_active").where("encounter_id", "==", vId).limit(1)),
-        transaction.get(db.collection("users").doc(authUid))
-      ]);
+      const encounterDoc = await transaction.get(visitRef);
+      const userProfileSnap = await transaction.get(db.collection("users").doc(authUid));
+      let queueDoc = null;
+      if (qRef) {
+        queueDoc = await transaction.get(qRef);
+      }
 
       if (!encounterDoc.exists) {
         throw new HttpsError("not-found", `Encounter ${vId} not found.`);
       }
 
-      const userProfile = userProfileDoc.data() || {};
+      const userProfile = (userProfileSnap?.data() as any) || {};
       const serverTime = admin.firestore.FieldValue.serverTimestamp();
 
       // 2. STAGE ALL WRITES
@@ -429,14 +434,12 @@ export const saveConsultation = onCall(async (request) => {
       }
 
       // E. Update Queue Entries
-      if (!qSnap.empty) {
-        qSnap.forEach((doc: any) => {
-          transaction.update(doc.ref, sanitizeData({ 
-            station: 'pharmacy',
-            status: 'WAITING_FOR_PHARMACY',
-            updated_at: serverTime 
-          }));
-        });
+      if (queueDoc && queueDoc.exists) {
+        transaction.update(queueDoc.ref, sanitizeData({ 
+          station: 'pharmacy',
+          status: 'WAITING_FOR_PHARMACY',
+          updated_at: serverTime 
+        }));
       }
 
       console.log(`HAEFA: Transaction commit staged for ${vId}`);
@@ -517,16 +520,16 @@ export const dispenseMedication = onCall(async (request) => {
 
       // SECOND: For each unique inventoryId, perform transaction.get(inventoryRef)
       const inventoryDocs = new Map<string, any>();
-      for (const id of invIds) {
-        try {
-          const invRef = db.collection('clinics').doc(cId).collection('inventory').doc(id);
-          const snap = await transaction.get(invRef);
-          inventoryDocs.set(id, snap.exists ? snap.data() : null);
-        } catch (err: any) {
-          logger.error(`Dispensing error: Failed to get inventory document for ID: ${id}`, { error: err.message });
-          throw new HttpsError("internal", `Could not retrieve inventory item ${id}`);
-        }
+      
+      const inventoryRefs = invIds.map(id => db.collection('clinics').doc(cId).collection('inventory').doc(id));
+      let inventorySnaps: any[] = [];
+      if (inventoryRefs.length > 0) {
+        inventorySnaps = await transaction.getAll(...inventoryRefs);
       }
+      
+      inventorySnaps.forEach((snap, idx) => {
+        inventoryDocs.set(invIds[idx], snap.exists ? snap.data() : null);
+      });
 
       // Step 3: LOCAL CALCULATIONS
       const currentStockLevels = new Map<string, number>();
@@ -601,9 +604,10 @@ export const dispenseMedication = onCall(async (request) => {
 
       // Prescription record update
       if (presRef) {
+        const presData = presDocSnap?.data() as any;
         transaction.update(presRef, sanitizeData({
           status: 'DISPENSED',
-          dispensedDate: (presDocSnap?.data()?.dispensedDate) || admin.firestore.FieldValue.serverTimestamp(),
+          dispensedDate: presData?.dispensedDate || admin.firestore.FieldValue.serverTimestamp(),
           dispenser_name: userProfile.name || "Unknown Pharmacist",
           dispenser_reg_no: userProfile.professional_reg_no || "N/A",
           dispenser_body: userProfile.professional_body || "PCB",

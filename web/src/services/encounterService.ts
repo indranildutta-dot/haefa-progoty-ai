@@ -332,7 +332,7 @@ export const markPrescriptionDispensed = async (prescriptionId: string) => {
   const docRef = doc(db, PRESCRIPTIONS_COLLECTION, prescriptionId);
   const pDoc = await getDoc(docRef);
   if (pDoc.exists()) {
-    const data = pDoc.data();
+    const data = pDoc.data() as any;
     await updateDoc(docRef, { 
       status: 'DISPENSED',
       updated_at: serverTimestamp()

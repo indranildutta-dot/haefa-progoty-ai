@@ -105,7 +105,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
 
       const allMeds: any[] = [];
       medsSnapshot.forEach(presDoc => {
-        const presData = presDoc.data();
+        const presData = presDoc.data() as any;
         if (Array.isArray(presData.prescriptions)) {
           presData.prescriptions.forEach((med: any, index: number) => {
             allMeds.push({
