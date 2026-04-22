@@ -68,6 +68,14 @@
         { "fieldPath": "quantity", "order": "ASCENDING" },
         { "fieldPath": "expiry_date", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "prescriptions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updated_at", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

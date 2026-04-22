@@ -11,6 +11,8 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import DownloadIcon from '@mui/icons-material/Download';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import InventoryIcon from '@mui/icons-material/Inventory';
+import HistoryIcon from '@mui/icons-material/History';
+import SearchIcon from '@mui/icons-material/Search';
 import LocalPharmacyIcon from '@mui/icons-material/LocalPharmacy';
 import { collection, query, where, getDocs, doc, addDoc, serverTimestamp, onSnapshot, orderBy } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
@@ -50,9 +52,16 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [lastEncounterId, setLastEncounterId] = useState<string | null>(null);
   
+  // History State
+  const [historyFromDate, setHistoryFromDate] = useState<Dayjs | null>(dayjs().subtract(7, 'day'));
+  const [historyToDate, setHistoryToDate] = useState<Dayjs | null>(dayjs());
+  const [historyRecords, setHistoryRecords] = useState<any[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  
   // Dispensing State
   const [dispensingModes, setDispensingModes] = useState<Record<string, string>>({});
   const [returnDates, setReturnDates] = useState<Record<string, Dayjs | null>>({});
+  const [partialQty, setPartialQty] = useState<Record<string, number | ''>>({});
   const [substitutionMeds, setSubstitutionMeds] = useState<Record<string, string | null>>({});
   const [substitutionReasons, setSubstitutionReasons] = useState<Record<string, string>>({});
   const [substitutionDosage, setSubstitutionDosage] = useState<Record<string, string>>({});
@@ -124,6 +133,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       // Initialize dispensing modes for each individual medication
       const initialModes: Record<string, string> = {};
       const initialDates: Record<string, Dayjs | null> = {};
+      const initialPartialQty: Record<string, number | ''> = {};
       const initialSubMeds: Record<string, string | null> = {};
       const initialSubReasons: Record<string, string> = {};
       const initialSubDosages: Record<string, string> = {};
@@ -132,6 +142,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       allMeds.forEach(m => {
         initialModes[m.id] = 'FULL';
         initialDates[m.id] = null;
+        initialPartialQty[m.id] = '';
         initialSubMeds[m.id] = null;
         initialSubReasons[m.id] = '';
         initialSubDosages[m.id] = '';
@@ -140,6 +151,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       
       setDispensingModes(initialModes);
       setReturnDates(initialDates);
+      setPartialQty(initialPartialQty);
       setSubstitutionMeds(initialSubMeds);
       setSubstitutionReasons(initialSubReasons);
       setSubstitutionDosage(initialSubDosages);
@@ -156,6 +168,11 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       if (mode === 'SUBSTITUTE') {
         if (!substitutionMeds[med.id] || !substitutionReasons[med.id] || !substitutionQty[med.id]) {
           return notify(`Please provide substitute medication, quantity, and reason for ${med.medicationName}`, "warning");
+        }
+      }
+      if (mode === 'PARTIAL') {
+        if (!partialQty[med.id]) {
+          return notify(`Please specify how many units were dispensed for partial fulfilment of ${med.medicationName}`, "warning");
         }
       }
       if ((mode === 'PARTIAL' || mode === 'OUT_OF_STOCK') && !returnDates[med.id]) {
@@ -188,7 +205,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
         return {
           medication_name: med.medicationName,
           mode,
-          qty: mode === 'SUBSTITUTE' && substitutionQty[med.id] ? Number(substitutionQty[med.id]) : med.quantity,
+          qty: mode === 'SUBSTITUTE' && substitutionQty[med.id] ? Number(substitutionQty[med.id]) : (mode === 'PARTIAL' && partialQty[med.id] ? Number(partialQty[med.id]) : med.quantity),
           inventoryId,
           substitution: mode === 'SUBSTITUTE' ? inventory.find(i => i.id === substitutionMeds[med.id])?.medication_id : null,
           substitution_reason: mode === 'SUBSTITUTE' ? substitutionReasons[med.id] : null,
@@ -252,6 +269,67 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       notify("Template downloaded", "success");
     } catch (err) {
       notify("Error downloading template", "error");
+    }
+  };
+
+  const fetchDispensingHistory = async () => {
+    if (!selectedClinic || !historyFromDate || !historyToDate) return;
+    
+    setIsHistoryLoading(true);
+    setHistoryRecords([]);
+    
+    try {
+      const start = historyFromDate.startOf('day').toDate();
+      const end = historyToDate.endOf('day').toDate();
+      
+      // Query prescriptions within the date range (in-memory filter for status to bypass composite index req)
+      const q = query(
+        collection(db, "prescriptions"),
+        where("updated_at", ">=", start),
+        where("updated_at", "<=", end)
+      );
+      
+      const snapshot = await getDocs(q);
+      const records: any[] = [];
+      
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        if (data.status !== "DISPENSED") continue;
+        
+        // Since we need to show patient name, we need to fetch the patient or use existing data if available
+        // To be safe we fetch the patient name if it's not readily available.
+        // It's better to fetch it to have accurate names for history
+        let patientName = "Unknown";
+        try {
+            const pData = await getPatientById(data.patient_id);
+            patientName = `${pData.given_name} ${pData.family_name}`;
+        } catch(e) {
+            console.error("Could not fetch patient name for history", e);
+        }
+
+        if (data.dispensation_details && Array.isArray(data.dispensation_details)) {
+          data.dispensation_details.forEach((detail: any) => {
+             records.push({
+               ...detail,
+               id: `${doc.id}-${records.length}`,
+               date: data.updated_at?.toDate(),
+               patientName,
+               pharmacist: data.dispenser_name,
+               encounterId: data.encounter_id
+             });
+          });
+        }
+      }
+      
+      // Sort in memory by date descending
+      records.sort((a, b) => b.date.getTime() - a.date.getTime());
+      
+      setHistoryRecords(records);
+    } catch (err) {
+      console.error("Error fetching dispensing history", err);
+      notify("Failed to fetch dispensing history", "error");
+    } finally {
+      setIsHistoryLoading(false);
     }
   };
 
@@ -434,15 +512,26 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
 
                           {(dispensingModes[med.id] === 'PARTIAL' || dispensingModes[med.id] === 'OUT_OF_STOCK') && (
                             <Box sx={{ mt: 2 }}>
-                              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                                <DatePicker
-                                  label="Return Date for IOU"
-                                  value={returnDates[med.id]}
-                                  onChange={(val) => setReturnDates(prev => ({ ...prev, [med.id]: val }))}
-                                  slotProps={{ textField: { fullWidth: true } }}
-                                  minDate={dayjs()}
-                                />
-                              </LocalizationProvider>
+                              <Stack spacing={2}>
+                                {dispensingModes[med.id] === 'PARTIAL' && (
+                                  <TextField 
+                                    label="Quantity Dispensed"
+                                    type="number"
+                                    required
+                                    value={partialQty[med.id] || ''}
+                                    onChange={(e) => setPartialQty(prev => ({ ...prev, [med.id]: e.target.value === '' ? '' : Number(e.target.value) }))}
+                                  />
+                                )}
+                                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                  <DatePicker
+                                    label="Return Date for IOU"
+                                    value={returnDates[med.id]}
+                                    onChange={(val) => setReturnDates(prev => ({ ...prev, [med.id]: val }))}
+                                    slotProps={{ textField: { fullWidth: true } }}
+                                    minDate={dayjs()}
+                                  />
+                                </LocalizationProvider>
+                              </Stack>
                             </Box>
                           )}
 
@@ -612,6 +701,107 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     </Box>
   );
 
+  const renderHistoryView = () => (
+    <Box>
+      <Paper sx={{ p: 3, mb: 4, borderRadius: 4 }}>
+        <Grid container spacing={3} alignItems="center">
+          <Grid size={{ xs: 12, md: 4 }}>
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <DatePicker
+                label="From Date"
+                value={historyFromDate}
+                onChange={(val) => setHistoryFromDate(val)}
+                slotProps={{ textField: { fullWidth: true } }}
+                maxDate={historyToDate || dayjs()}
+              />
+            </LocalizationProvider>
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <DatePicker
+                label="To Date"
+                value={historyToDate}
+                onChange={(val) => setHistoryToDate(val)}
+                slotProps={{ textField: { fullWidth: true } }}
+                minDate={historyFromDate || undefined}
+                maxDate={dayjs()}
+              />
+            </LocalizationProvider>
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Button 
+              variant="contained" 
+              size="large" 
+              startIcon={<SearchIcon />}
+              onClick={fetchDispensingHistory}
+              disabled={isHistoryLoading || !historyFromDate || !historyToDate}
+              sx={{ height: 56, width: '100%', fontWeight: 700 }}
+            >
+              Search History
+            </Button>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 4, border: '1px solid #e2e8f0' }}>
+        <Table>
+          <TableHead sx={{ bgcolor: '#f8fafc' }}>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 'bold' }}>Date & Time</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Patient</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Medication</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Dispensing Mode</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Qty Dispensed</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Pharmacist</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {isHistoryLoading ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                  <CircularProgress />
+                </TableCell>
+              </TableRow>
+            ) : historyRecords.length > 0 ? (
+              historyRecords.map((item) => (
+                <TableRow key={item.id} hover>
+                  <TableCell>
+                    {item.date ? dayjs(item.date).format('DD/MM/YYYY HH:mm') : 'N/A'}
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{item.patientName}</TableCell>
+                  <TableCell>
+                    {item.medication}
+                    {item.substitution && <Typography variant="caption" display="block" color="text.secondary">Sub for: {item.substitution}</Typography>}
+                  </TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={item.mode} 
+                      size="small" 
+                      color={item.mode === 'FULL' ? 'success' : item.mode === 'OUT_OF_STOCK' ? 'error' : 'warning'} 
+                      sx={{ fontWeight: 'bold', height: 24 }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{item.dispensed || 0}</TableCell>
+                  <TableCell>{item.pharmacist || 'Unknown'}</TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                  <Typography color="text.secondary">
+                    {historyRecords.length === 0 && !isHistoryLoading 
+                      ? "Search a date range to view dispensing history." 
+                      : "No records found for this period."}
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Box>
+  );
+
   return (
     <StationLayout title="Pharmacy & Inventory" stationName="Pharmacy" showPatientContext={!!selectedItem}>
       <Container maxWidth="xl" sx={{ py: 3 }}>
@@ -624,11 +814,12 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
             >
               <Tab icon={<LocalPharmacyIcon />} label="Dispensing Queue" iconPosition="start" />
               <Tab icon={<InventoryIcon />} label="Medicine Inventory" iconPosition="start" />
+              <Tab icon={<HistoryIcon />} label="Dispensing History" iconPosition="start" />
             </Tabs>
           </Box>
         )}
 
-        {activeTab === 0 ? renderDispensingView() : renderInventoryView()}
+        {activeTab === 0 ? renderDispensingView() : activeTab === 1 ? renderInventoryView() : renderHistoryView()}
       </Container>
 
       <CancelQueueDialog 

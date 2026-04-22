@@ -358,5 +358,10 @@ service cloud.firestore {
       allow read: if isApproved() && (isGlobalAdmin() || isStaff(resource.data.clinic_id));
       allow create: if isAuthenticated();
     }
+
+    match /requisitions/{reqId} {
+      allow read: if isApproved() && (isGlobalAdmin() || isStaff(resource.data.clinic_id));
+      allow write: if isApproved() && (isGlobalAdmin() || isStaff(request.resource.data.clinic_id));
+    }
   }
 }

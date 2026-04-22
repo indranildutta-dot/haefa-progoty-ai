@@ -393,9 +393,21 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
                   </Typography>
                 </Grid>
                 <Grid size={{ xs: 5 }} sx={{ textAlign: 'center' }}>
-                  <Box sx={{ borderBottom: '1px solid black', width: '80%', mx: 'auto', mb: 1, height: 30 }} />
+                  <Box sx={{ borderBottom: '1px solid black', width: '80%', mx: 'auto', mb: 1, height: 40, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                    <Typography 
+                      variant="h6" 
+                      sx={{ 
+                        fontFamily: '"Caveat", "Brush Script MT", "Lucida Handwriting", cursive', 
+                        transform: 'rotate(-2deg) translateY(4px)',
+                        fontWeight: 700,
+                        color: '#2563eb'
+                      }}
+                    >
+                      {prescription.dispenser_name || "Pharmacist"}
+                    </Typography>
+                  </Box>
                   <Typography variant="body2" fontWeight="900">{prescription.dispenser_name || "Pharmacist"}</Typography>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                     {prescription.dispenser_body || "PCB"} Reg No: {prescription.dispenser_reg_no || "N/A"}
                   </Typography>
                 </Grid>

@@ -412,18 +412,31 @@ exports.dispenseMedication = (0, https_1.onCall)(async (request) => {
         const presSnapOuter = await db.collection("prescriptions").where("encounter_id", "==", vId).limit(1).get();
         const presRef = presSnapOuter.empty ? null : presSnapOuter.docs[0].ref;
         return await db.runTransaction(async (transaction) => {
+            console.log("[TX] Starting transaction");
+            let phase = "READ";
+            let step = 0;
+            const logStep = (type, label) => {
+                step++;
+                console.log(`[TX][${step}] ${type} | phase=${phase} | ${label}`);
+                if (phase === "WRITE" && type === "READ") {
+                    console.error(`[TX][VIOLATION] READ AFTER WRITE DETECTED at step ${step}: ${label}`);
+                }
+            };
+            logStep("READ", `get ${visitRef.path}`);
             const visitDoc = await transaction.get(visitRef);
             if (!visitDoc.exists) {
                 throw new https_1.HttpsError("not-found", `Encounter ${vId} not found.`);
             }
             let presDocSnap = null;
             if (presRef) {
+                logStep("READ", `get ${presRef.path}`);
                 presDocSnap = await transaction.get(presRef);
             }
             const inventoryDocs = new Map();
             const inventoryRefs = invIds.map(id => db.collection('clinics').doc(cId).collection('inventory').doc(id));
             let inventorySnaps = [];
             if (inventoryRefs.length > 0) {
+                logStep("READ", `getAll inventoryRefs count=${inventoryRefs.length}`);
                 inventorySnaps = await transaction.getAll(...inventoryRefs);
             }
             inventorySnaps.forEach((snap, idx) => {
@@ -476,17 +489,23 @@ exports.dispenseMedication = (0, https_1.onCall)(async (request) => {
                     return_on: return_on || null
                 }));
             }
-            currentStockLevels.forEach((newQty, id) => {
+            for (const [id, newQty] of currentStockLevels.entries()) {
                 const invRef = db.collection('clinics').doc(cId).collection('inventory').doc(id);
-                transaction.update(invRef, (0, utils_1.sanitizeData)({ quantity: newQty }));
-            });
-            requisitionWrites.forEach(reqData => {
+                const cleanInvData = (0, utils_1.sanitizeData)({ quantity: newQty });
+                phase = "WRITE";
+                logStep("WRITE", `update inventory ${invRef.path} -> ${newQty}`);
+                transaction.update(invRef, cleanInvData);
+            }
+            for (const reqData of requisitionWrites) {
                 const reqRef = db.collection("requisitions").doc();
-                transaction.set(reqRef, (0, utils_1.sanitizeData)(reqData));
-            });
+                const cleanReqData = (0, utils_1.sanitizeData)(reqData);
+                phase = "WRITE";
+                logStep("WRITE", `create requisition ${reqRef.path}`);
+                transaction.set(reqRef, cleanReqData);
+            }
             if (presRef) {
                 const presData = presDocSnap?.data();
-                transaction.update(presRef, (0, utils_1.sanitizeData)({
+                const cleanPresData = (0, utils_1.sanitizeData)({
                     status: 'DISPENSED',
                     dispensedDate: presData?.dispensedDate || admin.firestore.FieldValue.serverTimestamp(),
                     dispenser_name: userProfile.name || "Unknown Pharmacist",
@@ -494,12 +513,19 @@ exports.dispenseMedication = (0, https_1.onCall)(async (request) => {
                     dispenser_body: userProfile.professional_body || "PCB",
                     dispensation_details: results,
                     updated_at: admin.firestore.FieldValue.serverTimestamp()
-                }));
+                });
+                phase = "WRITE";
+                logStep("WRITE", `update prescription ${presRef.path}`);
+                transaction.update(presRef, cleanPresData);
             }
-            transaction.update(visitRef, (0, utils_1.sanitizeData)({
+            const cleanVisitData = (0, utils_1.sanitizeData)({
                 status: 'COMPLETED',
                 last_updated: admin.firestore.FieldValue.serverTimestamp()
-            }));
+            });
+            phase = "WRITE";
+            logStep("WRITE", `update encounter ${visitRef.path}`);
+            transaction.update(visitRef, cleanVisitData);
+            console.log("[TX] Transaction completed successfully");
             return { success: true, summary: results };
         });
     }

@@ -504,9 +504,27 @@ export const dispenseMedication = onCall(async (request) => {
     const presSnapOuter = await db.collection("prescriptions").where("encounter_id", "==", vId).limit(1).get();
     const presRef = presSnapOuter.empty ? null : presSnapOuter.docs[0].ref;
 
+    // Resolve queue ref (outside transaction to avoid complex queries inside)
+    const qSnapOuter = await db.collection("queues_active").where("encounter_id", "==", vId).limit(1).get();
+    const qRef = qSnapOuter.empty ? null : qSnapOuter.docs[0].ref;
+
     return await db.runTransaction(async (transaction: any) => {
+      console.log("[TX] Starting transaction");
+      let phase: "READ" | "WRITE" = "READ";
+      let step = 0;
+
+      const logStep = (type: "READ" | "WRITE", label: string) => {
+        step++;
+        console.log(`[TX][${step}] ${type} | phase=${phase} | ${label}`);
+
+        if (phase === "WRITE" && type === "READ") {
+          console.error(`[TX][VIOLATION] READ AFTER WRITE DETECTED at step ${step}: ${label}`);
+        }
+      };
+
       // Step 2: ATOMIC READS (The 'Gather' Phase)
       // FIRST: Perform transaction.get(visitRef)
+      logStep("READ", `get ${visitRef.path}`);
       const visitDoc = await transaction.get(visitRef);
       if (!visitDoc.exists) {
         throw new HttpsError("not-found", `Encounter ${vId} not found.`);
@@ -515,6 +533,7 @@ export const dispenseMedication = onCall(async (request) => {
       // Gather Prescription doc if available
       let presDocSnap = null;
       if (presRef) {
+        logStep("READ", `get ${presRef.path}`);
         presDocSnap = await transaction.get(presRef);
       }
 
@@ -524,7 +543,15 @@ export const dispenseMedication = onCall(async (request) => {
       const inventoryRefs = invIds.map(id => db.collection('clinics').doc(cId).collection('inventory').doc(id));
       let inventorySnaps: any[] = [];
       if (inventoryRefs.length > 0) {
+        logStep("READ", `getAll inventoryRefs count=${inventoryRefs.length}`);
         inventorySnaps = await transaction.getAll(...inventoryRefs);
+      }
+
+      // Gather Queue doc if available
+      let queueDocSnap = null;
+      if (qRef) {
+        logStep("READ", `get ${qRef.path}`);
+        queueDocSnap = await transaction.get(qRef);
       }
       
       inventorySnaps.forEach((snap, idx) => {
@@ -591,21 +618,27 @@ export const dispenseMedication = onCall(async (request) => {
 
       // Step 4: ATOMIC WRITES (The 'Execute' Phase)
       // FIRST: Perform all transaction.update() calls for the inventory items
-      currentStockLevels.forEach((newQty, id) => {
+      for (const [id, newQty] of currentStockLevels.entries()) {
         const invRef = db.collection('clinics').doc(cId).collection('inventory').doc(id);
-        transaction.update(invRef, sanitizeData({ quantity: newQty }));
-      });
+        const cleanInvData = sanitizeData({ quantity: newQty });
+        phase = "WRITE";
+        logStep("WRITE", `update inventory ${invRef.path} -> ${newQty}`);
+        transaction.update(invRef, cleanInvData);
+      }
 
       // OTHER WRITES: Requisitions
-      requisitionWrites.forEach(reqData => {
+      for (const reqData of requisitionWrites) {
         const reqRef = db.collection("requisitions").doc();
-        transaction.set(reqRef, sanitizeData(reqData));
-      });
+        const cleanReqData = sanitizeData(reqData);
+        phase = "WRITE";
+        logStep("WRITE", `create requisition ${reqRef.path}`);
+        transaction.set(reqRef, cleanReqData);
+      }
 
       // Prescription record update
       if (presRef) {
         const presData = presDocSnap?.data() as any;
-        transaction.update(presRef, sanitizeData({
+        const cleanPresData = sanitizeData({
           status: 'DISPENSED',
           dispensedDate: presData?.dispensedDate || admin.firestore.FieldValue.serverTimestamp(),
           dispenser_name: userProfile.name || "Unknown Pharmacist",
@@ -613,15 +646,32 @@ export const dispenseMedication = onCall(async (request) => {
           dispenser_body: userProfile.professional_body || "PCB",
           dispensation_details: results,
           updated_at: admin.firestore.FieldValue.serverTimestamp()
-        }));
+        });
+        phase = "WRITE";
+        logStep("WRITE", `update prescription ${presRef.path}`);
+        transaction.update(presRef, cleanPresData);
       }
 
       // LAST: Perform the final transaction.update() for the visit record
-      transaction.update(visitRef, sanitizeData({ 
+      const cleanVisitData = sanitizeData({ 
         status: 'COMPLETED', 
         last_updated: admin.firestore.FieldValue.serverTimestamp() 
-      }));
+      });
+      phase = "WRITE";
+      logStep("WRITE", `update encounter ${visitRef.path}`);
+      transaction.update(visitRef, cleanVisitData);
+      
+      // Remove or mark as COMPLETED from active queues
+      if (qRef && queueDocSnap?.exists) {
+        phase = "WRITE";
+        logStep("WRITE", `update queue ${qRef.path} to COMPLETED`);
+        transaction.update(qRef, sanitizeData({
+          status: 'COMPLETED',
+          updated_at: admin.firestore.FieldValue.serverTimestamp()
+        }));
+      }
 
+      console.log("[TX] Transaction completed successfully");
       return { success: true, summary: results };
     });
   } catch (error: any) {
