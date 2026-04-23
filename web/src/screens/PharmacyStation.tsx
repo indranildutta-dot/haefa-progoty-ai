@@ -41,6 +41,20 @@ interface InventoryItem {
   expiry_date?: any;
 }
 
+const toDateSafely = (timestamp: any) => {
+  if (!timestamp) return null;
+  if (typeof timestamp.toDate === 'function') return timestamp.toDate();
+  if (timestamp instanceof Date) return timestamp;
+  if (typeof timestamp === 'number') return new Date(timestamp);
+  if (typeof timestamp === 'string') return new Date(timestamp);
+  return null;
+};
+
+const toMillisSafely = (timestamp: any) => {
+  const d = toDateSafely(timestamp);
+  return d ? d.getTime() : 0;
+};
+
 const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const { notify, selectedClinic, setSelectedPatient, userProfile } = useAppStore();
   const [activeTab, setActiveTab] = useState(0);
@@ -106,7 +120,9 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
 
   const formatWaitTime = (createdAt: any) => {
     if (!createdAt) return '0m';
-    const totalMinutes = Math.floor((Date.now() - createdAt.toDate().getTime()) / 60000);
+    const date = toDateSafely(createdAt);
+    if (!date) return '0m';
+    const totalMinutes = Math.floor((Date.now() - date.getTime()) / 60000);
     return totalMinutes < 60 ? `${totalMinutes}m` : `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
   };
 
@@ -138,7 +154,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
               presDocId: presDoc.id,
               originalIndex: index,
               isOwed: false,
-              visitDate: presData.created_at?.toDate() || new Date(),
+              visitDate: toDateSafely(presData.created_at) || new Date(),
               dispensedInfo: dispensation,
               pharmacistName: presData.dispenser_name,
               pharmacistRegNo: presData.dispenser_reg_no,
@@ -154,10 +170,10 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       const pastPres = pastMedsSnapshot.docs
         .map(d => ({ id: d.id, ...d.data() } as any))
         .filter(p => p.encounter_id !== item.encounter_id)
-        .sort((a, b) => (a.created_at?.toMillis() || 0) - (b.created_at?.toMillis() || 0)); // Sort ASC (Oldest first)
+        .sort((a, b) => toMillisSafely(a.created_at) - toMillisSafely(b.created_at)); // Sort ASC (Oldest first)
         
       for (const pastDoc of pastPres) {
-        const visitDate = pastDoc.created_at?.toDate() || new Date();
+        const visitDate = toDateSafely(pastDoc.created_at) || new Date();
         
         if (Array.isArray(pastDoc.dispensation_details)) {
           // If there's dispensation info, we look at what happened
@@ -396,7 +412,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
              records.push({
                ...detail,
                id: `${d.id}-${records.length}`,
-               date: data.updated_at?.toDate(),
+               date: toDateSafely(data.updated_at),
                patientName,
                pharmacist: data.dispenser_name,
                encounterId: data.encounter_id
@@ -454,7 +470,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       const snapshot = await getDocs(qRef);
       // Filter out FULFILLED records to keep the report clean, or show everything
       const records = snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.status !== 'FULFILLED');
-      records.sort((a: any, b: any) => (b.created_at?.toMillis() || 0) - (a.created_at?.toMillis() || 0));
+      records.sort((a: any, b: any) => toMillisSafely(b.created_at) - toMillisSafely(a.created_at));
       setProcurementRecords(records);
     } catch (e) {
       console.error("Error fetching requisitions:", e);
@@ -474,7 +490,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     if (!procurementRecords.length) return;
     
     const formattedData = procurementRecords.map(r => ({
-      'Date': r.created_at ? dayjs(r.created_at.toDate()).format('DD/MM/YYYY HH:mm') : 'N/A',
+      'Date': r.created_at ? dayjs(toDateSafely(r.created_at)).format('DD/MM/YYYY HH:mm') : 'N/A',
       'Medication Name': r.medication_name || 'Unknown',
       'Requirement Type': r.type === 'LOW_STOCK_ALERT' ? 'Low Stock Warning' : 
                           r.type === 'PATIENT_IOU_SHORTFALL' ? 'Patient Dispense Shortfall (IOU)' : 
@@ -744,7 +760,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                             {isAlreadyDispensed && (
                               <Box sx={{ mt: 2, p: 1.5, bgcolor: '#f1f5f9', borderRadius: 2, border: '1px solid #cbd5e1' }}>
                                 <Typography variant="body2" sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>
-                                  Dispensed By: <strong>{med.pharmacistName}</strong> ({med.pharmacistRegNo}) on {med.dispensedInfo?.created_at?.toDate ? dayjs(med.dispensedInfo.created_at.toDate()).format('DD/MM/YYYY') : 'N/A'}
+                                  Dispensed By: <strong>{med.pharmacistName}</strong> ({med.pharmacistRegNo}) on {toDateSafely(med.dispensedInfo?.created_at) ? dayjs(toDateSafely(med.dispensedInfo.created_at)).format('DD/MM/YYYY') : 'N/A'}
                                 </Typography>
                               </Box>
                             )}
@@ -1021,7 +1037,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                   </TableCell>
                   <TableCell>
                     {item.expiry_date ? (
-                      item.expiry_date.toDate ? dayjs(item.expiry_date.toDate()).format('DD/MM/YYYY') : 'N/A'
+                      toDateSafely(item.expiry_date) ? dayjs(toDateSafely(item.expiry_date)).format('DD/MM/YYYY') : 'N/A'
                     ) : 'N/A'}
                   </TableCell>
                 </TableRow>
@@ -1190,7 +1206,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
               <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Medication</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', align: 'center' }}>Deficit Qty</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }} align="center">Deficit Qty</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Linked Patient</TableCell>
             </TableRow>
@@ -1206,7 +1222,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
               procurementRecords.map((item) => (
                 <TableRow key={item.id} hover>
                   <TableCell>
-                    {item.created_at ? dayjs(item.created_at.toDate()).format('DD/MM/YY HH:mm') : 'N/A'}
+                    {item.created_at ? dayjs(toDateSafely(item.created_at)).format('DD/MM/YY HH:mm') : 'N/A'}
                   </TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>{item.medication_name || 'Unknown'}</TableCell>
                   <TableCell>

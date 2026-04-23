@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, forwardRef } from 'react';
 import { 
   Box, Typography, Grid, Card, CardContent, Table, TableBody, 
   TableCell, TableContainer, TableHead, TableRow, Paper, Divider, 
@@ -31,7 +31,7 @@ interface PrescriptionPrintTemplateProps {
   onReady?: () => void;
 }
 
-const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ encounterId, onReady }) => {
+const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTemplateProps>(({ encounterId, onReady }, ref) => {
   const { selectedClinic } = useAppStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -182,43 +182,54 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
   };
 
   return (
-    <Box id="prescription-content" sx={{ 
+    <Box ref={ref} id="prescription-content" sx={{ 
       p: 4, 
       bgcolor: 'white', 
       minHeight: '297mm', 
       width: '210mm', 
       mx: 'auto', 
       color: 'black',
+      position: 'relative',
+      '& *': {
+        printColorAdjust: 'exact',
+        WebkitPrintColorAdjust: 'exact',
+      },
       '@media print': {
-        p: 0,
+        p: '15mm',
         m: 0,
-        width: '100%',
-        minHeight: 'auto',
+        width: '210mm',
+        minHeight: '297mm',
         boxShadow: 'none',
         '.MuiBox-root': { boxShadow: 'none' }
       }
     }}>
       <style>
         {`
+          @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@700&display=swap');
+          
           @media print {
-            body { 
-              visibility: hidden; 
-              background: white !important;
-            }
-            #prescription-content, #prescription-content * { 
-              visibility: visible; 
-            }
-            #prescription-content { 
-              position: absolute; 
-              left: 0; 
-              top: 0; 
-              width: 100%;
-              padding: 0 !important;
-              margin: 0 !important;
-            }
             @page {
-              size: auto;
-              margin: 15mm;
+              size: A4;
+              margin: 0;
+            }
+            body {
+              margin: 0;
+              padding: 0;
+              background: white !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            #prescription-content {
+              box-shadow: none !important;
+              border: none !important;
+              width: 210mm !important;
+              min-height: 297mm !important;
+              margin: 0 !important;
+              padding: 15mm !important;
+            }
+            .MuiPaper-root {
+              border: 1px solid #e2e8f0 !important;
+              box-shadow: none !important;
             }
           }
         `}
@@ -481,6 +492,6 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
       </Box>
     </Box>
   );
-};
+});
 
 export default PrescriptionPrintTemplate;

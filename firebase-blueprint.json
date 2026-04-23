@@ -115,12 +115,36 @@
         "last_updated": { "type": "string", "format": "date-time" }
       },
       "required": ["date", "clinic_id", "country_id", "total_patients"]
+    },
+    "Requisition": {
+      "title": "Requisition",
+      "description": "Inventory and procurement requests",
+      "type": "object",
+      "properties": {
+        "clinic_id": { "type": "string" },
+        "medication_name": { "type": "string" },
+        "type": { "type": "string", "enum": ["LOW_STOCK_ALERT", "PATIENT_IOU_SHORTFALL", "PROCUREMENT_NEEDED", "DOCTOR_ORDER_NON_STOCK"] },
+        "status": { "type": "string", "enum": ["PENDING", "WAITING_FOR_STOCK", "FULFILLED"] },
+        "required_quantity": { "type": "number" },
+        "requested_qty": { "type": "number" },
+        "current_stock": { "type": "number" },
+        "patient_id": { "type": "string" },
+        "encounter_id": { "type": "string" },
+        "dosage": { "type": "string" },
+        "return_date": { "type": "string", "format": "date" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clinic_id", "medication_name", "type", "status", "created_at"]
     }
   },
   "firestore": {
     "patients": {
       "schema": "Patient",
       "description": "Collection of patients"
+    },
+    "requisitions": {
+      "schema": "Requisition",
+      "description": "Collection of procurement and stock notifications"
     },
     "daily_summaries": {
       "schema": "DailySummary",
