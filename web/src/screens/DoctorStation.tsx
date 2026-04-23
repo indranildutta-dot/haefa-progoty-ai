@@ -1645,6 +1645,8 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
         notify("Diagnosis marked as complete.", "success");
       } else {
         notify("Progress saved locally.", "info");
+        setSelectedItem(null);
+        setSelectedPatient(null);
       }
     } catch (e: any) {
       console.error('HAEFA SAVE ERROR:', e);

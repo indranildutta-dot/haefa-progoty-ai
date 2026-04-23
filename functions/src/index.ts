@@ -569,6 +569,7 @@ export const dispenseMedication = onCall(async (request) => {
 
       const results: any[] = [];
       const requisitionWrites: Array<any> = [];
+      let anyShortfallRemaining = false;
 
       for (const medication of meds) {
         const { medication_name, mode, qty, prescribed_qty, substitution, return_on, inventoryId } = medication;
@@ -604,6 +605,7 @@ export const dispenseMedication = onCall(async (request) => {
         }
 
         if (mode === 'PARTIAL' || mode === 'OUT_OF_STOCK') {
+          anyShortfallRemaining = true;
           requisitionWrites.push({
             clinic_id: cId, patient_id: pId, medication_name: medication_name,
             type: 'PATIENT_IOU_SHORTFALL', status: 'WAITING_FOR_STOCK',
@@ -618,13 +620,6 @@ export const dispenseMedication = onCall(async (request) => {
             required_quantity: shortfall,
             created_at: admin.firestore.FieldValue.serverTimestamp()
           });
-        } else if (!inventoryId) {
-          requisitionWrites.push({
-            clinic_id: cId, patient_id: pId, medication_name: medication_name,
-            type: 'PROCUREMENT_NEEDED', status: 'PENDING', encounter_id: vId,
-            required_quantity: shortfall,
-            created_at: admin.firestore.FieldValue.serverTimestamp()
-          });
         }
         
         results.push(sanitizeData({ 
@@ -632,7 +627,8 @@ export const dispenseMedication = onCall(async (request) => {
           dispensed: actualDeducted, 
           mode, 
           substitution: substitution || null, 
-          return_on: return_on || null 
+          return_on: return_on || null,
+          created_at: admin.firestore.FieldValue.serverTimestamp() 
         }));
       }
 
@@ -658,13 +654,19 @@ export const dispenseMedication = onCall(async (request) => {
       // Prescription record update
       if (presRef) {
         const presData = presDocSnap?.data() as any;
+        const existingDetails = Array.isArray(presData?.dispensation_details) ? presData.dispensation_details : [];
+        
+        // Merge results: If medication already has details, we might want to merge or append.
+        // Given we want history, APPENDING is safer to track every single event.
+        const mergedDetails = [...existingDetails, ...results];
+
         const cleanPresData = sanitizeData({
-          status: 'DISPENSED',
+          status: anyShortfallRemaining ? 'PARTIAL_DISPENSED' : 'DISPENSED',
           dispensedDate: presData?.dispensedDate || admin.firestore.FieldValue.serverTimestamp(),
           dispenser_name: userProfile.name || "Unknown Pharmacist",
           dispenser_reg_no: userProfile.professional_reg_no || "N/A",
           dispenser_body: userProfile.professional_body || "PCB",
-          dispensation_details: results,
+          dispensation_details: mergedDetails,
           updated_at: admin.firestore.FieldValue.serverTimestamp()
         });
         phase = "WRITE";
@@ -722,20 +724,21 @@ export const dispenseMedication = onCall(async (request) => {
       }
 
       // LAST: Perform the final transaction.update() for the visit record
+      const finalStatus = anyShortfallRemaining ? 'PHARMACY_IOU' : 'COMPLETED';
       const cleanVisitData = sanitizeData({ 
-        status: 'COMPLETED', 
+        status: finalStatus, 
         last_updated: admin.firestore.FieldValue.serverTimestamp() 
       });
       phase = "WRITE";
-      logStep("WRITE", `update encounter ${visitRef.path}`);
+      logStep("WRITE", `update encounter ${visitRef.path} to ${finalStatus}`);
       transaction.update(visitRef, cleanVisitData);
       
       // Remove or mark as COMPLETED from active queues
       if (qRef && queueDocSnap?.exists) {
         phase = "WRITE";
-        logStep("WRITE", `update queue ${qRef.path} to COMPLETED`);
+        logStep("WRITE", `update queue ${qRef.path} to ${finalStatus}`);
         transaction.update(qRef, sanitizeData({
-          status: 'COMPLETED',
+          status: finalStatus,
           updated_at: admin.firestore.FieldValue.serverTimestamp()
         }));
       }

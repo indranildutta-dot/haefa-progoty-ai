@@ -20,14 +20,19 @@ import {
   CalendarMonth as CalendarIcon,
   Download as DownloadIcon,
   ArrowBack as ArrowBackIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  Print as PrintIcon,
+  MonitorHeart as HeartIcon,
+  Science as LabIcon
 } from '@mui/icons-material';
 import { useAppStore } from '../store/useAppStore';
 import { searchPatients, getPatientById } from '../services/patientService';
 import { getPatientFullHistory } from '../services/encounterService';
 import StationLayout from '../components/StationLayout';
 import QrScannerModal from '../components/QrScannerModal';
+import PrintPrescriptionDialog from '../components/PrintPrescriptionDialog';
 import { Patient, Encounter, VitalsRecord, DiagnosisRecord, PrescriptionRecord } from '../types';
+import { calculateAgeDisplay } from '../utils/patient';
 import dayjs from 'dayjs';
 
 interface HistoryEvent {
@@ -46,6 +51,10 @@ const PatientHistory: React.FC = () => {
   const [history, setHistory] = useState<any>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
+  
+  // Printing State
+  const [reprintOpen, setReprintOpen] = useState(false);
+  const [reprintEncounterId, setReprintEncounterId] = useState<string | null>(null);
 
   // Search logic
   useEffect(() => {
@@ -92,6 +101,25 @@ const PatientHistory: React.FC = () => {
     }
   };
 
+  const handleReprintLatest = () => {
+    if (!history?.encounters?.length) {
+      notify("No prescriptions found for this patient", "info");
+      return;
+    }
+    
+    // Find latest encounter that has a prescription
+    const prescEncounters = history.encounters
+      .filter((e: Encounter) => history.prescriptions.some((p: PrescriptionRecord) => p.encounter_id === e.id))
+      .sort((a: Encounter, b: Encounter) => b.created_at.toMillis() - a.created_at.toMillis());
+      
+    if (prescEncounters.length > 0) {
+      setReprintEncounterId(prescEncounters[0].id);
+      setReprintOpen(true);
+    } else {
+      notify("No prescription records found in history", "info");
+    }
+  };
+
   const handleQrScan = async (data: string) => {
     setQrOpen(false);
     if (!data) return;
@@ -123,9 +151,6 @@ const PatientHistory: React.FC = () => {
   const renderTimeline = () => {
     if (!history) return null;
 
-    // Combine encounters and "Pharmacy Only" dispensations into a unified timeline
-    // A "Pharmacy Only" dispensation is one that happened on a day when there was no encounter creation
-    // OR it happened significantly later than the encounter
     const events: HistoryEvent[] = [];
 
     history.encounters.forEach((enc: Encounter) => {
@@ -137,12 +162,10 @@ const PatientHistory: React.FC = () => {
       });
     });
 
-    // Add dispensations that are essentially separate visits
     history.dispensations.forEach((disp: any) => {
       const dispDate = disp.created_at.toDate();
       const hasCloseEncounter = history.encounters.some((enc: Encounter) => {
         const encDate = enc.created_at.toDate();
-        // If within 4 hours of an encounter, consider it part of the encounter flow
         return Math.abs(dispDate.getTime() - encDate.getTime()) < 4 * 60 * 60 * 1000;
       });
 
@@ -156,8 +179,8 @@ const PatientHistory: React.FC = () => {
       }
     });
 
-    // Sort all events by date DESC
-    events.sort((a, b) => b.date.getTime() - a.date.getTime());
+    // Sort all events by date ASC (Oldest at top) as requested
+    events.sort((a, b) => a.date.getTime() - b.date.getTime());
 
     return (
       <Box sx={{ mt: 4 }}>
@@ -195,151 +218,211 @@ const PatientHistory: React.FC = () => {
                            </Typography>
                            {enc.triage_level && (
                              <Chip 
-                              label={enc.triage_level.toUpperCase()} 
-                              size="small" 
-                              sx={{ 
-                                height: 16, 
-                                fontSize: '0.65rem', 
-                                fontWeight: 900,
-                                bgcolor: getTriageColor(enc.triage_level),
-                                color: 'white'
-                              }} 
+                               label={enc.triage_level.toUpperCase()} 
+                               size="small" 
+                               sx={{ 
+                                 height: 16, 
+                                 fontSize: '0.65rem', 
+                                 fontWeight: 900,
+                                 bgcolor: getTriageColor(enc.triage_level),
+                                 color: 'white'
+                               }} 
                              />
                            )}
                         </Stack>
                       </Box>
-                      <Chip label={enc.status} color={enc.status === 'COMPLETED' ? 'success' : 'warning'} size="small" variant="outlined" />
+                      <Chip 
+                        label={(enc.status === 'COMPLETED' || diagnosis || prescription) ? 'COMPLETED' : `PROGRESS: ${enc.status.replace(/_/g, ' ')}`} 
+                        color={(enc.status === 'COMPLETED' || diagnosis || prescription) ? 'success' : 'warning'} 
+                        size="small" 
+                        variant="outlined" 
+                        sx={{ fontWeight: 900 }}
+                      />
                     </Stack>
                   </AccordionSummary>
                   <AccordionDetails>
-                    <Grid container spacing={3}>
-                      {/* Vitals Section */}
-                      <Grid item xs={12} md={4}>
-                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, bgcolor: '#f8fafc', height: '100%' }}>
-                          <Stack direction="row" spacing={1} alignItems="center" mb={2}>
-                            <VitalsIcon color="primary" fontSize="small" />
-                            <Typography variant="subtitle2" fontWeight="900">Vitals & Body Measures</Typography>
+                    <Grid container spacing={2}>
+                      {/* Body Measures */}
+                      <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+                        <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 3, bgcolor: '#f8fafc', height: '100%' }}>
+                          <Stack direction="row" spacing={1} alignItems="center" mb={1.5}>
+                            <VitalsIcon color="primary" sx={{ fontSize: 18 }} />
+                            <Typography variant="caption" fontWeight="900" sx={{ textTransform: 'uppercase' }}>Body Measures</Typography>
                           </Stack>
                           {vitals ? (
-                            <Stack spacing={1}>
+                            <Stack spacing={0.5}>
                               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Typography variant="body2" color="text.secondary">BP:</Typography>
-                                <Typography variant="body2" fontWeight="bold">{vitals.systolic}/{vitals.diastolic} mmHg</Typography>
+                                <Typography variant="caption" color="text.secondary">Weight:</Typography>
+                                <Typography variant="caption" fontWeight="bold">{vitals.weight || '--'} kg</Typography>
                               </Box>
                               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Typography variant="body2" color="text.secondary">HR / RR:</Typography>
-                                <Typography variant="body2" fontWeight="bold">{vitals.heartRate} bpm / {vitals.respiratoryRate} rpm</Typography>
+                                <Typography variant="caption" color="text.secondary">Height:</Typography>
+                                <Typography variant="caption" fontWeight="bold">{vitals.height || '--'} cm</Typography>
                               </Box>
                               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Typography variant="body2" color="text.secondary">Temp:</Typography>
-                                <Typography variant="body2" fontWeight="bold">{vitals.temperature}°C</Typography>
-                              </Box>
-                              <Divider sx={{ my: 1 }} />
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Typography variant="body2" color="text.secondary">Weight / Height:</Typography>
-                                <Typography variant="body2" fontWeight="bold">{vitals.weight}kg / {vitals.height}cm</Typography>
+                                <Typography variant="caption" color="text.secondary">BMI:</Typography>
+                                <Typography variant="caption" fontWeight="bold">
+                                  {vitals.bmi?.toFixed(1) || '--'} 
+                                  <span style={{ fontSize: '0.6rem', color: '#64748b', marginLeft: '2px' }}>({vitals.bmi_class || 'N/A'})</span>
+                                </Typography>
                               </Box>
                               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Typography variant="body2" color="text.secondary">BMI:</Typography>
-                                <Typography variant="body2" fontWeight="bold">{vitals.bmi?.toFixed(1)} ({vitals.bmi_class})</Typography>
-                              </Box>
-                              <Divider sx={{ my: 1 }} />
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Typography variant="body2" color="text.secondary">Random Glucose:</Typography>
-                                <Typography variant="body2" fontWeight="bold">{vitals.rbg || vitals.blood_sugar || '--'} mg/dL</Typography>
+                                <Typography variant="caption" color="text.secondary">MUAC:</Typography>
+                                <Typography variant="caption" fontWeight="bold">
+                                  {vitals.muac || '--'} cm
+                                  {vitals.muac_class && <span style={{ fontSize: '0.6rem', color: '#64748b', marginLeft: '2px' }}>({vitals.muac_class})</span>}
+                                </Typography>
                               </Box>
                             </Stack>
                           ) : (
-                            <Typography variant="body2" color="text.secondary">No vitals recorded.</Typography>
+                            <Typography variant="caption" color="text.secondary">No data.</Typography>
+                          )}
+                        </Paper>
+                      </Grid>
+
+                      {/* Vital Signs */}
+                      <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+                        <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 3, bgcolor: '#fff5f5', height: '100%', border: '1px solid #fee2e2' }}>
+                          <Stack direction="row" spacing={1} alignItems="center" mb={1.5}>
+                            <HeartIcon sx={{ fontSize: 18, color: '#dc2626' }} />
+                            <Typography variant="caption" fontWeight="900" sx={{ textTransform: 'uppercase', color: '#991b1b' }}>Vital Signs</Typography>
+                          </Stack>
+                          {vitals ? (
+                            <Stack spacing={0.5}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="caption" color="text.secondary">BP:</Typography>
+                                <Typography variant="caption" fontWeight="bold">{vitals.systolic || '--'}/{vitals.diastolic || '--'} mmHg</Typography>
+                              </Box>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="caption" color="text.secondary">HR:</Typography>
+                                <Typography variant="caption" fontWeight="bold">{vitals.heartRate || '--'} bpm</Typography>
+                              </Box>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="caption" color="text.secondary">RR:</Typography>
+                                <Typography variant="caption" fontWeight="bold">{vitals.respiratoryRate || '--'} rpm</Typography>
+                              </Box>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="caption" color="text.secondary">Temp:</Typography>
+                                <Typography variant="caption" fontWeight="bold">{vitals.temperature || '--'}°C</Typography>
+                              </Box>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="caption" color="text.secondary">SpO2:</Typography>
+                                <Typography variant="caption" fontWeight="bold">{vitals.oxygenSaturation || '--'}%</Typography>
+                              </Box>
+                            </Stack>
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">No data.</Typography>
+                          )}
+                        </Paper>
+                      </Grid>
+
+                      {/* Labs & Risks */}
+                      <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+                        <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 3, bgcolor: '#f5f3ff', height: '100%', border: '1px solid #ddd6fe' }}>
+                          <Stack direction="row" spacing={1} alignItems="center" mb={1.5}>
+                            <LabIcon sx={{ fontSize: 18, color: '#7c3aed' }} />
+                            <Typography variant="caption" fontWeight="900" sx={{ textTransform: 'uppercase', color: '#5b21b6' }}>Labs & Risks</Typography>
+                          </Stack>
+                          {vitals ? (
+                            <Stack spacing={0.5}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="caption" color="text.secondary">Glucose:</Typography>
+                                <Box sx={{ textAlign: 'right' }}>
+                                  <Typography variant="caption" fontWeight="bold" sx={{ display: 'block' }}>{vitals.rbg || vitals.blood_sugar || '--'} mg/dL</Typography>
+                                  {(vitals.rbg || vitals.blood_sugar) && (
+                                    <Typography variant="caption" sx={{ fontSize: '0.6rem', color: '#7c3aed' }}>
+                                      {vitals.is_fasting ? '(Fasting)' : '(Random)'}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              </Box>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="caption" color="text.secondary">Cholesterol:</Typography>
+                                <Typography variant="caption" fontWeight="bold">{vitals.total_cholesterol || '--'} mg/dL</Typography>
+                              </Box>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="caption" color="text.secondary">HDL:</Typography>
+                                <Typography variant="caption" fontWeight="bold">{vitals.hdl_cholesterol || '--'} mg/dL</Typography>
+                              </Box>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="caption" color="text.secondary">Hb:</Typography>
+                                <Typography variant="caption" fontWeight="bold">{vitals.hemoglobin || '--'} g/dL</Typography>
+                              </Box>
+                            </Stack>
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">No data.</Typography>
                           )}
                         </Paper>
                       </Grid>
 
                       {/* Doctor Section */}
-                      <Grid item xs={12} md={4}>
-                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, bgcolor: '#f0f9ff', height: '100%', border: '1px solid #bae6fd' }}>
-                          <Stack direction="row" spacing={1} alignItems="center" mb={2}>
-                            <DiagnosisIcon color="primary" fontSize="small" />
-                            <Typography variant="subtitle2" fontWeight="900">Clinical Assessment</Typography>
+                      <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+                        <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 3, bgcolor: '#f0f9ff', height: '100%', border: '1px solid #bae6fd' }}>
+                          <Stack direction="row" spacing={1} alignItems="center" mb={1.5}>
+                            <DiagnosisIcon color="primary" sx={{ fontSize: 18 }} />
+                            <Typography variant="caption" fontWeight="900" sx={{ textTransform: 'uppercase', color: '#0369a1' }}>Doctor Assessment</Typography>
                           </Stack>
                           {diagnosis ? (
-                            <Stack spacing={1.5}>
+                            <Stack spacing={1}>
                               <Box>
-                                <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ display: 'block' }}>DIAGNOSIS</Typography>
-                                <Typography variant="body2" fontWeight="bold">{diagnosis.diagnosis}</Typography>
+                                <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ display: 'block', fontSize: '0.65rem' }}>DIAGNOSIS</Typography>
+                                <Typography variant="caption" fontWeight="bold" sx={{ display: 'block' }}>{diagnosis.diagnosis || 'Undiagnosed'}</Typography>
                               </Box>
                               {diagnosis.notes && (
                                 <Box>
-                                  <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ display: 'block' }}>DOCTOR NOTES</Typography>
-                                  <Typography variant="body2" sx={{ fontStyle: 'italic' }}>{diagnosis.notes}</Typography>
+                                  <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ display: 'block', fontSize: '0.65rem' }}>DOCTOR NOTES</Typography>
+                                  <Typography variant="caption" sx={{ fontStyle: 'italic', display: 'block', lineHeight: 1.2 }}>{diagnosis.notes}</Typography>
                                 </Box>
                               )}
-                              <Box>
-                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>PRESCRIBER</Typography>
-                                <Typography variant="caption" fontWeight="bold">{diagnosis.prescriber_name || 'Staff'}</Typography>
-                              </Box>
+                              <Typography variant="caption" sx={{ borderTop: '1px solid #e0f2fe', pt: 0.5, fontSize: '0.6rem', color: '#64748b' }}>
+                                Prescriber: {diagnosis.prescriber_name || 'Medical Officer'}
+                              </Typography>
                             </Stack>
                           ) : (
-                            <Typography variant="body2" color="text.secondary">Consultation in progress or skipped.</Typography>
+                            <Typography variant="caption" color="text.secondary">Consultation skipped.</Typography>
                           )}
                         </Paper>
                       </Grid>
 
                       {/* Pharmacy Section */}
-                      <Grid item xs={12} md={4}>
-                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, bgcolor: '#f0fdf4', height: '100%', border: '1px solid #bbf7d0' }}>
-                          <Stack direction="row" spacing={1} alignItems="center" mb={2}>
-                            <PharmacyIcon sx={{ color: '#10b981' }} fontSize="small" />
-                            <Typography variant="subtitle2" fontWeight="900" sx={{ color: '#166534' }}>Pharmacy & Dispensing</Typography>
+                      <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+                        <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 3, bgcolor: '#f0fdf4', height: '100%', border: '1px solid #bbf7d0' }}>
+                          <Stack direction="row" spacing={1} alignItems="center" mb={1.5}>
+                            <PharmacyIcon sx={{ color: '#10b981', fontSize: 18 }} />
+                            <Typography variant="caption" fontWeight="900" sx={{ textTransform: 'uppercase', color: '#166534' }}>Pharmacy & Dispensing</Typography>
                           </Stack>
                           {prescription ? (
-                            <Stack spacing={1.5}>
+                            <Stack spacing={1}>
                               <Box>
-                                <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ display: 'block' }}>PRESCRIPTIONS</Typography>
-                                <List dense sx={{ p: 0 }}>
+                                <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ display: 'block', fontSize: '0.65rem' }}>PRESCRIPTIONS</Typography>
+                                <Box sx={{ mt: 0.5 }}>
                                     {prescription.prescriptions.map((p, i) => (
-                                      <ListItem key={i} sx={{ px: 0, py: 0.25 }}>
-                                        <ListItemText 
-                                          primary={<Typography variant="caption" fontWeight="bold">{p.medicationName}</Typography>}
-                                          secondary={<Typography variant="caption">{p.dosageValue}{p.dosageUnit} x {p.quantity}</Typography>}
-                                        />
-                                      </ListItem>
+                                      <Typography key={i} variant="caption" sx={{ display: 'block', fontWeight: 900, lineHeight: 1.1, mb: 0.5 }}>
+                                        • {p.medicationName} ({p.quantity})
+                                      </Typography>
                                     ))}
-                                </List>
+                                </Box>
                               </Box>
                               
-                              <Divider />
-                              
-                              <Box>
-                                <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ display: 'block' }}>DISPENSING SESSIONS</Typography>
+                              <Box sx={{ borderTop: '1px solid #dcfce7', pt: 0.5 }}>
+                                <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ display: 'block', fontSize: '0.65rem' }}>DISPENSING</Typography>
                                 {encDispensations.length > 0 ? (
-                                  <Stack spacing={1} mt={0.5}>
+                                  <Stack spacing={0.5} mt={0.5}>
                                     {encDispensations.map((d: any, idx: number) => (
                                       <Box key={idx} sx={{ p: 0.5, bgcolor: '#ffffff', borderRadius: 1, border: '1px solid #dcfce7' }}>
-                                        <Typography variant="caption" sx={{ fontSize: '0.65rem', display: 'block' }}>
+                                        <Typography variant="caption" sx={{ fontSize: '0.6rem', color: '#64748b', display: 'block' }}>
                                           {dayjs(d.created_at.toDate()).format('D MMM, HH:mm')} by {d.dispenser_name}
                                         </Typography>
-                                        <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                                          {d.items.map((item: any, iidx: number) => (
-                                            <Chip 
-                                              key={iidx} 
-                                              label={`${item.medication}: ${item.dispensed}`} 
-                                              size="small" 
-                                              sx={{ height: 16, fontSize: '0.6rem', mb: 0.5 }} 
-                                              color={item.mode === 'FULL' ? 'success' : 'warning'} 
-                                            />
-                                          ))}
-                                        </Stack>
                                       </Box>
                                     ))}
                                   </Stack>
                                 ) : (
-                                  <Typography variant="caption">Pending dispensation.</Typography>
+                                  <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>Pending...</Typography>
                                 )}
                               </Box>
                             </Stack>
                           ) : (
-                            <Typography variant="body2" color="text.secondary">No prescriptions issued.</Typography>
+                            <Typography variant="caption" color="text.secondary">No prescriptions.</Typography>
                           )}
                         </Paper>
                       </Grid>
@@ -373,19 +456,19 @@ const PatientHistory: React.FC = () => {
                           Pharmacy Follow-up • {dayjs(event.date).format('h:mm A')}
                         </Typography>
                       </Box>
-                      <Chip label="DISPENSED" color="success" size="small" />
+                      <Chip label="DISPENSED" color="success" size="small" sx={{ fontWeight: 900 }} />
                     </Stack>
                   </AccordionSummary>
                   <AccordionDetails>
                     <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'white' }}>
-                       <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Follow-up Dispensation Details</Typography>
-                       <Typography variant="body2" color="text.secondary" gutterBottom>Dispenser: {disp.dispenser_name} ({disp.dispenser_reg_no})</Typography>
+                       <Typography variant="subtitle2" fontWeight="900" gutterBottom sx={{ textTransform: 'uppercase', fontSize: '0.75rem', color: '#166534' }}>Follow-up Dispensation Details</Typography>
+                       <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>Dispenser: {disp.dispenser_name} ({disp.dispenser_reg_no || 'No Reg No'})</Typography>
                        <List dense>
                           {disp.items.map((item: any, i: number) => (
                             <ListItem key={i} sx={{ px: 1, py: 0.5, bgcolor: '#f8fafc', mb: 0.5, borderRadius: 1 }}>
                                <ListItemText 
-                                  primary={<Typography variant="body2" fontWeight="bold">{item.medication}</Typography>}
-                                  secondary={`Dispensed: ${item.dispensed} • Type: ${item.mode}`}
+                                  primary={<Typography variant="caption" fontWeight="900">{item.medication}</Typography>}
+                                  secondary={<Typography variant="caption" sx={{ fontSize: '0.65rem' }}>Dispensed: {item.dispensed} • Mode: {item.mode}</Typography>}
                                />
                             </ListItem>
                           ))}
@@ -402,7 +485,7 @@ const PatientHistory: React.FC = () => {
   };
 
   return (
-    <StationLayout title="Patient Clinical History" subtitle="Comprehensive view of all patient encounters and clinical events">
+    <StationLayout title="Patient Clinical History">
       <Container maxWidth="xl">
         {!selectedPatient ? (
           <Box maxWidth="md" sx={{ mx: 'auto', mt: 8 }}>
@@ -479,35 +562,63 @@ const PatientHistory: React.FC = () => {
           <Box>
             <Button 
               startIcon={<ArrowBackIcon />} 
-              onClick={() => setSelectedPatient(null)}
+              onClick={() => {
+                setSelectedPatient(null);
+                setHistory(null);
+              }}
               sx={{ mb: 3 }}
             >
               Back to Search
             </Button>
 
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 5, border: '1px solid #3b82f6', bgcolor: '#f0f9ff', mb: 4 }}>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 8, border: '1px solid #3b82f6', bgcolor: '#fbfdff', mb: 4, boxShadow: '0 4px 20px -5px rgba(59, 130, 246, 0.1)' }}>
               <Grid container spacing={3} alignItems="center">
-                <Grid item xs={12} sm="auto">
+                <Grid size={{ xs: 12, sm: 'auto' }}>
                   <Avatar 
                     src={selectedPatient.photo_url} 
-                    sx={{ width: 100, height: 100, borderRadius: 4, border: '4px solid white', boxShadow: 3 }}
+                    sx={{ width: 120, height: 120, borderRadius: 6, border: '6px solid white', boxShadow: 3 }}
                   >
-                    <PersonIcon sx={{ fontSize: 60 }} />
+                    <PersonIcon sx={{ fontSize: 80 }} />
                   </Avatar>
                 </Grid>
-                <Grid item xs={12} sm>
-                  <Typography variant="h4" fontWeight="900" color="primary">
+                <Grid size={{ xs: 12, sm: 'auto' }}>
+                  <Typography variant="h3" fontWeight="900" color="primary" sx={{ letterSpacing: '-0.02em', mb: 1 }}>
                     {selectedPatient.given_name} {selectedPatient.family_name}
                   </Typography>
-                  <Stack direction="row" spacing={2} mt={1}>
-                    <Chip icon={<CalendarIcon />} label={`Age: ${selectedPatient.age_years}y ${selectedPatient.age_months}m`} variant="outlined" size="small" />
-                    <Chip icon={<InfoIcon />} label={`ID: ${selectedPatient.national_id || selectedPatient.rohingya_number || 'N/A'}`} variant="outlined" size="small" />
-                    <Chip label={selectedPatient.gender.toUpperCase()} variant="filled" size="small" color="primary" />
+                  <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+                    <Chip 
+                      icon={<CalendarIcon sx={{ fontSize: '1rem !important' }} />} 
+                      label={calculateAgeDisplay(selectedPatient)} 
+                      variant="outlined" 
+                      sx={{ fontWeight: 900, height: 28, bgcolor: 'white' }} 
+                    />
+                    <Chip 
+                      icon={<InfoIcon sx={{ fontSize: '1rem !important' }} />} 
+                      label={`ID: ${selectedPatient.national_id || selectedPatient.rohingya_number || selectedPatient.bhutanese_refugee_number || selectedPatient.nepal_id || 'N/A'}`} 
+                      variant="outlined" 
+                      sx={{ fontWeight: 900, height: 28, bgcolor: 'white' }} 
+                    />
+                    <Chip 
+                      label={selectedPatient.gender.toUpperCase()} 
+                      variant="filled" 
+                      size="small" 
+                      color="primary" 
+                      sx={{ fontWeight: 900, height: 28, px: 1 }} 
+                    />
                   </Stack>
                 </Grid>
-                <Grid item xs={12} md="auto">
+                <Grid size={{ xs: 12, md: 'auto' }}>
                    <Stack direction="row" spacing={1}>
-                      <Button variant="contained" startIcon={<DownloadIcon />} color="primary" sx={{ borderRadius: 2 }}>
+                      <Button 
+                        variant="contained" 
+                        startIcon={<PrintIcon />} 
+                        color="secondary" 
+                        onClick={handleReprintLatest}
+                        sx={{ borderRadius: 2.5, fontWeight: 900, py: 1.5, px: 3 }}
+                      >
+                        Reprint Latest RX
+                      </Button>
+                      <Button variant="outlined" startIcon={<DownloadIcon />} color="primary" sx={{ borderRadius: 2.5, fontWeight: 900, py: 1.5, px: 3 }}>
                         Export History
                       </Button>
                    </Stack>
@@ -531,6 +642,17 @@ const PatientHistory: React.FC = () => {
         onClose={() => setQrOpen(false)} 
         onScan={handleQrScan} 
       />
+
+      {reprintEncounterId && (
+        <PrintPrescriptionDialog
+          open={reprintOpen}
+          onClose={() => {
+            setReprintOpen(false);
+            setReprintEncounterId(null);
+          }}
+          encounterId={reprintEncounterId}
+        />
+      )}
     </StationLayout>
   );
 };

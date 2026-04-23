@@ -4,6 +4,8 @@ import {
   TableCell, TableContainer, TableHead, TableRow, Paper, Divider, 
   Stack, Chip, CircularProgress, Alert
 } from '@mui/material';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { db } from '../firebase';
 import QRCode from 'react-qr-code';
 import dayjs from 'dayjs';
 import { 
@@ -18,7 +20,8 @@ import {
   Encounter, 
   VitalsRecord, 
   DiagnosisRecord, 
-  PrescriptionRecord 
+  PrescriptionRecord,
+  Prescription
 } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { calculateAgeDisplay } from '../utils/patient';
@@ -32,6 +35,7 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
   const { selectedClinic } = useAppStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mergedPrescriptions, setMergedPrescriptions] = useState<Prescription[]>([]);
   const [data, setData] = useState<{
     patient: Patient;
     encounter: Encounter;
@@ -54,6 +58,38 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
           getPrescriptionByEncounter(encounterId)
         ]);
 
+        // Fetch all historical prescriptions to satisfy the "RX history" requirement
+        const q = query(
+          collection(db, "prescriptions"),
+          where("patient_id", "==", encounter.patient_id),
+          orderBy("created_at", "desc")
+        );
+        const allHistQuery = await getDocs(q);
+        const allHistRecords = allHistQuery.docs.map(d => ({ id: d.id, ...d.data() } as PrescriptionRecord));
+
+        // Logic: Show prescriptions from current session OR those that were dispensed today (even if from past visits)
+        const currentPresMeds = prescription?.prescriptions || [];
+        const dispensedMedsToday = prescription?.dispensation_details || [];
+        const dispensedNames = new Set(dispensedMedsToday.map((d: any) => d.medication));
+
+        // Find initial Rx details for anything dispensed today that isn't already in the current prescribed list
+        const historicalRequired: Prescription[] = [];
+        
+        dispensedNames.forEach(name => {
+          // If it's already in the current prescription, skip
+          if (currentPresMeds.some(m => m.medicationName === name)) return;
+          
+          // Otherwise, find the LATEST instructions for this drug in history
+          for (const record of allHistRecords) {
+            const match = record.prescriptions.find(p => p.medicationName === name);
+            if (match) {
+              historicalRequired.push(match);
+              break; // Found latest instructions
+            }
+          }
+        });
+
+        setMergedPrescriptions([...currentPresMeds, ...historicalRequired]);
         setData({ patient, encounter, vitals, diagnosis, prescription });
         setLoading(false);
         if (onReady) onReady();
@@ -220,8 +256,21 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
           </Typography>
         </Grid>
         <Grid size={{ xs: 3 }} sx={{ textAlign: 'right' }}>
-          <Typography variant="caption" fontWeight="900" color="text.secondary" sx={{ display: 'block' }}>ENCOUNTER ID</Typography>
-          <Typography variant="h6" fontWeight="900" sx={{ color: '#2563eb' }}>#{encounterId.slice(-8).toUpperCase()}</Typography>
+          {patient.photo_url && (
+            <Box 
+              component="img" 
+              src={patient.photo_url} 
+              referrerPolicy="no-referrer"
+              sx={{ 
+                width: 90, 
+                height: 90, 
+                borderRadius: 2, 
+                objectFit: 'cover', 
+                border: '1px solid #e2e8f0',
+                ml: 'auto'
+              }} 
+            />
+          )}
         </Grid>
       </Grid>
 
@@ -291,16 +340,22 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
               </TableRow>
             </TableHead>
             <TableBody>
-              {prescription?.prescriptions.map((med, idx) => (
+              {mergedPrescriptions.map((med, idx) => (
                 <TableRow key={idx}>
                   <TableCell sx={{ fontWeight: 700 }}>{med.medicationName}</TableCell>
-                  <TableCell>{med.dosageValue}{med.dosageUnit}</TableCell>
-                  <TableCell>{med.frequencyValue}x {med.frequencyUnit}</TableCell>
-                  <TableCell>{med.durationValue} {med.durationUnit}</TableCell>
+                  <TableCell>
+                    {med.dosage || `${med.dosageValue || ''}${med.dosageUnit || ''}`}
+                  </TableCell>
+                  <TableCell>
+                    {med.frequency || `${med.frequencyValue || ''}x ${med.frequencyUnit || ''}`}
+                  </TableCell>
+                  <TableCell>
+                    {med.duration || `${med.durationValue || ''} ${med.durationUnit || ''}`}
+                  </TableCell>
                   <TableCell sx={{ fontStyle: 'italic', color: 'text.secondary' }}>{med.instructions}</TableCell>
                 </TableRow>
               ))}
-              {(!prescription || prescription.prescriptions.length === 0) && (
+              {mergedPrescriptions.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 3 }}>No medications prescribed.</TableCell>
                 </TableRow>
@@ -353,8 +408,8 @@ const PrescriptionPrintTemplate: React.FC<PrescriptionPrintTemplateProps> = ({ e
         </Grid>
       </Grid>
 
-      {/* Dispensing Summary (Only if dispensed) */}
-      {prescription?.status === 'DISPENSED' && (
+      {/* Dispensing Summary (Only if dispensed or partial) */}
+      {(prescription?.status === 'DISPENSED' || prescription?.status === 'PARTIAL_DISPENSED') && (
         <Box sx={{ mt: 4, pt: 4, borderTop: '2px dashed #cbd5e1' }}>
           <Typography variant="subtitle2" fontWeight="900" color="secondary" sx={{ mb: 2, textTransform: 'uppercase' }}>Dispensing Summary (Pharmacy)</Typography>
           <Card variant="outlined" sx={{ borderRadius: 3, border: '1px solid #e2e8f0' }}>

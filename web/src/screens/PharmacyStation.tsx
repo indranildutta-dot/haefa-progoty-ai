@@ -15,7 +15,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import SearchIcon from '@mui/icons-material/Search';
 import LocalPharmacyIcon from '@mui/icons-material/LocalPharmacy';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
-import { collection, query, where, getDocs, doc, updateDoc, addDoc, serverTimestamp, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, addDoc, serverTimestamp, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
@@ -77,9 +77,12 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const [procurementRecords, setProcurementRecords] = useState<any[]>([]);
   const [isProcurementLoading, setIsProcurementLoading] = useState(false);
 
+  // Checkout State
+  const [checkoutList, setCheckoutList] = useState<string[]>([]);
+
   useEffect(() => {
     if (!selectedClinic) return;
-    return subscribeToQueue('WAITING_FOR_PHARMACY' as any, setWaitingList, (err) => console.error(err));
+    return subscribeToQueue(['WAITING_FOR_PHARMACY', 'PHARMACY_IOU'] as any, setWaitingList, (err) => console.error(err));
   }, [selectedClinic]);
 
   useEffect(() => {
@@ -122,63 +125,111 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       medsSnapshot.forEach(presDoc => {
         const presData = presDoc.data() as any;
         if (Array.isArray(presData.prescriptions)) {
-          // If the prescription doc is NOT already dispensed (unless we want to allow re-dispensing?)
-          // Usually we just show the array if it's there
           presData.prescriptions.forEach((med: any, index: number) => {
+            // Check if this specific medication in the current encounter was already dispensed
+            // (e.g. if the pharmacist is re-opening a completed patient)
+            const dispensation = Array.isArray(presData.dispensation_details) 
+              ? presData.dispensation_details.find((d: any) => d.medication === med.medicationName)
+              : null;
+
             allMeds.push({
               ...med,
-              id: `${presDoc.id}-${index}`, // Unique key for local state
+              id: `${presDoc.id}-${index}`,
               presDocId: presDoc.id,
               originalIndex: index,
-              isOwed: false
+              isOwed: false,
+              visitDate: presData.created_at?.toDate() || new Date(),
+              dispensedInfo: dispensation,
+              pharmacistName: presData.dispenser_name,
+              pharmacistRegNo: presData.dispenser_reg_no,
+              isAlreadyFullyDispensed: dispensation?.mode === 'FULL' || dispensation?.mode === 'SUBSTITUTE' || presData.status === 'DISPENSED' && !dispensation
             });
           });
         }
       });
       
       // Calculate missing/owed meds from previous encounters
-      const owedMedsTracked = new Set<string>();
+      // We'll also track encounter IDs to avoid duplicate information if the user wants to see EXACTLY what was dispensed
       
-      // Sort in descending order to process the most recent past encounter first
       const pastPres = pastMedsSnapshot.docs
         .map(d => ({ id: d.id, ...d.data() } as any))
         .filter(p => p.encounter_id !== item.encounter_id)
-        .sort((a, b) => (b.created_at?.toMillis() || 0) - (a.created_at?.toMillis() || 0));
+        .sort((a, b) => (a.created_at?.toMillis() || 0) - (b.created_at?.toMillis() || 0)); // Sort ASC (Oldest first)
         
       for (const pastDoc of pastPres) {
-        if (pastDoc.status === 'DISPENSED' && Array.isArray(pastDoc.dispensation_details)) {
+        const visitDate = pastDoc.created_at?.toDate() || new Date();
+        
+        if (Array.isArray(pastDoc.dispensation_details)) {
+          // If there's dispensation info, we look at what happened
           for (const detail of pastDoc.dispensation_details) {
-            if ((detail.mode === 'PARTIAL' || detail.mode === 'OUT_OF_STOCK') && !owedMedsTracked.has(detail.medication)) {
-              owedMedsTracked.add(detail.medication);
-              
-              const originalPres = (pastDoc.prescriptions || []).find((p: any) => p.medicationName === detail.medication);
-              const originalQty = originalPres ? Number(originalPres.quantity) : 0;
-              const dispensedSoFar = Number(detail.dispensed) || 0;
-              const owedQty = Math.max(0, originalQty - dispensedSoFar);
-              
-              if (owedQty > 0) {
-                allMeds.push({
+            const originalPres = (pastDoc.prescriptions || []).find((p: any) => p.medicationName === detail.medication);
+            const originalQty = originalPres ? Number(originalPres.quantity) : 0;
+            const dispensedSoFar = Number(detail.dispensed) || 0;
+            const owedQty = Math.max(0, originalQty - dispensedSoFar);
+
+            const isFullyDispensed = detail.mode === 'FULL' || detail.mode === 'SUBSTITUTE';
+
+            if (isFullyDispensed) {
+              // Add for information only
+              allMeds.push({
                   medicationName: detail.medication,
                   dosageValue: originalPres?.dosageValue || '',
                   dosageUnit: originalPres?.dosageUnit || '',
-                  instructions: `[PREVIOUSLY OWED from ${new Date(pastDoc.created_at?.toMillis() || Date.now()).toLocaleDateString()}] Originally ordered: ${originalQty}, Dispensed earlier: ${dispensedSoFar}`,
-                  quantity: owedQty, // Current payload wants the owed qty
+                  instructions: `Fully dispensed on ${visitDate.toLocaleDateString()}`,
+                  quantity: originalQty,
                   isOwed: true,
-                  id: `owed-${pastDoc.id}-${detail.medication.replace(/\s+/g,'-')}`,
+                  id: `past-full-${pastDoc.id}-${detail.medication.replace(/\s+/g,'-')}`,
                   presDocId: pastDoc.id,
-                  originalIndex: -1
+                  originalIndex: -1,
+                  visitDate: visitDate,
+                  isAlreadyFullyDispensed: true,
+                  pharmacistName: pastDoc.dispenser_name,
+                  pharmacistRegNo: pastDoc.dispenser_reg_no,
+                  dispensedInfo: detail
                 });
-              }
-            } else if ((detail.mode === 'FULL' || detail.mode === 'SUBSTITUTE') && !owedMedsTracked.has(detail.medication)) {
-               // If we see it was eventually FULLY dispensed in another past encounter, mark it so we don't show it as owed anymore
-               owedMedsTracked.add(detail.medication);
+            } else if (owedQty > 0) {
+              allMeds.push({
+                medicationName: detail.medication,
+                dosageValue: originalPres?.dosageValue || '',
+                dosageUnit: originalPres?.dosageUnit || '',
+                instructions: `[PREVIOUSLY OWED from ${visitDate.toLocaleDateString()}] Originally ordered: ${originalQty}, Dispensed earlier: ${dispensedSoFar}`,
+                quantity: owedQty,
+                promisedDate: detail.return_on, // Capture when they were advised to come back
+                isOwed: true,
+                id: `owed-${pastDoc.id}-${detail.medication.replace(/\s+/g,'-')}`,
+                presDocId: pastDoc.id,
+                originalIndex: -1,
+                visitDate: visitDate,
+                isAlreadyFullyDispensed: false,
+                dispensedInfo: detail
+              });
             }
+          }
+        } else if (Array.isArray(pastDoc.prescriptions)) {
+          // No dispensation info yet for this past encounter record? This shouldn't happen usually for DISPENSED status
+          // but let's handle it by showing them as needing dispensing if status is not DISPENSED
+          if (pastDoc.status !== 'DISPENSED') {
+             pastDoc.prescriptions.forEach((med: any, index: number) => {
+                allMeds.push({
+                  ...med,
+                  id: `past-pending-${pastDoc.id}-${index}`,
+                  presDocId: pastDoc.id,
+                  originalIndex: index,
+                  isOwed: true,
+                  visitDate: visitDate,
+                  isAlreadyFullyDispensed: false
+                });
+             });
           }
         }
       }
 
+      // Final sort: all meds by visit date ASC
+      allMeds.sort((a, b) => a.visitDate.getTime() - b.visitDate.getTime());
+
       setSelectedPatient({ ...patient, currentVitals: vitalsResult, triage_level: item.triage_level });
       setPrescriptions(allMeds);
+      setCheckoutList([]);
       
       // Initialize dispensing modes for each individual medication
       const initialModes: Record<string, string> = {};
@@ -234,7 +285,9 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     try {
       const dispense = httpsCallable(functions, 'dispenseMedication');
       
-      const medsToDispense = prescriptions.map(med => {
+      const medsInCheckout = prescriptions.filter(m => checkoutList.includes(m.id));
+      
+      const medsToDispense = medsInCheckout.map(med => {
         const mode = dispensingModes[med.id];
         let inventoryId: string | undefined = undefined;
 
@@ -462,6 +515,40 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     reader.readAsDataURL(file);
   };
 
+  const handleReprintFromSearch = async (patientId: string) => {
+    try {
+      const q = query(
+        collection(db, "encounters"),
+        where("patient_id", "==", patientId),
+        orderBy("created_at", "desc"),
+        limit(1)
+      );
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        setLastEncounterId(snapshot.docs[0].id);
+        setShowPrintDialog(true);
+      } else {
+        // Try archived encounters if not in active
+        const aq = query(
+          collection(db, "encounters_archive"),
+          where("patient_id", "==", patientId),
+          orderBy("created_at", "desc"),
+          limit(1)
+        );
+        const aSnapshot = await getDocs(aq);
+        if(!aSnapshot.empty) {
+          setLastEncounterId(aSnapshot.docs[0].id);
+          setShowPrintDialog(true);
+        } else {
+          notify("No encounters found for this patient", "warning");
+        }
+      }
+    } catch (err) {
+      console.error("Reprint error:", err);
+      notify("Error finding latest prescription", "error");
+    }
+  };
+
   const handleCancelQueueItem = async (reason: string) => {
     if (!cancelTarget) return;
     try {
@@ -484,6 +571,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
             waitingList={waitingList}
             highlightedPatientIds={highlightedPatientIds}
             setHighlightedPatientIds={setHighlightedPatientIds}
+            onReprint={handleReprintFromSearch}
           />
 
           <TableContainer component={Paper} elevation={0} sx={{ p: 2, borderRadius: 4, border: '1px solid #e2e8f0' }}>
@@ -510,10 +598,15 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                     >
                       <TableCell>{formatWaitTime(item.created_at)}</TableCell>
                       <TableCell sx={{ fontWeight: 'bold' }}>
-                        {item.patient_name}
-                        {isHighlighted && (
-                          <Chip label="MATCH" size="small" color="warning" sx={{ ml: 2, fontWeight: 900, height: 20 }} />
-                        )}
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Typography fontWeight="bold">{item.patient_name}</Typography>
+                          {item.status === 'PHARMACY_IOU' && (
+                            <Chip label="IOU PENDING" size="small" color="warning" sx={{ fontWeight: 900, height: 20 }} />
+                          )}
+                          {isHighlighted && (
+                            <Chip label="MATCH" size="small" color="warning" sx={{ ml: 1, fontWeight: 900, height: 20 }} />
+                          )}
+                        </Stack>
                       </TableCell>
                       <TableCell align="right">
                         <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
@@ -578,128 +671,265 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
               </Stack>
               
               <Stack spacing={3}>
-                {prescriptions.map((med, idx) => (
-                  <Card key={idx} variant="outlined" sx={{ borderRadius: 4, border: '1px solid #e2e8f0' }}>
-                    <CardContent>
-                      <Grid container spacing={3}>
-                        <Grid size={{ xs: 12, md: 6 }}>
-                          <Typography variant="caption" fontWeight="900" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>Prescribed By Doctor</Typography>
-                          <Typography variant="h6" color="primary" fontWeight="900" mt={0.5}>
-                            {med.medicationName || "Unspecified"}
-                          </Typography>
-                          <Typography variant="body1" fontWeight="700">
-                            {med.dosageValue}{med.dosageUnit} x {med.quantity} Total
-                          </Typography>
-                          {med.instructions && (
-                            <Box sx={{ mt: 1.5, p: 2, bgcolor: '#f8fafc', borderRadius: 2, borderLeft: '4px solid #3b82f6' }}>
-                                <Typography variant="caption" fontWeight="900" color="#1e40af" sx={{ textTransform: 'uppercase' }}>Doctor's Notes:</Typography>
-                                <Typography variant="body2">{med.instructions}</Typography>
+                {prescriptions.map((med, idx) => {
+                  const isAlreadyDispensed = med.isAlreadyFullyDispensed;
+                  // IMPROVED NEW MED DETECTION: Check if explicitly marked OR if missing from currently loaded inventory
+                  const inInventory = inventory.some(i => i.medication_id.toLowerCase().replace(/\s+/g, '') === med.medicationName.toLowerCase().replace(/\s+/g, ''));
+                  const isNewMed = med.isRequisition || (!inInventory && !isAlreadyDispensed);
+                  const currentMode = dispensingModes[med.id] || 'FULL';
+                  const isInCheckout = checkoutList.includes(med.id);
+
+                  return (
+                    <Card key={idx} variant="outlined" sx={{ 
+                      borderRadius: 4, 
+                      border: isInCheckout ? '2px solid #3b82f6' : (isAlreadyDispensed ? '1px dashed #cbd5e1' : '1px solid #e2e8f0'),
+                      bgcolor: isAlreadyDispensed ? '#f8fafc' : 'white',
+                      opacity: isAlreadyDispensed ? 0.7 : 1,
+                      position: 'relative'
+                    }}>
+                      <CardContent>
+                        <Grid container spacing={3}>
+                          <Grid size={{ xs: 12, md: 6 }}>
+                            <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+                              <Typography variant="caption" fontWeight="900" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+                                Visit Date: {med.visitDate ? dayjs(med.visitDate).format('DD/MM/YYYY') : 'N/A'}
+                              </Typography>
+                              {med.isOwed && <Chip label="OWED" size="small" color="warning" sx={{ height: 16, fontSize: '0.65rem', fontWeight: 900 }} />}
+                              {isNewMed && <Chip label="NOT IN MEDICINE INVENTORY" size="small" color="secondary" sx={{ height: 16, fontSize: '0.65rem', fontWeight: 900 }} />}
+                              {isInCheckout && <Chip label="IN CHECKOUT" size="small" color="primary" icon={<ShoppingCartIcon sx={{ fontSize: '10px !important' }} />} sx={{ height: 16, fontSize: '0.65rem', fontWeight: 900 }} />}
+                            </Stack>
+                            
+                            <Box sx={{ 
+                              bgcolor: isNewMed ? '#e2e8f0' : 'transparent', 
+                              px: isNewMed ? 1.5 : 0, 
+                              py: isNewMed ? 0.75 : 0, 
+                              borderRadius: 2, 
+                              display: 'inline-block',
+                              border: isNewMed ? '1px solid #cbd5e1' : 'none'
+                            }}>
+                              <Typography variant="h6" color={isAlreadyDispensed ? "text.secondary" : (isNewMed ? "#1e293b" : "primary")} fontWeight="900">
+                                {med.medicationName || "Unspecified"}
+                              </Typography>
                             </Box>
-                          )}
-                          <Box sx={{ mt: 2, p: 1.5, bgcolor: '#f0f9ff', borderRadius: 2, border: '1px solid #e0f2fe' }}>
-                            <Typography variant="body2" sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>
-                              Dispensed by: <strong>{userProfile?.name}</strong> ({userProfile?.professional_body || 'PCB'}: {userProfile?.professional_reg_no || 'PENDING'})
+                            
+                            <Typography variant="body1" fontWeight="700" sx={{ color: isAlreadyDispensed ? 'text.secondary' : 'inherit', mt: 0.5 }}>
+                              {med.dosageValue}{med.dosageUnit} x {med.quantity} Total
                             </Typography>
-                          </Box>
-                        </Grid>
-                        <Grid size={{ xs: 12, md: 6 }}>
-                          <Typography variant="subtitle2" fontWeight="bold" mb={1}>Dispensing Mode:</Typography>
-                          <ToggleButtonGroup
-                            value={dispensingModes[med.id] || 'FULL'}
-                            exclusive
-                            onChange={(_, val) => val && setDispensingModes(prev => ({ ...prev, [med.id]: val }))}
-                            fullWidth
-                            color="primary"
-                            sx={{ mb: 2 }}
-                          >
-                            <ToggleButton value="FULL" sx={{ py: 1.5 }}>FULL</ToggleButton>
-                            <ToggleButton value="PARTIAL" sx={{ py: 1.5 }}>PARTIAL</ToggleButton>
-                            <ToggleButton value="OUT_OF_STOCK" sx={{ py: 1.5 }}>OOS</ToggleButton>
-                            <ToggleButton value="SUBSTITUTE" sx={{ py: 1.5 }}>SUB</ToggleButton>
-                          </ToggleButtonGroup>
+                            
+                            {med.promisedDate && (
+                              <Box sx={{ mt: 1, p: 1, bgcolor: '#fff7ed', borderRadius: 1.5, border: '1px solid #ffedd5' }}>
+                                <Typography variant="caption" color="#9a3412" fontWeight="bold">
+                                  ADVISED RETURN DATE: {dayjs(med.promisedDate).format('DD/MM/YYYY')}
+                                </Typography>
+                              </Box>
+                            )}
 
-                          {(dispensingModes[med.id] === 'PARTIAL' || dispensingModes[med.id] === 'OUT_OF_STOCK') && (
-                            <Box sx={{ mt: 2 }}>
-                              <Stack spacing={2}>
-                                {dispensingModes[med.id] === 'PARTIAL' && (
-                                  <TextField 
-                                    label="Quantity Dispensed"
+                            {med.instructions && (
+                              <Box sx={{ mt: 1.5, p: 2, bgcolor: '#f8fafc', borderRadius: 2, borderLeft: '4px solid #3b82f6' }}>
+                                  <Typography variant="caption" fontWeight="900" color="#1e40af" sx={{ textTransform: 'uppercase' }}>
+                                    {med.isOwed ? "Pharmacist's Note:" : "Doctor's Notes:"}
+                                  </Typography>
+                                  <Typography variant="body2">{med.instructions}</Typography>
+                              </Box>
+                            )}
+                            
+                            {!isAlreadyDispensed && (
+                              <Box sx={{ mt: 2, p: 1.5, bgcolor: '#f0f9ff', borderRadius: 2, border: '1px solid #e0f2fe' }}>
+                                <Typography variant="body2" sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>
+                                  Assigned to: <strong>{userProfile?.name}</strong> ({userProfile?.professional_body || 'PCB'}: {userProfile?.professional_reg_no || 'PENDING'})
+                                </Typography>
+                              </Box>
+                            )}
+                            
+                            {isAlreadyDispensed && (
+                              <Box sx={{ mt: 2, p: 1.5, bgcolor: '#f1f5f9', borderRadius: 2, border: '1px solid #cbd5e1' }}>
+                                <Typography variant="body2" sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>
+                                  Dispensed By: <strong>{med.pharmacistName}</strong> ({med.pharmacistRegNo}) on {med.dispensedInfo?.created_at?.toDate ? dayjs(med.dispensedInfo.created_at.toDate()).format('DD/MM/YYYY') : 'N/A'}
+                                </Typography>
+                              </Box>
+                            )}
+                          </Grid>
+                          <Grid size={{ xs: 12, md: 6 }}>
+                            <Typography variant="subtitle2" fontWeight="bold" mb={1} sx={{ color: isAlreadyDispensed ? 'text.disabled' : 'inherit' }}>Dispensing Mode:</Typography>
+                            <ToggleButtonGroup
+                              value={currentMode}
+                              exclusive
+                              onChange={(_, val) => val && setDispensingModes(prev => ({ ...prev, [med.id]: val }))}
+                              fullWidth
+                              color="primary"
+                              sx={{ mb: 2 }}
+                              disabled={isAlreadyDispensed || isInCheckout}
+                            >
+                              <ToggleButton value="FULL" sx={{ py: 1.5 }} disabled={isNewMed}>FULL</ToggleButton>
+                              <ToggleButton value="PARTIAL" sx={{ py: 1.5 }} disabled={isNewMed}>PARTIAL</ToggleButton>
+                              <ToggleButton value="OUT_OF_STOCK" sx={{ py: 1.5 }}>OOS</ToggleButton>
+                              <ToggleButton value="SUBSTITUTE" sx={{ py: 1.5 }}>SUB</ToggleButton>
+                            </ToggleButtonGroup>
+
+                          {isAlreadyDispensed ? (
+                             <Box sx={{ mt: 2, p: 2, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                               <Typography variant="subtitle2" fontWeight="bold" color="text.secondary">Item already processed in history</Typography>
+                               <Typography variant="caption" color="text.secondary">Select an active prescription to modify dispensing.</Typography>
+                             </Box>
+                          ) : (
+                           <>
+                            {(currentMode === 'PARTIAL' || currentMode === 'OUT_OF_STOCK') && (
+                              <Box sx={{ mt: 2 }}>
+                                <Stack spacing={2}>
+                                  {currentMode === 'PARTIAL' && (
+                                    <TextField 
+                                      label="Quantity Dispensed"
+                                      type="number"
+                                      required
+                                      value={partialQty[med.id] || ''}
+                                      onChange={(e) => setPartialQty(prev => ({ ...prev, [med.id]: e.target.value === '' ? '' : Number(e.target.value) }))}
+                                    />
+                                  )}
+                                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                    <DatePicker
+                                      label="Return Date for IOU"
+                                      value={returnDates[med.id]}
+                                      onChange={(val) => setReturnDates(prev => ({ ...prev, [med.id]: val }))}
+                                      slotProps={{ textField: { fullWidth: true } }}
+                                      minDate={dayjs()}
+                                    />
+                                  </LocalizationProvider>
+                                </Stack>
+                              </Box>
+                            )}
+
+                            {currentMode === 'SUBSTITUTE' && (
+                              <Stack spacing={2} sx={{ mt: 2, p: 2, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+                                <Typography variant="subtitle2" fontWeight="800" color="primary">Substitute Medication Details</Typography>
+                                <Autocomplete
+                                  options={inventory.filter(i => i.quantity > 0)}
+                                  getOptionLabel={(option) => `${option.medication_id} (${option.dosage}) - Stock: ${option.quantity}`}
+                                  value={inventory.find(i => i.id === substitutionMeds[med.id]) || null}
+                                  onChange={(_, newValue) => {
+                                    setSubstitutionMeds(prev => ({ ...prev, [med.id]: newValue ? newValue.id : null }));
+                                    if (newValue) {
+                                      setSubstitutionDosage(prev => ({ ...prev, [med.id]: newValue.dosage || '' }));
+                                    } else {
+                                      setSubstitutionDosage(prev => ({ ...prev, [med.id]: '' }));
+                                    }
+                                  }}
+                                  renderInput={(params) => <TextField {...params} label="Select Substitute from Inventory" size="small" required />}
+                                />
+                                <Stack direction="row" spacing={2}>
+                                  <TextField
+                                    label="Dosage"
+                                    size="small"
+                                    value={substitutionDosage[med.id] || ''}
+                                    fullWidth
+                                    disabled
+                                  />
+                                  <TextField
+                                    label="Dispensing Qty"
                                     type="number"
+                                    size="small"
+                                    fullWidth
+                                    value={substitutionQty[med.id] || ''}
+                                    onChange={(e) => setSubstitutionQty(prev => ({ ...prev, [med.id]: e.target.value === '' ? '' : Number(e.target.value) }))}
                                     required
-                                    value={partialQty[med.id] || ''}
-                                    onChange={(e) => setPartialQty(prev => ({ ...prev, [med.id]: e.target.value === '' ? '' : Number(e.target.value) }))}
                                   />
-                                )}
-                                <LocalizationProvider dateAdapter={AdapterDayjs}>
-                                  <DatePicker
-                                    label="Return Date for IOU"
-                                    value={returnDates[med.id]}
-                                    onChange={(val) => setReturnDates(prev => ({ ...prev, [med.id]: val }))}
-                                    slotProps={{ textField: { fullWidth: true } }}
-                                    minDate={dayjs()}
-                                  />
-                                </LocalizationProvider>
+                                </Stack>
+                                <TextField
+                                  label="Reason for Substitution"
+                                  fullWidth
+                                  size="small"
+                                  required
+                                  multiline
+                                  rows={2}
+                                  value={substitutionReasons[med.id] || ''}
+                                  onChange={(e) => setSubstitutionReasons(prev => ({ ...prev, [med.id]: e.target.value }))}
+                                />
                               </Stack>
-                            </Box>
+                            )}
+                           </>
                           )}
 
-                          {dispensingModes[med.id] === 'SUBSTITUTE' && (
-                            <Stack spacing={2} sx={{ mt: 2, p: 2, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
-                              <Typography variant="subtitle2" fontWeight="800" color="primary">Substitute Medication Details</Typography>
-                              <Autocomplete
-                                options={inventory.filter(i => i.quantity > 0)}
-                                getOptionLabel={(option) => `${option.medication_id} (${option.dosage}) - Stock: ${option.quantity}`}
-                                value={inventory.find(i => i.id === substitutionMeds[med.id]) || null}
-                                onChange={(_, newValue) => {
-                                  setSubstitutionMeds(prev => ({ ...prev, [med.id]: newValue ? newValue.id : null }));
-                                  if (newValue) {
-                                    setSubstitutionDosage(prev => ({ ...prev, [med.id]: newValue.dosage || '' }));
+                          {!isAlreadyDispensed && (
+                            <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end' }}>
+                              <Button
+                                size="large"
+                                variant={isInCheckout ? "outlined" : "contained"}
+                                color={isInCheckout ? "error" : "primary"}
+                                startIcon={isInCheckout ? <CancelIcon /> : <ShoppingCartIcon />}
+                                onClick={() => {
+                                  if (isInCheckout) {
+                                    setCheckoutList(prev => prev.filter(id => id !== med.id));
                                   } else {
-                                    setSubstitutionDosage(prev => ({ ...prev, [med.id]: '' }));
+                                    setCheckoutList(prev => [...prev, med.id]);
                                   }
                                 }}
-                                renderInput={(params) => <TextField {...params} label="Select Substitute from Inventory" size="small" required />}
-                              />
-                              <Stack direction="row" spacing={2}>
-                                <TextField
-                                  label="Dosage"
-                                  size="small"
-                                  value={substitutionDosage[med.id] || ''}
-                                  fullWidth
-                                  disabled
-                                />
-                                <TextField
-                                  label="Dispensing Qty"
-                                  type="number"
-                                  size="small"
-                                  fullWidth
-                                  value={substitutionQty[med.id] || ''}
-                                  onChange={(e) => setSubstitutionQty(prev => ({ ...prev, [med.id]: e.target.value === '' ? '' : Number(e.target.value) }))}
-                                  required
-                                />
-                              </Stack>
-                              <TextField
-                                label="Reason for Substitution"
-                                fullWidth
-                                size="small"
-                                required
-                                multiline
-                                rows={2}
-                                value={substitutionReasons[med.id] || ''}
-                                onChange={(e) => setSubstitutionReasons(prev => ({ ...prev, [med.id]: e.target.value }))}
-                              />
-                            </Stack>
+                                sx={{ borderRadius: 2, px: 4, fontWeight: 900 }}
+                              >
+                                {isInCheckout ? "REMOVE FROM CHECKOUT" : "ADD TO CHECKOUT"}
+                              </Button>
+                            </Box>
                           )}
                         </Grid>
                       </Grid>
                     </CardContent>
                   </Card>
-                ))}
+                )})}
               </Stack>
               
               <Divider sx={{ my: 4 }} />
               
               <Box sx={{ mt: 8, pt: 4, borderTop: '2px dashed #e2e8f0' }}>
+                {checkoutList.length > 0 && (
+                  <Alert severity="info" sx={{ mb: 4, borderRadius: 3, '& .MuiAlert-message': { width: '100%' } }}>
+                    <Stack spacing={2}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Typography variant="subtitle1" fontWeight="bold">
+                          Checkout Summary: {checkoutList.length} item(s) selected
+                        </Typography>
+                        <Button size="small" color="primary" variant="outlined" onClick={() => setCheckoutList([])}>
+                          Clear All
+                        </Button>
+                      </Stack>
+                      
+                      <TableContainer component={Paper} elevation={0} sx={{ bgcolor: 'rgba(255,255,255,0.5)', borderRadius: 2 }}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell sx={{ fontWeight: 'bold' }}>Medication</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>Dosage</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>Mode</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>Qty</TableCell>
+                              <TableCell align="right"></TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {prescriptions.filter(m => checkoutList.includes(m.id)).map(med => {
+                              const mode = dispensingModes[med.id];
+                              const qty = mode === 'PARTIAL' ? partialQty[med.id] : 
+                                          mode === 'SUBSTITUTE' ? substitutionQty[med.id] : 
+                                          med.quantity;
+                              return (
+                                <TableRow key={med.id}>
+                                  <TableCell>{med.medicationName}</TableCell>
+                                  <TableCell>{med.dosageValue}{med.dosageUnit}</TableCell>
+                                  <TableCell>
+                                    <Chip label={mode} size="small" color={mode === 'FULL' ? 'success' : 'warning'} variant="outlined" sx={{ fontWeight: 'bold', fontSize: '0.65rem' }} />
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 'bold' }}>{qty || med.quantity}</TableCell>
+                                  <TableCell align="right">
+                                    <IconButton size="small" color="error" onClick={() => setCheckoutList(prev => prev.filter(id => id !== med.id))}>
+                                      <CancelIcon fontSize="small" />
+                                    </IconButton>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </Stack>
+                  </Alert>
+                )}
+
                 <Grid container spacing={2}>
                   <Grid size={{ xs: 12, sm: 4 }}>
                     <Button 
@@ -710,25 +940,25 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                       Cancel
                     </Button>
                   </Grid>
-                  <Grid size={{ xs: 12, sm: 4 }}>
-                    <Button 
-                      fullWidth variant="contained" color="primary" size="large" 
-                      onClick={handleFinalize}
-                      disabled={isFinalizing || prescriptions.some(med => dispensingModes[med.id] === 'PARTIAL' || dispensingModes[med.id] === 'OUT_OF_STOCK')}
-                      sx={{ height: 60, borderRadius: 3, fontWeight: 900 }}
-                    >
-                      {isFinalizing ? <CircularProgress size={24} color="inherit" /> : "Dispense"}
-                    </Button>
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 4 }}>
-                    <Button 
-                      fullWidth variant="contained" color="warning" size="large" 
-                      onClick={handleFinalize}
-                      disabled={isFinalizing || !prescriptions.some(med => dispensingModes[med.id] === 'PARTIAL' || dispensingModes[med.id] === 'OUT_OF_STOCK')}
-                      sx={{ height: 60, borderRadius: 3, fontWeight: 900 }}
-                    >
-                      {isFinalizing ? <CircularProgress size={24} color="inherit" /> : "IOU"}
-                    </Button>
+                  <Grid size={{ xs: 12, sm: 8 }}>
+                    {(() => {
+                       const medsInCheckout = prescriptions.filter(m => checkoutList.includes(m.id));
+                       const hasIOUInCheckout = medsInCheckout.some(med => dispensingModes[med.id] === 'PARTIAL' || dispensingModes[med.id] === 'OUT_OF_STOCK');
+                       const label = hasIOUInCheckout ? "FINALIZE WITH IOU" : "FINALIZE & DISPENSE";
+                       return (
+                        <Button 
+                          fullWidth 
+                          variant="contained" 
+                          color={hasIOUInCheckout ? "warning" : "primary"} 
+                          size="large" 
+                          onClick={handleFinalize}
+                          disabled={isFinalizing || checkoutList.length === 0}
+                          sx={{ height: 60, borderRadius: 3, fontWeight: 900 }}
+                        >
+                          {isFinalizing ? <CircularProgress size={24} color="inherit" /> : `${label} (${checkoutList.length})`}
+                        </Button>
+                       );
+                    })()}
                   </Grid>
                 </Grid>
               </Box>

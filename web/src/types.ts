@@ -262,7 +262,7 @@ export interface PrescriptionRecord {
   clinic_id: string;
   country_id: string;
   prescriptions: Prescription[];
-  status: 'PENDING' | 'DISPENSED';
+  status: 'PENDING' | 'DISPENSED' | 'PARTIAL_DISPENSED';
   dispenser_name?: string;
   dispenser_reg_no?: string;
   dispenser_body?: string;

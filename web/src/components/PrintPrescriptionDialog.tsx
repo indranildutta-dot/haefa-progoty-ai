@@ -1,12 +1,11 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { 
   Dialog, DialogTitle, DialogContent, DialogActions, 
-  Button, Box, IconButton, Paper 
+  Button, Box, IconButton, Paper, CircularProgress 
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import PrintIcon from '@mui/icons-material/Print';
 import PrescriptionPrintTemplate from './PrescriptionPrintTemplate';
-import { useReactToPrint } from 'react-to-print';
 
 interface PrintPrescriptionDialogProps {
   open: boolean;
@@ -15,27 +14,16 @@ interface PrintPrescriptionDialogProps {
 }
 
 const PrintPrescriptionDialog: React.FC<PrintPrescriptionDialogProps> = ({ open, onClose, encounterId }) => {
-  const componentRef = useRef<HTMLDivElement>(null);
-
-  const handlePrint = useReactToPrint({
-    contentRef: componentRef,
-    documentTitle: `Prescription-${encounterId}`,
-    onAfterPrint: () => console.log("Print process completed."),
-    onPrintError: (error) => {
-      console.error("Print Error:", error);
-      // Fallback to window.print() if react-to-print fails
-      window.print();
-    }
-  });
+  const [isReady, setIsReady] = React.useState(false);
 
   const onPrintClick = () => {
-    console.log("HAEFA: Initiating print for encounter:", encounterId);
-    if (typeof handlePrint === 'function') {
-      handlePrint();
-    } else {
-      console.warn("HAEFA: handlePrint not ready, falling back to window.print()");
-      window.print();
-    }
+    if (!isReady) return;
+    
+    console.log("HAEFA: Initiating native print for encounter:", encounterId);
+    
+    // We rely on the @media print styles defined in PrescriptionPrintTemplate.tsx
+    // which hide the main UI and show only the prescription content.
+    window.print();
   };
 
   return (
@@ -44,7 +32,9 @@ const PrintPrescriptionDialog: React.FC<PrintPrescriptionDialogProps> = ({ open,
       onClose={onClose} 
       maxWidth="md" 
       fullWidth
-      PaperProps={{ id: 'print-dialog-content', sx: { borderRadius: 4, overflow: 'hidden' } }}
+      slotProps={{
+        paper: { id: 'print-dialog-content', sx: { borderRadius: 4, overflow: 'hidden' } }
+      }}
     >
       <DialogTitle sx={{ m: 0, p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: '#f8fafc' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -58,9 +48,11 @@ const PrintPrescriptionDialog: React.FC<PrintPrescriptionDialogProps> = ({ open,
       <DialogContent dividers sx={{ p: 0, bgcolor: '#f1f5f9' }}>
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
           <Paper elevation={4} sx={{ borderRadius: 0 }}>
-            <div ref={componentRef} id="prescription-content">
-              <PrescriptionPrintTemplate encounterId={encounterId} />
-            </div>
+            {/* The ID here matches the @media print rules in the template */}
+            <PrescriptionPrintTemplate 
+              encounterId={encounterId} 
+              onReady={() => setIsReady(true)}
+            />
           </Paper>
         </Box>
       </DialogContent>
@@ -71,10 +63,11 @@ const PrintPrescriptionDialog: React.FC<PrintPrescriptionDialogProps> = ({ open,
         <Button 
           onClick={onPrintClick} 
           variant="contained" 
-          startIcon={<PrintIcon />}
+          startIcon={isReady ? <PrintIcon /> : <CircularProgress size={20} color="inherit" />}
+          disabled={!isReady}
           sx={{ borderRadius: 2, fontWeight: 900, px: 4 }}
         >
-          Print Prescription
+          {isReady ? "Print Prescription" : "Preparing..."}
         </Button>
       </DialogActions>
     </Dialog>

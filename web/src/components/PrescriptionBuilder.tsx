@@ -103,7 +103,7 @@ const PrescriptionBuilder: React.FC<{ onPrescriptionChange?: (p: Prescription[])
           Prescribe from Inventory
         </Button>
         <Button variant="outlined" color="secondary" startIcon={<PostAddIcon />} onClick={() => addNewItem(true)} sx={{ borderRadius: 3, fontWeight: 800 }}>
-          Add New Medicine
+          Add Not in Medicine Inventory
         </Button>
       </Stack>
 
