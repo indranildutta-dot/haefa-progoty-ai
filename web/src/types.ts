@@ -146,10 +146,12 @@ export interface QueueItem {
   clinic_id: string;
   triage_level?: TriageLevel;
   priority_score?: number;
+  bmi_class?: string;
   doctor_id?: string;
   doctor_called_at?: Timestamp;
   created_at: Timestamp;
   updated_at?: Timestamp;
+  station_entry_at?: Timestamp;
 }
 
 export interface Encounter {
@@ -301,6 +303,7 @@ export interface QueuePatient {
   ageDisplay?: string;
   gender?: string;
   village?: string;
+  bmiClass?: string;
 }
 
 export interface AuditLog {

@@ -131,6 +131,7 @@ const PatientContextBar: React.FC = () => {
 
       // Factor: BMI
       if (vitals.bmi_class === 'Obese' || vitals.bmi_class === 'Underweight') updatePriority(colors.RED);
+      else if (vitals.bmi_class === 'Overweight') updatePriority(colors.YELLOW);
       else if (vitals.bmi > 0) updatePriority(colors.GREEN);
 
       // Factor: MUAC
@@ -300,11 +301,19 @@ const PatientContextBar: React.FC = () => {
         )}
 
         {/* BMI Alert */}
-        {!!vitals?.bmi_class && (vitals.bmi_class === 'Obese' || vitals.bmi_class === 'Underweight') && (
+        {!!vitals?.bmi_class && (vitals.bmi_class === 'Obese' || vitals.bmi_class === 'Overweight' || vitals.bmi_class === 'Underweight') && (
           <Chip 
             icon={<SpeedIcon style={{ color: 'white', fontSize: 16 }} />}
             label={vitals.bmi_class.toUpperCase()}
-            sx={{ bgcolor: vitals.bmi_class === 'Obese' ? '#7c2d12' : '#0369a1', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
+            sx={{ 
+              bgcolor: vitals.bmi_class === 'Obese' ? '#7c2d12' : 
+                       vitals.bmi_class === 'Overweight' ? '#f59e0b' : '#0369a1', 
+              color: 'white', 
+              fontWeight: 900, 
+              borderRadius: 1.5, 
+              height: 28, 
+              fontSize: '0.7rem' 
+            }}
           />
         )}
 

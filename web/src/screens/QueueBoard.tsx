@@ -56,8 +56,12 @@ const QueueBoard: React.FC<{ countryId: string }> = ({ countryId }) => {
         // Filter status in memory
         const items = allItems.filter(item => item.status !== 'COMPLETED');
         
-        // Sort by arrival time
-        items.sort((a, b) => (a.created_at?.toMillis() || 0) - (b.created_at?.toMillis() || 0));
+        // Sort by station entry time (or created_at if not available)
+        items.sort((a, b) => {
+          const timeA = (a.station_entry_at?.toMillis() || a.created_at?.toMillis() || 0);
+          const timeB = (b.station_entry_at?.toMillis() || b.created_at?.toMillis() || 0);
+          return timeA - timeB;
+        });
         setRawQueueItems(items);
         setLoading(false);
       } catch (e) { setLoading(false); }
@@ -95,12 +99,13 @@ const QueueBoard: React.FC<{ countryId: string }> = ({ countryId }) => {
         triageLevel: item.triage_level,
         encounterStatus: item.status,
         createdAt: item.created_at,
-        waitTimeDisplay: formatWaitTime(item.created_at),
+        waitTimeDisplay: formatWaitTime(item.station_entry_at || item.created_at),
         triageColor: getTriageColor(item.triage_level),
         photoUrl: p?.photo_url,
         ageDisplay: calculateAgeDisplay(p),
         gender: p?.gender,
-        village: p?.village
+        village: p?.village,
+        bmiClass: item.bmi_class
       } as any;
     });
   }, [rawQueueItems, patientsCache]);

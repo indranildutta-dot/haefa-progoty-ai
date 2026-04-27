@@ -63,7 +63,9 @@ import {
   getVitalsByEncounter, 
   getLatestVitals,
   getPatientHistory,
-  updateEncounterStatus 
+  updateEncounterStatus,
+  getDiagnosisByEncounter,
+  getPrescriptionByEncounter
 } from '../services/encounterService';
 import { getPatientById } from '../services/patientService';
 import { useAppStore } from '../store/useAppStore';
@@ -1587,14 +1589,18 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
         }
       };
 
+      // Fetch any saved progress
+      const savedDiagnosis = await getDiagnosisByEncounter(item.encounter_id);
+      const savedPrescription = await getPrescriptionByEncounter(item.encounter_id);
+
       setConsultData({
-        diagnosis: '', 
-        notes: '', 
-        treatment_notes: '', 
-        prescriptions: [], 
-        assessment: preFilledAssessment,
-        labInvestigations: [],
-        referrals: []
+        diagnosis: savedDiagnosis?.diagnosis || '', 
+        notes: savedDiagnosis?.notes || '', 
+        treatment_notes: savedDiagnosis?.treatment_notes || '', 
+        prescriptions: savedPrescription?.prescriptions || [], 
+        assessment: savedDiagnosis?.assessment || preFilledAssessment,
+        labInvestigations: savedDiagnosis?.labInvestigations || [],
+        referrals: savedDiagnosis?.referrals || []
       });
     } catch (e) { 
       notify("Error loading patient context.", "error"); 
@@ -1632,7 +1638,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
 
     try {
       setIsFinalizing(true);
-      await saveConsultation(cleanPayload, finalPrescriptionData);
+      await saveConsultation(cleanPayload, finalPrescriptionData, !!options.isFinalize);
       
       if (options.isFinalize) {
         await updateQueueStatus(selectedItem.id, 'WAITING_FOR_PHARMACY' as any);
@@ -1744,7 +1750,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
                       <Stack direction="row" spacing={1} alignItems="center">
                         <TimerIcon sx={{ fontSize: 16, color: 'text.secondary' }} /> 
                         <Typography variant="body2">
-                          {Math.floor((Date.now() - (item.created_at?.toDate().getTime() || Date.now())) / 60000)}m
+                          {Math.floor((Date.now() - ((item.station_entry_at || item.created_at)?.toDate().getTime() || Date.now())) / 60000)}m
                         </Typography>
                       </Stack>
                     </TableCell>
@@ -1761,7 +1767,23 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
                         }} 
                       />
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>{item.patient_name}</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>
+                      {item.patient_name}
+                      {item.bmi_class && (item.bmi_class === 'Obese' || item.bmi_class === 'Overweight' || item.bmi_class === 'Underweight') && (
+                        <Chip 
+                          label={item.bmi_class.toUpperCase()} 
+                          size="small" 
+                          sx={{ 
+                            ml: 2, 
+                            fontWeight: 900, 
+                            height: 20, 
+                            bgcolor: item.bmi_class === 'Obese' ? '#7c2d12' : item.bmi_class === 'Overweight' ? '#f59e0b' : '#0369a1',
+                            color: 'white',
+                            fontSize: '0.65rem'
+                          }} 
+                        />
+                      )}
+                    </TableCell>
                     <TableCell align="right">
                       <Stack direction="row" spacing={1} justifyContent="flex-end">
                         <Button variant="contained" onClick={() => handleOpenConsult(item)} sx={{ borderRadius: 2, fontWeight: 700 }}>

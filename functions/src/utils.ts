@@ -75,8 +75,12 @@ export const deepSanitize = (data: any): any => {
                          constructorName?.endsWith('Transform') ||
                          (typeof data._methodName === 'string') ||
                          (data._sentinel !== undefined);
+                         
+    const isTimestamp = (data instanceof admin.firestore.Timestamp) || 
+                        constructorName === 'Timestamp' ||
+                        (typeof data.toDate === 'function' && typeof data.toMillis === 'function');
     
-    if (isFieldValue) {
+    if (isFieldValue || isTimestamp) {
       return data;
     }
 

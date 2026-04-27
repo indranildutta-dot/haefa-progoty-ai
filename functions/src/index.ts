@@ -315,6 +315,7 @@ export const saveConsultation = onCall(async (request) => {
     labInvestigations?: any[];
     referrals?: any[];
     assessment?: any;
+    isFinalize?: boolean;
   };
 
   const vId = data.encounterId || data.visitId;
@@ -328,12 +329,13 @@ export const saveConsultation = onCall(async (request) => {
 
   const { 
     prescriptions = [], 
-    diagnosis = "No diagnosis", 
+    diagnosis = "", 
     notes = "", 
     treatment_notes = "", 
     labInvestigations = [], 
     referrals = [], 
-    assessment = {} 
+    assessment = {},
+    isFinalize = true
   } = data;
 
   console.log(`HAEFA: Starting saveConsultation for Encounter ${vId}, Patient ${pId}`);
@@ -376,17 +378,25 @@ export const saveConsultation = onCall(async (request) => {
       // 2. STAGE ALL WRITES
       
       // A. Update Encounter doc
-      transaction.update(visitRef, sanitizeData({
-        status: 'WAITING_FOR_PHARMACY',
-        encounter_status: 'WAITING_FOR_PHARMACY',
-        current_station: 'pharmacy',
-        diagnosis,
-        notes,
-        last_updated: serverTime
-      }));
+      if (isFinalize) {
+        transaction.update(visitRef, sanitizeData({
+          status: 'WAITING_FOR_PHARMACY',
+          encounter_status: 'WAITING_FOR_PHARMACY',
+          current_station: 'pharmacy',
+          diagnosis,
+          notes,
+          last_updated: serverTime
+        }));
+      } else {
+        transaction.update(visitRef, sanitizeData({
+          diagnosis,
+          notes,
+          last_updated: serverTime
+        }));
+      }
 
-      // B. Create Diagnosis Record
-      const diagRef = db.collection("diagnoses").doc();
+      // B. Create or Update Diagnosis Record
+      const diagRef = db.collection("diagnoses").doc(`${vId}_diag`);
       transaction.set(diagRef, sanitizeData({
         encounter_id: vId,
         patient_id: pId,
@@ -402,10 +412,10 @@ export const saveConsultation = onCall(async (request) => {
         prescriber_body: userProfile.professional_body || "BMDC",
         prescriber_designation: userProfile.designation || "Medical Officer",
         created_at: serverTime
-      }));
+      }), { merge: true });
 
-      // C. Create Prescription Record
-      const presRef = db.collection("prescriptions").doc();
+      // C. Create or Update Prescription Record
+      const presRef = db.collection("prescriptions").doc(`${vId}_pres`);
       transaction.set(presRef, sanitizeData({
         encounter_id: vId,
         patient_id: pId,
@@ -413,10 +423,10 @@ export const saveConsultation = onCall(async (request) => {
         prescriptions: Array.isArray(prescriptions) ? prescriptions : [],
         status: 'PENDING',
         created_at: serverTime
-      }));
+      }), { merge: true });
 
       // D. Handle Requisitions
-      if (Array.isArray(prescriptions)) {
+      if (isFinalize && Array.isArray(prescriptions)) {
         for (const med of prescriptions) {
           if (med && med.isRequisition) {
             const reqRef = db.collection("requisitions").doc();
@@ -434,7 +444,7 @@ export const saveConsultation = onCall(async (request) => {
       }
 
       // E. Update Queue Entries
-      if (queueDoc && queueDoc.exists) {
+      if (isFinalize && queueDoc && queueDoc.exists) {
         transaction.update(queueDoc.ref, sanitizeData({ 
           station: 'pharmacy',
           status: 'WAITING_FOR_PHARMACY',
@@ -599,7 +609,7 @@ export const dispenseMedication = onCall(async (request) => {
             requisitionWrites.push({
               clinic_id: cId, medication_name: targetMedName,
               current_stock: newQty, type: 'LOW_STOCK_ALERT', status: 'PENDING',
-              created_at: admin.firestore.FieldValue.serverTimestamp()
+              created_at: admin.firestore.Timestamp.now()
             });
           }
         }
@@ -611,14 +621,14 @@ export const dispenseMedication = onCall(async (request) => {
             type: 'PATIENT_IOU_SHORTFALL', status: 'WAITING_FOR_STOCK',
             required_quantity: shortfall,
             return_date: return_on || null, encounter_id: vId,
-            created_at: admin.firestore.FieldValue.serverTimestamp()
+            created_at: admin.firestore.Timestamp.now()
           });
           
           requisitionWrites.push({
             clinic_id: cId, patient_id: pId, medication_name: medication_name,
             type: 'PROCUREMENT_NEEDED', status: 'PENDING', encounter_id: vId,
             required_quantity: shortfall,
-            created_at: admin.firestore.FieldValue.serverTimestamp()
+            created_at: admin.firestore.Timestamp.now()
           });
         }
         
@@ -628,7 +638,7 @@ export const dispenseMedication = onCall(async (request) => {
           mode, 
           substitution: substitution || null, 
           return_on: return_on || null,
-          created_at: admin.firestore.FieldValue.serverTimestamp() 
+          created_at: admin.firestore.Timestamp.now() 
         }));
       }
 
@@ -662,12 +672,12 @@ export const dispenseMedication = onCall(async (request) => {
 
         const cleanPresData = sanitizeData({
           status: anyShortfallRemaining ? 'PARTIAL_DISPENSED' : 'DISPENSED',
-          dispensedDate: presData?.dispensedDate || admin.firestore.FieldValue.serverTimestamp(),
+          dispensedDate: presData?.dispensedDate || admin.firestore.Timestamp.now(),
           dispenser_name: userProfile.name || "Unknown Pharmacist",
           dispenser_reg_no: userProfile.professional_reg_no || "N/A",
           dispenser_body: userProfile.professional_body || "PCB",
           dispensation_details: mergedDetails,
-          updated_at: admin.firestore.FieldValue.serverTimestamp()
+          updated_at: admin.firestore.Timestamp.now()
         });
         phase = "WRITE";
         logStep("WRITE", `update prescription ${presRef.path}`);
@@ -679,14 +689,14 @@ export const dispenseMedication = onCall(async (request) => {
           patient_id: pId,
           clinic_id: cId,
           status: 'DISPENSED',
-          dispensedDate: admin.firestore.FieldValue.serverTimestamp(),
+          dispensedDate: admin.firestore.Timestamp.now(),
           dispenser_name: userProfile.name || "Unknown Pharmacist",
           dispenser_reg_no: userProfile.professional_reg_no || "N/A",
           dispenser_body: userProfile.professional_body || "PCB",
           dispensation_details: results,
           prescriptions: [],
-          created_at: admin.firestore.FieldValue.serverTimestamp(),
-          updated_at: admin.firestore.FieldValue.serverTimestamp()
+          created_at: admin.firestore.Timestamp.now(),
+          updated_at: admin.firestore.Timestamp.now()
         });
         phase = "WRITE";
         logStep("WRITE", `create new prescription ${newPresRef.path}`);
@@ -703,7 +713,7 @@ export const dispenseMedication = onCall(async (request) => {
         dispenser_name: userProfile.name || "Unknown Pharmacist",
         dispenser_reg_no: userProfile.professional_reg_no || "N/A",
         dispenser_body: userProfile.professional_body || "PCB",
-        created_at: admin.firestore.FieldValue.serverTimestamp()
+        created_at: admin.firestore.Timestamp.now()
       }));
 
       // SACRED ADDITION: Create inventory logs
@@ -718,7 +728,7 @@ export const dispenseMedication = onCall(async (request) => {
             user_id: authUid,
             encounter_id: vId,
             patient_id: pId,
-            timestamp: admin.firestore.FieldValue.serverTimestamp()
+            timestamp: admin.firestore.Timestamp.now()
           }));
         }
       }
@@ -727,7 +737,7 @@ export const dispenseMedication = onCall(async (request) => {
       const finalStatus = anyShortfallRemaining ? 'PHARMACY_IOU' : 'COMPLETED';
       const cleanVisitData = sanitizeData({ 
         status: finalStatus, 
-        last_updated: admin.firestore.FieldValue.serverTimestamp() 
+        last_updated: admin.firestore.Timestamp.now() 
       });
       phase = "WRITE";
       logStep("WRITE", `update encounter ${visitRef.path} to ${finalStatus}`);
@@ -739,7 +749,7 @@ export const dispenseMedication = onCall(async (request) => {
         logStep("WRITE", `update queue ${qRef.path} to ${finalStatus}`);
         transaction.update(qRef, sanitizeData({
           status: finalStatus,
-          updated_at: admin.firestore.FieldValue.serverTimestamp()
+          updated_at: admin.firestore.Timestamp.now()
         }));
       }
 

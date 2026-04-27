@@ -194,6 +194,28 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
     vitals.nurse_priority
   ]);
 
+  // Delayed clinical validation for Labs to prevent premature warnings while typing
+  useEffect(() => {
+    if (mode !== 3) return;
+
+    const handler = setTimeout(() => {
+      // Check RBG
+      if (!isNaN(vitals.rbg) && (vitals.rbg > 600 || (vitals.rbg < 20 && vitals.rbg > 0))) {
+        notify("Impossible Glucose value. Please recheck.", "warning");
+      }
+      // Check FBG
+      if (!isNaN(vitals.fbg) && (vitals.fbg > 600 || (vitals.fbg < 20 && vitals.fbg > 0))) {
+        notify("Impossible Glucose value. Please recheck.", "warning");
+      }
+      // Check Hemoglobin
+      if (!isNaN(vitals.hemoglobin) && (vitals.hemoglobin > 25 || (vitals.hemoglobin < 3 && vitals.hemoglobin > 0))) {
+        notify("Impossible Hemoglobin value. Please recheck.", "warning");
+      }
+    }, 4000); // 4-second delay as requested by clinical staff
+
+    return () => clearTimeout(handler);
+  }, [vitals.rbg, vitals.fbg, vitals.hemoglobin, mode]);
+
   // Smart Wait-Time Formatting: Shows hours if > 60 mins
   const formatWaitTime = (createdAt: any) => {
     if (!createdAt) return '0 min';
@@ -357,26 +379,44 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
           // Clear fields for the current mode to respect "blank form" requirement
           // This ensures the nurse starts with a fresh form for the current station
           // while preserving data from previous stations for the top bar and final save.
+          // Clear fields for the current mode ONLY if we are starting fresh for this station.
+          // If we are revisiting a patient at the same station, keep the data.
+          // However, the user requirement is to respect "blank form" requirement for NEW visits at a station.
+          // The bug is that even when clicking "Save Progress" it clears it on revisit.
+          
+          // SOLUTION: Only clear if the encounter vitals don't have fields specific to this station already.
           if (mode === 1) {
-            mergedVitals = { 
-              ...mergedVitals, 
-              weight: NaN, height: NaN, bmi: NaN, bmi_class: '', muac: NaN, muac_class: '', 
-              blood_group: '', is_pregnant: false, pregnancy_months: NaN 
-            };
+            // mode 1 is Body Measures
+            const hasBodyMeasures = !isNaN(existingVitals.weight) || !isNaN(existingVitals.height);
+            if (!hasBodyMeasures) {
+              mergedVitals = { 
+                ...mergedVitals, 
+                weight: NaN, height: NaN, bmi: NaN, bmi_class: '', muac: NaN, muac_class: '', 
+                blood_group: '', is_pregnant: false, pregnancy_months: NaN 
+              };
+            }
           } else if (mode === 2) {
-            mergedVitals = { 
-              ...mergedVitals, 
-              systolic: NaN, diastolic: NaN, systolic_2: NaN, diastolic_2: NaN, 
-              heartRate: NaN, temperature: NaN, oxygenSaturation: NaN, respiratoryRate: NaN,
-              social_history: initialVitals.social_history, alcohol_use: 'None'
-            };
+            // mode 2 is Vital Signs
+            const hasVitalSigns = !isNaN(existingVitals.systolic) || !isNaN(existingVitals.heartRate);
+            if (!hasVitalSigns) {
+              mergedVitals = { 
+                ...mergedVitals, 
+                systolic: NaN, diastolic: NaN, systolic_2: NaN, diastolic_2: NaN, 
+                heartRate: NaN, temperature: NaN, oxygenSaturation: NaN, respiratoryRate: NaN,
+                social_history: initialVitals.social_history, alcohol_use: 'None'
+              };
+            }
           } else if (mode === 3) {
-            mergedVitals = { 
-              ...mergedVitals, 
-              blood_sugar: NaN, rbg: NaN, fbg: NaN, hours_since_meal: NaN, 
-              hemoglobin: NaN, is_fasting: false, has_symptoms: false, 
-              allergies: '', chronic_conditions: [] 
-            };
+            // mode 3 is Labs & Risks
+            const hasLabs = !isNaN(existingVitals.blood_sugar) || !isNaN(existingVitals.rbg) || !isNaN(existingVitals.hemoglobin);
+            if (!hasLabs) {
+              mergedVitals = { 
+                ...mergedVitals, 
+                blood_sugar: NaN, rbg: NaN, fbg: NaN, hours_since_meal: NaN, 
+                hemoglobin: NaN, is_fasting: false, has_symptoms: false, 
+                allergies: '', chronic_conditions: [] 
+              };
+            }
           }
           setVitals(mergedVitals);
         } else {
@@ -431,7 +471,8 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
       await updateQueueStatus(selectedQueueItem.id, nextStatus);
       await updateQueueTriage(selectedQueueItem.id, {
         triage_level: finalPriority as TriageLevel,
-        priority_score: systemTriage.priority_score
+        priority_score: systemTriage.priority_score,
+        bmi_class: vitals.bmi_class
       });
       
       notify(`Patient moved to ${nextStatus.replace(/_/g, ' ')}`, 'success');
@@ -484,13 +525,27 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       <TableCell>
                         <Stack direction="row" spacing={1} alignItems="center">
                           <TimerIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                          <Typography variant="body2">{formatWaitTime(item.created_at)}</Typography>
+                          <Typography variant="body2">{formatWaitTime(item.station_entry_at || item.created_at)}</Typography>
                         </Stack>
                       </TableCell>
                       <TableCell sx={{ fontWeight: 'bold', py: 3 }}>
                         {item.patient_name}
                         {isHighlighted && (
                           <Chip label="MATCH" size="small" color="warning" sx={{ ml: 2, fontWeight: 900, height: 20 }} />
+                        )}
+                        {item.bmi_class && (item.bmi_class === 'Obese' || item.bmi_class === 'Overweight' || item.bmi_class === 'Underweight') && (
+                          <Chip 
+                            label={item.bmi_class.toUpperCase()} 
+                            size="small" 
+                            sx={{ 
+                              ml: 2, 
+                              fontWeight: 900, 
+                              height: 20, 
+                              bgcolor: item.bmi_class === 'Obese' ? '#7c2d12' : item.bmi_class === 'Overweight' ? '#f59e0b' : '#0369a1',
+                              color: 'white',
+                              fontSize: '0.65rem'
+                            }} 
+                          />
                         )}
                       </TableCell>
                     <TableCell align="right">
@@ -951,9 +1006,6 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                             return;
                           }
                           const mgdl = glucoseUnit === 'mg/dL' ? val : val * 18;
-                          if (mgdl > 600 || (mgdl < 20 && mgdl > 0)) {
-                            notify("Impossible Glucose value. Please recheck.", "warning");
-                          }
                           setVitals({...vitals, rbg: mgdl});
                         }} 
                         InputProps={{ 
@@ -1003,9 +1055,6 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                             return;
                           }
                           const mgdl = glucoseUnit === 'mg/dL' ? val : val * 18;
-                          if (mgdl > 600 || (mgdl < 20 && mgdl > 0)) {
-                            notify("Impossible Glucose value. Please recheck.", "warning");
-                          }
                           setVitals({...vitals, fbg: mgdl});
                         }} 
                         InputProps={{ 
@@ -1067,9 +1116,6 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                             return;
                           }
                           const gdl = hbUnit === 'g/dL' ? val : val / 10;
-                          if (gdl > 25 || (gdl < 3 && gdl > 0)) {
-                            notify("Impossible Hemoglobin value. Please recheck.", "warning");
-                          }
                           setVitals({...vitals, hemoglobin: gdl});
                         }} 
                         InputProps={{ 

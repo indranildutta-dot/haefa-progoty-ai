@@ -96,7 +96,8 @@ export const createEncounter = async (patient_id: string) => {
  */
 export const saveConsultation = async (
   diagnosisData: Omit<DiagnosisRecord, 'id' | 'created_at' | 'country_id' | 'clinic_id'>,
-  prescriptionData?: Omit<PrescriptionRecord, 'id' | 'created_at' | 'status' | 'country_id' | 'clinic_id'>
+  prescriptionData?: Omit<PrescriptionRecord, 'id' | 'created_at' | 'status' | 'country_id' | 'clinic_id'>,
+  isFinalize: boolean = false
 ) => {
   const { selectedClinic } = getSession();
   if (!selectedClinic) throw new Error("Clinic not selected");
@@ -115,15 +116,18 @@ export const saveConsultation = async (
       treatment_notes: diagnosisData.treatment_notes || "",
       labInvestigations: diagnosisData.labInvestigations || [],
       referrals: diagnosisData.referrals || [],
-      assessment: diagnosisData.assessment || null
+      assessment: diagnosisData.assessment || null,
+      isFinalize
     });
 
-    // Logging the successful hand-off for audit purposes
-    await logAction({
-      action: 'DIAGNOSIS_CREATED',
-      encounter_id: diagnosisData.encounter_id,
-      patient_id: diagnosisData.patient_id
-    });
+    if (isFinalize) {
+      // Logging the successful hand-off for audit purposes
+      await logAction({
+        action: 'DIAGNOSIS_CREATED',
+        encounter_id: diagnosisData.encounter_id,
+        patient_id: diagnosisData.patient_id
+      });
+    }
 
     return result.data;
   } catch (error) {

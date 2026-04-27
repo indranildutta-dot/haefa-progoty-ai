@@ -76,7 +76,7 @@ const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals }) => {
       {renderSection('Body Measures', [
         { label: 'Weight', value: vitals.weight ? `${vitals.weight} kg` : null },
         { label: 'Height', value: vitals.height ? `${vitals.height} cm` : null },
-        { label: 'BMI', value: vitals.bmi ? `${vitals.bmi} (${vitals.bmi_class})` : null, abnormal: vitals.bmi_class === 'Obese' || vitals.bmi_class === 'Underweight' },
+        { label: 'BMI', value: vitals.bmi ? `${vitals.bmi} (${vitals.bmi_class})` : null, abnormal: vitals.bmi_class === 'Obese' || vitals.bmi_class === 'Overweight' || vitals.bmi_class === 'Underweight' },
         { label: 'MUAC', value: vitals.muac ? `${vitals.muac} (${vitals.muac_class})` : null, abnormal: vitals.muac_class !== 'Normal' && !!vitals.muac_class },
       ])}
 

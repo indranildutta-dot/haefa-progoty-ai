@@ -38,7 +38,8 @@ export const addToQueue = async (queueData: Omit<QueueItem, 'id' | 'created_at' 
       country_id: selectedCountry.id,
       clinic_id: selectedClinic.id,
       created_at: serverTimestamp(),
-      updated_at: serverTimestamp()
+      updated_at: serverTimestamp(),
+      station_entry_at: serverTimestamp()
     };
     console.log("Queue item data to add:", data);
     docRef = await addDoc(collection(db, QUEUE_ACTIVE_COLLECTION), data);
@@ -97,7 +98,7 @@ export const updateQueueStatus = async (queueId: string, status: EncounterStatus
   const docSnap = await getDoc(docRef);
   
   let station = 'registration';
-  if (status === 'WAITING_FOR_VITALS') station = 'vitals';
+  if (status.startsWith('WAITING_FOR_VITALS')) station = 'vitals';
   else if (status === 'READY_FOR_DOCTOR' || status === 'IN_CONSULTATION') station = 'doctor';
   else if (status === 'WAITING_FOR_PHARMACY') station = 'pharmacy';
   else if (status === 'COMPLETED') station = 'completed';
@@ -119,7 +120,8 @@ export const updateQueueStatus = async (queueId: string, status: EncounterStatus
       await updateDoc(docRef, { 
         status, 
         station,
-        updated_at: serverTimestamp()
+        updated_at: serverTimestamp(),
+        station_entry_at: serverTimestamp()
       });
     }
 

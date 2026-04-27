@@ -83,6 +83,21 @@ const PatientQueueCard: React.FC<PatientQueueCardProps> = ({ patient, onClick })
           <Typography variant="caption" color="text.secondary" fontWeight="700" sx={{ display: 'block', mt: 0.5, fontSize: '0.75rem' }}>
             {patient.ageDisplay ? `${patient.ageDisplay} • ` : ''}{patient.gender?.charAt(0).toUpperCase() || 'N/A'}
           </Typography>
+          {patient.bmiClass && (patient.bmiClass === 'Obese' || patient.bmiClass === 'Overweight' || patient.bmiClass === 'Underweight') && (
+            <Chip 
+              label={patient.bmiClass.toUpperCase()} 
+              size="small" 
+              sx={{ 
+                mt: 0.5, 
+                fontWeight: 900, 
+                height: 18, 
+                bgcolor: patient.bmiClass === 'Obese' ? '#7c2d12' : patient.bmiClass === 'Overweight' ? '#f59e0b' : '#0369a1',
+                color: 'white',
+                fontSize: '0.55rem',
+                borderRadius: 1
+              }} 
+            />
+          )}
         </Box>
       </Box>
       

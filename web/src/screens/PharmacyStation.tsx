@@ -612,7 +612,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                         borderLeft: isHighlighted ? '6px solid #facc15' : 'none'
                       }}
                     >
-                      <TableCell>{formatWaitTime(item.created_at)}</TableCell>
+                      <TableCell>{formatWaitTime(item.station_entry_at || item.created_at)}</TableCell>
                       <TableCell sx={{ fontWeight: 'bold' }}>
                         <Stack direction="row" spacing={1} alignItems="center">
                           <Typography fontWeight="bold">{item.patient_name}</Typography>
