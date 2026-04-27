@@ -128,7 +128,7 @@ export const syncUserPermissions = onCall(async (request) => {
       assignedCountries: assignedCountries || [],
       assignedClinics: assignedClinics || [],
       isApproved: isApproved ?? false,
-      lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+      lastUpdated: admin.firestore.Timestamp.now()
     }, { merge: true });
     return { success: true };
   } catch (error: any) {
@@ -224,7 +224,7 @@ export const initClinics = onCall(async (request) => {
       { id: 'consultation', name: 'Doctor Consultation', order: 3 },
       { id: 'pharmacy', name: 'Pharmacy/Dispensing', order: 4 }
     ],
-    created_at: (await getAdmin()).firestore.FieldValue.serverTimestamp()
+    created_at: (await getAdmin()).firestore.Timestamp.now()
   };
 
   try {
@@ -373,7 +373,7 @@ export const saveConsultation = onCall(async (request) => {
       }
 
       const userProfile = (userProfileSnap?.data() as any) || {};
-      const serverTime = admin.firestore.FieldValue.serverTimestamp();
+      const serverTime = admin.firestore.Timestamp.now();
 
       // 2. STAGE ALL WRITES
       
@@ -506,8 +506,6 @@ export const dispenseMedication = onCall(async (request) => {
   try {
     const db = await getDb();
     const admin = await getAdmin();
-    // Pre-fetch user profile before transaction
-    const userProfile = (await db.collection("users").doc(authUid).get()).data() || {};
     const visitRef = db.collection("encounters").doc(vId);
 
     // Step 1: PRE-TRANSACTION PREP
@@ -535,13 +533,17 @@ export const dispenseMedication = onCall(async (request) => {
         }
       };
 
-      // Step 2: ATOMIC READS (The 'Gather' Phase)
-      // FIRST: Perform transaction.get(visitRef)
+      // 1. PERFORM ALL READS
       logStep("READ", `get ${visitRef.path}`);
       const visitDoc = await transaction.get(visitRef);
       if (!visitDoc.exists) {
         throw new HttpsError("not-found", `Encounter ${vId} not found.`);
       }
+
+      // Gather user profile (Read-Modify-Write consistency)
+      logStep("READ", `get user profile ${authUid}`);
+      const userProfileSnap = await transaction.get(db.collection("users").doc(authUid));
+      const userProfile = (userProfileSnap.data() as any) || {};
 
       // Gather Prescription doc if available
       let presDocSnap = null;
@@ -805,7 +807,7 @@ export const bulkUpload = onCall(async (request) => {
       medication_id: medId, 
       med_id_lower: medLower, 
       dosage, quantity: qty, 
-      created_at: admin.firestore.FieldValue.serverTimestamp() 
+      created_at: admin.firestore.Timestamp.now() 
     });
   });
 
@@ -836,13 +838,13 @@ export const bulkUpload = onCall(async (request) => {
             batch.update(docSnap.ref, {
                required_quantity: newReqQty,
                status: newReqQty <= 0 ? 'FULFILLED' : data.status,
-               updated_at: admin.firestore.FieldValue.serverTimestamp()
+               updated_at: admin.firestore.Timestamp.now()
             });
         } else if (remainingStock > 0 && data.type === 'LOW_STOCK_ALERT') {
             // Fulfill the low stock alert if stock is now > 0
             batch.update(docSnap.ref, {
                status: 'FULFILLED',
-               updated_at: admin.firestore.FieldValue.serverTimestamp()
+               updated_at: admin.firestore.Timestamp.now()
             });
         }
      }
@@ -990,7 +992,7 @@ export const generateDailySummaries = onSchedule("every 24 hours", async (event)
       infectious_disease: {
         tb_suspected_cases: tbSuspected
       },
-      last_updated: admin.firestore.FieldValue.serverTimestamp()
+      last_updated: admin.firestore.Timestamp.now()
     }, { merge: true });
   }
 });
