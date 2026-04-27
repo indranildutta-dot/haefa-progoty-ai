@@ -21,8 +21,9 @@ import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
 import { subscribeToQueue, updateQueueStatus, cancelQueueItem } from '../services/queueService';
 import { getPatientById } from '../services/patientService';
-import { getVitalsByEncounter } from '../services/encounterService';
+import { getVitalsByEncounter, saveDispensationProgress } from '../services/encounterService';
 import { useAppStore } from '../store/useAppStore';
+import SaveIcon from '@mui/icons-material/Save';
 import StationLayout from '../components/StationLayout';
 import StationSearchHeader from '../components/StationSearchHeader';
 import PatientContextBar from '../components/PatientContextBar'; 
@@ -63,6 +64,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
   const [patientVitals, setPatientVitals] = useState<any>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
+  const [isSavingProgress, setIsSavingProgress] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<any>(null);
   const [highlightedPatientIds, setHighlightedPatientIds] = useState<string[]>([]);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
@@ -95,9 +97,11 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const [checkoutList, setCheckoutList] = useState<string[]>([]);
 
   useEffect(() => {
+    setSelectedPatient(null);
+    setSelectedItem(null);
     if (!selectedClinic) return;
     return subscribeToQueue(['WAITING_FOR_PHARMACY', 'PHARMACY_IOU'] as any, setWaitingList, (err) => console.error(err));
-  }, [selectedClinic]);
+  }, [selectedClinic, setSelectedPatient]);
 
   useEffect(() => {
     if (!selectedClinic) return;
@@ -266,6 +270,16 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
         initialSubQty[m.id] = '';
       });
       
+      // Pre-populate if progress was previously saved
+      allMeds.forEach(m => {
+        if (m.dispensedInfo) {
+          const detail = m.dispensedInfo;
+          initialModes[m.id] = detail.mode || 'FULL';
+          if (detail.return_on) initialDates[m.id] = dayjs(toDateSafely(detail.return_on));
+          if (detail.dispensed !== undefined) initialPartialQty[m.id] = detail.dispensed;
+        }
+      });
+      
       setDispensingModes(initialModes);
       setReturnDates(initialDates);
       setPartialQty(initialPartialQty);
@@ -275,6 +289,36 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       setSubstitutionQty(initialSubQty);
     } catch (e) { 
       notify("Error loading dispensing data", "error"); 
+    }
+  };
+
+  const handleSaveProgress = async () => {
+    if (!selectedItem) return;
+    setIsSavingProgress(true);
+    try {
+      const medsInCheckout = prescriptions.filter(m => checkoutList.includes(m.id));
+      
+      const dispensationDetails = medsInCheckout.map(med => {
+        const mode = dispensingModes[med.id];
+        return {
+          medication: med.medicationName,
+          mode,
+          dispensed: mode === 'PARTIAL' ? Number(partialQty[med.id]) : (mode === 'SUBSTITUTE' ? Number(substitutionQty[med.id]) : Number(med.quantity)),
+          return_on: (mode === 'PARTIAL' || mode === 'OUT_OF_STOCK') ? returnDates[med.id]?.toISOString() : null,
+          created_at: new Date()
+        };
+      });
+
+      await saveDispensationProgress(selectedItem.encounter_id, dispensationDetails);
+      await updateQueueStatus(selectedItem.id, selectedItem.status, true);
+      
+      notify("Progress saved. Patient remains in pharmacy queue.", "success");
+      setSelectedItem(null);
+      setSelectedPatient(null);
+    } catch (error: any) {
+      notify(`Failed to save progress: ${error.message}`, "error");
+    } finally {
+      setIsSavingProgress(false);
     }
   };
 
@@ -801,7 +845,6 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                                       onChange={(e) => setPartialQty(prev => ({ ...prev, [med.id]: e.target.value === '' ? '' : Number(e.target.value) }))}
                                     />
                                   )}
-                                  <LocalizationProvider dateAdapter={AdapterDayjs}>
                                     <DatePicker
                                       label="Return Date for IOU"
                                       value={returnDates[med.id]}
@@ -809,7 +852,6 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                                       slotProps={{ textField: { fullWidth: true } }}
                                       minDate={dayjs()}
                                     />
-                                  </LocalizationProvider>
                                 </Stack>
                               </Box>
                             )}
@@ -947,7 +989,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                 )}
 
                 <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, sm: 4 }}>
+                  <Grid size={{ xs: 12, sm: 3 }}>
                     <Button 
                       fullWidth variant="outlined" color="inherit" size="large" 
                       onClick={() => setSelectedItem(null)}
@@ -956,25 +998,33 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                       Cancel
                     </Button>
                   </Grid>
-                  <Grid size={{ xs: 12, sm: 8 }}>
-                    {(() => {
-                       const medsInCheckout = prescriptions.filter(m => checkoutList.includes(m.id));
-                       const hasIOUInCheckout = medsInCheckout.some(med => dispensingModes[med.id] === 'PARTIAL' || dispensingModes[med.id] === 'OUT_OF_STOCK');
-                       const label = hasIOUInCheckout ? "FINALIZE WITH IOU" : "FINALIZE & DISPENSE";
-                       return (
-                        <Button 
-                          fullWidth 
-                          variant="contained" 
-                          color={hasIOUInCheckout ? "warning" : "primary"} 
-                          size="large" 
-                          onClick={handleFinalize}
-                          disabled={isFinalizing || checkoutList.length === 0}
-                          sx={{ height: 60, borderRadius: 3, fontWeight: 900 }}
-                        >
-                          {isFinalizing ? <CircularProgress size={24} color="inherit" /> : `${label} (${checkoutList.length})`}
-                        </Button>
-                       );
-                    })()}
+                  <Grid size={{ xs: 12, sm: 3 }}>
+                    <Button 
+                      fullWidth variant="outlined" color="primary" size="large" 
+                      startIcon={<SaveIcon />}
+                      onClick={handleSaveProgress}
+                      disabled={isFinalizing || isSavingProgress || checkoutList.length === 0}
+                      sx={{ height: 60, borderRadius: 3, fontWeight: 800 }}
+                    >
+                      {isSavingProgress ? <CircularProgress size={24} /> : "Save Progress"}
+                    </Button>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Button 
+                      fullWidth 
+                      variant="contained" 
+                      color={prescriptions.filter(m => checkoutList.includes(m.id)).some(med => dispensingModes[med.id] === 'PARTIAL' || dispensingModes[med.id] === 'OUT_OF_STOCK') ? "warning" : "primary"} 
+                      size="large" 
+                      onClick={handleFinalize}
+                      disabled={isFinalizing || checkoutList.length === 0}
+                      sx={{ height: 60, borderRadius: 3, fontWeight: 900 }}
+                    >
+                      {isFinalizing ? <CircularProgress size={24} color="inherit" /> : (
+                        prescriptions.filter(m => checkoutList.includes(m.id)).some(med => dispensingModes[med.id] === 'PARTIAL' || dispensingModes[med.id] === 'OUT_OF_STOCK') 
+                        ? `FINALIZE WITH IOU (${checkoutList.length})` 
+                        : `FINALIZE & DISPENSE (${checkoutList.length})`
+                      )}
+                    </Button>
                   </Grid>
                 </Grid>
               </Box>
@@ -1265,7 +1315,8 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   );
 
   return (
-    <StationLayout title="Pharmacy & Inventory" stationName="Pharmacy" showPatientContext={!!selectedItem}>
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <StationLayout title="Pharmacy & Inventory" stationName="Pharmacy" showPatientContext={!!selectedItem}>
       <Container maxWidth="xl" sx={{ py: 3 }}>
         {!selectedItem && (
           <Box sx={{ mb: 4 }}>
@@ -1299,6 +1350,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
         />
       )}
     </StationLayout>
+    </LocalizationProvider>
   );
 };
 

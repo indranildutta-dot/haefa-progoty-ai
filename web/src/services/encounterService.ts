@@ -332,6 +332,30 @@ export const getPrescriptionByEncounter = async (encounterId: string): Promise<P
   return null;
 };
 
+export const saveDispensationProgress = async (
+  encounterId: string,
+  dispensationDetails: any[]
+) => {
+  const q = query(
+    collection(db, PRESCRIPTIONS_COLLECTION),
+    where("encounter_id", "==", encounterId),
+    limit(1)
+  );
+  const querySnapshot = await getDocs(q);
+  if (querySnapshot.empty) {
+    throw new Error("No prescription found for this encounter");
+  }
+
+  const docId = querySnapshot.docs[0].id;
+  const docRef = doc(db, PRESCRIPTIONS_COLLECTION, docId);
+  
+  await updateDoc(docRef, {
+    dispensation_details: dispensationDetails,
+    updated_at: serverTimestamp(),
+    status: 'DISPENSING_IN_PROGRESS'
+  });
+};
+
 export const markPrescriptionDispensed = async (prescriptionId: string) => {
   const docRef = doc(db, PRESCRIPTIONS_COLLECTION, prescriptionId);
   const pDoc = await getDoc(docRef);

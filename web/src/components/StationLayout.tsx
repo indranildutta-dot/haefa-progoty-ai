@@ -51,7 +51,7 @@ const StationLayout: React.FC<StationLayoutProps> = ({
   const { isMobile, isTablet, isDesktop } = useResponsiveLayout();
   const navigate = useNavigate();
   const location = useLocation();
-  const { notifications, selectedPatient } = useAppStore();
+  const { notifications, selectedPatient, clearNotifications } = useAppStore();
   const [open, setOpen] = useState(false);
   const [currentNotification, setCurrentNotification] = useState<any>(null);
 
@@ -59,8 +59,10 @@ const StationLayout: React.FC<StationLayoutProps> = ({
     if (notifications.length > 0) {
       setCurrentNotification(notifications[notifications.length - 1]);
       setOpen(true);
+      // Clear store notifications to prevent replaying on remount
+      clearNotifications();
     }
-  }, [notifications]);
+  }, [notifications, clearNotifications]);
 
   const handleClose = () => {
     setOpen(false);

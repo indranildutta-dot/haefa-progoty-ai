@@ -109,10 +109,12 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
   const [hbUnit, setHbUnit] = useState<'g/dL' | 'g/L'>('g/dL');
 
   useEffect(() => {
+    setSelectedPatient(null);
+    setSelectedQueueItem(null);
     if (!selectedClinic) return;
     const unsubscribe = subscribeToQueue(station as any, setWaitingList, (err) => console.error(err));
     return () => unsubscribe();
-  }, [selectedClinic, station]);
+  }, [selectedClinic, station, setSelectedPatient]);
 
   const getBMIClass = (bmi: number) => {
     if (bmi < 18.5) return 'Underweight';
@@ -376,19 +378,12 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
           // Merge existing vitals with initial state
           let mergedVitals = { ...initialVitals, ...existingVitals };
           
-          // Clear fields for the current mode to respect "blank form" requirement
-          // This ensures the nurse starts with a fresh form for the current station
-          // while preserving data from previous stations for the top bar and final save.
           // Clear fields for the current mode ONLY if we are starting fresh for this station.
-          // If we are revisiting a patient at the same station, keep the data.
-          // However, the user requirement is to respect "blank form" requirement for NEW visits at a station.
-          // The bug is that even when clicking "Save Progress" it clears it on revisit.
-          
-          // SOLUTION: Only clear if the encounter vitals don't have fields specific to this station already.
+          // We check if any significant field for this mode already has a value.
+          // If NOT, we clear them to ensure a blank form for the new station.
           if (mode === 1) {
-            // mode 1 is Body Measures
-            const hasBodyMeasures = !isNaN(existingVitals.weight) || !isNaN(existingVitals.height);
-            if (!hasBodyMeasures) {
+            const hasExistingBodyMeasures = !isNaN(existingVitals.weight) || !isNaN(existingVitals.height) || existingVitals.muac;
+            if (!hasExistingBodyMeasures) {
               mergedVitals = { 
                 ...mergedVitals, 
                 weight: NaN, height: NaN, bmi: NaN, bmi_class: '', muac: NaN, muac_class: '', 
@@ -396,9 +391,8 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
               };
             }
           } else if (mode === 2) {
-            // mode 2 is Vital Signs
-            const hasVitalSigns = !isNaN(existingVitals.systolic) || !isNaN(existingVitals.heartRate);
-            if (!hasVitalSigns) {
+            const hasExistingVitalSigns = !isNaN(existingVitals.systolic) || !isNaN(existingVitals.heartRate) || !isNaN(existingVitals.temperature);
+            if (!hasExistingVitalSigns) {
               mergedVitals = { 
                 ...mergedVitals, 
                 systolic: NaN, diastolic: NaN, systolic_2: NaN, diastolic_2: NaN, 
@@ -407,9 +401,8 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
               };
             }
           } else if (mode === 3) {
-            // mode 3 is Labs & Risks
-            const hasLabs = !isNaN(existingVitals.blood_sugar) || !isNaN(existingVitals.rbg) || !isNaN(existingVitals.hemoglobin);
-            if (!hasLabs) {
+            const hasExistingLabs = !isNaN(existingVitals.blood_sugar) || !isNaN(existingVitals.rbg) || !isNaN(existingVitals.hemoglobin);
+            if (!hasExistingLabs) {
               mergedVitals = { 
                 ...mergedVitals, 
                 blood_sugar: NaN, rbg: NaN, fbg: NaN, hours_since_meal: NaN, 
@@ -433,7 +426,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
     return s >= 130 || d >= 80;
   };
 
-  const handleSaveVitals = async (nextStatus: EncounterStatus) => {
+  const handleSaveVitals = async (nextStatus: EncounterStatus, isSaveProgress: boolean = false) => {
     if (!selectedQueueItem) return;
 
     // Reject impossible values
@@ -468,14 +461,18 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
       }, nextStatus);
       
       // 2. Update the active queue item status and triage level
-      await updateQueueStatus(selectedQueueItem.id, nextStatus);
+      await updateQueueStatus(selectedQueueItem.id, nextStatus, isSaveProgress);
       await updateQueueTriage(selectedQueueItem.id, {
         triage_level: finalPriority as TriageLevel,
         priority_score: systemTriage.priority_score,
         bmi_class: vitals.bmi_class
       });
       
-      notify(`Patient moved to ${nextStatus.replace(/_/g, ' ')}`, 'success');
+      if (isSaveProgress) {
+        notify(`Progress saved. Patient remains in ${stationName} queue.`, 'success');
+      } else {
+        notify(`Patient moved to ${nextStatus.replace(/_/g, ' ')}`, 'success');
+      }
       
       // Reset
       setSelectedPatient(null);
@@ -1203,7 +1200,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                 <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <Button 
                     fullWidth variant="outlined" color="primary" size="large" 
-                    startIcon={<SaveIcon />} onClick={() => handleSaveVitals(station as any)}
+                    startIcon={<SaveIcon />} onClick={() => handleSaveVitals(station as any, true)}
                     disabled={isSaving}
                     sx={{ height: 60, borderRadius: 3, fontWeight: 800 }}
                   >
@@ -1213,7 +1210,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                 <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <Button 
                     fullWidth variant="contained" color="info" size="large" 
-                    onClick={() => handleSaveVitals(station as any)}
+                    onClick={() => handleSaveVitals(station as any, true)}
                     disabled={isSaving}
                     sx={{ height: 60, borderRadius: 3, fontWeight: 800 }}
                   >

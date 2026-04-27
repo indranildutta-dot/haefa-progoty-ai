@@ -25,9 +25,33 @@ import { handleFirestoreError, OperationType } from "../utils/firestoreError";
 const QUEUE_ACTIVE_COLLECTION = "queues_active";
 const QUEUE_ARCHIVE_COLLECTION = "queues_archive";
 
+export const isPatientInQueue = async (patientId: string) => {
+  const { selectedClinic } = getSession();
+  if (!selectedClinic) return null;
+
+  const q = query(
+    collection(db, QUEUE_ACTIVE_COLLECTION),
+    where("clinic_id", "==", selectedClinic.id),
+    where("patient_id", "==", patientId)
+  );
+  
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return null;
+  
+  const doc = snapshot.docs[0];
+  return { id: doc.id, ...doc.data() } as QueueItem;
+};
+
 export const addToQueue = async (queueData: Omit<QueueItem, 'id' | 'created_at' | 'country_id' | 'clinic_id'>) => {
   const { selectedCountry, selectedClinic } = getSession();
   if (!selectedClinic) throw new Error("Clinic not selected");
+
+  // Check if patient is already in queue
+  const existingItem = await isPatientInQueue(queueData.patient_id);
+  if (existingItem) {
+    const stationName = (existingItem.station || 'another').charAt(0).toUpperCase() + (existingItem.station || 'another').slice(1);
+    throw new Error(`Patient Duplicate Entry: This patient is already in the active ${stationName} queue. Please complete or remove the patient from that station before adding them to this queue.`);
+  }
 
   console.log(`Adding patient ${queueData.patient_id} to queue for clinic ${selectedClinic.id}...`);
 
@@ -93,7 +117,7 @@ export const callNextPatient = async (queueId: string, doctorId: string) => {
   }
 };
 
-export const updateQueueStatus = async (queueId: string, status: EncounterStatus) => {
+export const updateQueueStatus = async (queueId: string, status: EncounterStatus, isSaveProgress: boolean = false) => {
   const docRef = doc(db, QUEUE_ACTIVE_COLLECTION, queueId);
   const docSnap = await getDoc(docRef);
   
@@ -117,12 +141,18 @@ export const updateQueueStatus = async (queueId: string, status: EncounterStatus
       });
       await deleteDoc(docRef);
     } else {
-      await updateDoc(docRef, { 
+      const updates: any = { 
         status, 
         station,
-        updated_at: serverTimestamp(),
-        station_entry_at: serverTimestamp()
-      });
+        updated_at: serverTimestamp()
+      };
+      
+      // Only reset wait timer if moving to a new station or not a simple progress save
+      if (!isSaveProgress) {
+        updates.station_entry_at = serverTimestamp();
+      }
+      
+      await updateDoc(docRef, updates);
     }
 
     await logAction({

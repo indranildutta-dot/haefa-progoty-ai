@@ -144,9 +144,9 @@ const StationSearchHeader: React.FC<StationSearchHeaderProps> = ({
       setOpen(false);
       setQrOpen(false);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding to queue:", error);
-      notify("Failed to add patient to queue", "error");
+      notify(error.message || "Failed to add patient to queue", "error");
     } finally {
       setLoading(false);
     }

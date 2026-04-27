@@ -1536,6 +1536,8 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
   // QUEUE & DATA LOGIC
   // ==========================================
   useEffect(() => {
+    setSelectedPatient(null);
+    setSelectedItem(null);
     if (!selectedClinic) return;
     const unsubscribe = subscribeToQueue(
       ['READY_FOR_DOCTOR', 'IN_CONSULTATION'] as any, 
@@ -1543,7 +1545,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
       (err) => console.error("Doctor Queue Error:", err)
     );
     return () => unsubscribe();
-  }, [selectedClinic]);
+  }, [selectedClinic, setSelectedPatient]);
 
   const handleOpenConsult = async (item: any) => {
     try {
@@ -1650,7 +1652,9 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
       } else if (options.isComplete) {
         notify("Diagnosis marked as complete.", "success");
       } else {
-        notify("Progress saved locally.", "info");
+        // Save Progress: Move back to READY_FOR_DOCTOR but preserve wait timer
+        await updateQueueStatus(selectedItem.id, 'READY_FOR_DOCTOR' as any, true);
+        notify("Progress saved. Patient returned to waiting queue.", "info");
         setSelectedItem(null);
         setSelectedPatient(null);
       }

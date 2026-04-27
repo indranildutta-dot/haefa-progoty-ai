@@ -27,6 +27,7 @@ interface AppState {
   
   notifications: Notification[];
   notify: (message: string, type?: Notification['type']) => void;
+  clearNotifications: () => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -67,6 +68,7 @@ export const useAppStore = create<AppState>()(
           notifications: [...state.notifications, { id, message, type }]
         }));
       },
+      clearNotifications: () => set({ notifications: [] }),
     }),
     {
       name: 'haefa-progoty-session-v3',

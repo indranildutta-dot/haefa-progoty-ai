@@ -52,7 +52,8 @@ import {
   createEncounter 
 } from '../services/encounterService';
 import { 
-  addToQueue 
+  addToQueue,
+  isPatientInQueue
 } from '../services/queueService';
 import { 
   Patient,
@@ -557,6 +558,14 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
     if (!selectedClinic) return;
     setLoading(true);
     try {
+      // Pre-check queue status
+      const existingItem = await isPatientInQueue(patientId);
+      if (existingItem) {
+        const stationName = (existingItem.station || 'another').charAt(0).toUpperCase() + (existingItem.station || 'another').slice(1);
+        notify(`Patient Duplicate Entry: This patient is already in the active ${stationName} queue. Please complete or remove the patient from that station before adding them to this queue.`, "error");
+        return;
+      }
+
       const encounterId = await createEncounter(patientId);
       await addToQueue({
         patient_id: patientId,
