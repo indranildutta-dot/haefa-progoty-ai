@@ -328,10 +328,26 @@ const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTe
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
           <Typography variant="subtitle2" fontWeight="900" sx={{ mb: 1, textTransform: 'uppercase', color: '#2563eb' }}>Provisional Diagnosis</Typography>
-          <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, minHeight: 120, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', bgcolor: '#fff7ed' }}>
-            <Typography variant="h6" fontWeight="900" color="#9a3412" sx={{ textAlign: 'center' }}>
-              {diagnosis?.diagnosis || "Pending Finalization"}
-            </Typography>
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, minHeight: 120, display: 'flex', flexDirection: 'column', gap: 1, justifyContent: 'center', alignItems: 'center', bgcolor: '#fff7ed' }}>
+            <Box sx={{ textAlign: 'center', width: '100%' }}>
+              <Typography variant="caption" sx={{ textTransform: 'uppercase', color: '#d97706', fontWeight: 800, mb: 0.5, display: 'block' }}>Major</Typography>
+              {(diagnosis?.provisionalDiagnosisMajor && diagnosis.provisionalDiagnosisMajor.length > 0) ? (
+                diagnosis.provisionalDiagnosisMajor.map((d, i) => (
+                  <Typography key={i} variant="h6" fontWeight="900" color="#9a3412" sx={{ lineHeight: 1.2 }}>{d}</Typography>
+                ))
+              ) : (
+                <Typography variant="body1" color="#9a3412">{diagnosis?.diagnosis || "Pending Finalization"}</Typography>
+              )}
+            </Box>
+            
+            {diagnosis?.provisionalDiagnosisMinor && diagnosis.provisionalDiagnosisMinor.length > 0 && (
+              <Box sx={{ textAlign: 'center', width: '100%', mt: 1, pt: 1, borderTop: '1px dashed #fed7aa' }}>
+                <Typography variant="caption" sx={{ textTransform: 'uppercase', color: '#d97706', fontWeight: 800, mb: 0.5, display: 'block' }}>Minor</Typography>
+                {diagnosis.provisionalDiagnosisMinor.map((d, i) => (
+                  <Typography key={i} variant="body1" fontWeight="700" color="#9a3412" sx={{ lineHeight: 1.2 }}>{d}</Typography>
+                ))}
+              </Box>
+            )}
           </Paper>
         </Grid>
       </Grid>

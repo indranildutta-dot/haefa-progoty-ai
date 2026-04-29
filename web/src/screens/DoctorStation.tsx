@@ -80,6 +80,7 @@ import VitalsSnapshot from '../components/VitalsSnapshot';
 import CancelQueueDialog from '../components/CancelQueueDialog';
 import PrintPrescriptionDialog from '../components/PrintPrescriptionDialog';
 import PrescriptionBuilder from '../components/PrescriptionBuilder';
+import icdData from '../data/icd11PrimaryCareSouthAsia.json';
 
 // ICD-11 Library (Types only, scripts are in index.html)
 // import * as ECT from '@whoicd/icd11ect'; // Removed to avoid conflict with CDN script
@@ -289,6 +290,8 @@ export const initialClinicalAssessment: ClinicalAssessmentData = {
 
 export interface ConsultationData {
   diagnosis: string;
+  provisionalDiagnosisMajor: string[];
+  provisionalDiagnosisMinor: string[];
   notes: string;
   treatment_notes: string;
   prescriptions: any[];
@@ -1437,6 +1440,8 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
   
   const [consultData, setConsultData] = useState<ConsultationData>({ 
     diagnosis: '', 
+    provisionalDiagnosisMajor: [],
+    provisionalDiagnosisMinor: [],
     notes: '', 
     treatment_notes: '', 
     prescriptions: [], 
@@ -1447,90 +1452,6 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
 
   const icdInputRef = useRef<HTMLInputElement>(null);
 
-  // ==========================================
-  // ICD-11 INTEGRATION (CDN SCRIPT SYNC)
-  // ==========================================
-  useEffect(() => {
-    const initECT = () => {
-      // Check if (window.ECT) to ensure the library is loaded from CDN
-      if (typeof (window as any).ECT === 'undefined') {
-        console.log("WHO ECT library not loaded yet, retrying...");
-        setTimeout(initECT, 500);
-        return;
-      }
-
-      console.log("Initializing ICD-11 ECT Handler via Local Assets...");
-      const ECT_LIB = (window as any).ECT;
-      
-      const settings = {
-        apiServerUrl: "https://id.who.int",
-        apiLinearization: "mms",
-        getNewTokenFunction: async () => {
-          try {
-            console.table({ event: 'ICD_TOKEN_REQUEST', timestamp: new Date().toISOString() });
-            console.log('HAEFA: Library is requesting a new token...');
-            console.log("Fetching ICD token from backend Function...");
-            const getIcdToken = httpsCallable(functions, 'getIcdToken');
-            const result: any = await getIcdToken();
-            
-            // WHO library strictly requires the string inside .data
-            console.log('DEBUG: Backend Token Response:', result);
-            console.log('HAEFA: Unwrapped Token:', result.data);
-            return result.data; 
-          } catch (error) {
-            console.error("Critical Token Error:", error);
-            return "";
-          }
-        }
-      };
-
-      const callbacks = {
-        selectedEntityFunction: (selectedEntity: any) => {
-          console.log("ICD Entity Selected:", selectedEntity);
-          const diagnosisText = `${selectedEntity.code} - ${selectedEntity.bestMatchText}`;
-          
-          // Update the Ref directly (Uncontrolled)
-          if (icdInputRef.current) {
-            icdInputRef.current.value = diagnosisText;
-          }
-          
-          // Update the State for persistence
-          setConsultData(prev => ({
-            ...prev,
-            diagnosis: diagnosisText
-          }));
-          
-          ECT_LIB.Handler.clear("1");
-        }
-      };
-
-      // Configure the ECT Handler
-      ECT_LIB.Handler.configure(settings, callbacks);
-      
-      // CRITICAL: Manual initialization to ensure server URL is explicitly set before binding
-      console.log("HAEFA: Setting explicit apiServerUrl and binding...");
-      ECT_LIB.Handler.configure({ apiServerUrl: "https://id.who.int" });
-      
-      // CRITICAL: Manually connect the search tool to the input field with delay
-      setTimeout(() => {
-        console.log("Binding ICD-11 search tool to input field...");
-        ECT_LIB.Handler.bind("1");
-        console.log('HAEFA: ICD-11 Engine Bound');
-      }, 500);
-    };
-
-    if (selectedItem) {
-      // Delay initialization slightly to ensure DOM is ready
-      const timer = setTimeout(initECT, 500);
-      return () => clearTimeout(timer);
-    }
-
-    return () => {
-      if (typeof (window as any).ECT !== 'undefined') {
-        (window as any).ECT.Handler.clear("1");
-      }
-    };
-  }, [selectedItem]);
 
   // ==========================================
   // QUEUE & DATA LOGIC
@@ -1597,6 +1518,8 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
 
       setConsultData({
         diagnosis: savedDiagnosis?.diagnosis || '', 
+        provisionalDiagnosisMajor: savedDiagnosis?.provisionalDiagnosisMajor || [],
+        provisionalDiagnosisMinor: savedDiagnosis?.provisionalDiagnosisMinor || [],
         notes: savedDiagnosis?.notes || '', 
         treatment_notes: savedDiagnosis?.treatment_notes || '', 
         prescriptions: savedPrescription?.prescriptions || [], 
@@ -1667,8 +1590,8 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
   };
 
   const handleFinalize = async (status: string) => {
-    if (!consultData.diagnosis) {
-      notify("A primary diagnosis is required.", "warning");
+    if (!consultData.provisionalDiagnosisMajor || consultData.provisionalDiagnosisMajor.length === 0) {
+      notify("A major diagnosis is required.", "warning");
       return;
     }
     await handleSave({ isFinalize: true });
@@ -1845,50 +1768,121 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
 
                   <Divider />
 
-                  {/* Section 3: Diagnosis (ICD-11 UNCONTROLLED) */}
+                  {/* Section 3: Diagnosis (ICD-11 Local Cache) */}
                   <Box>
                     <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>
-                      Section 3 — Provisional Diagnosis (ICD-11)
+                      Section 3a — Provisional Diagnosis (ICD-11) (major)
                     </Typography>
-                    <Box sx={{ position: 'relative' }}>
-                      <TextField 
-                        fullWidth
-                        inputRef={icdInputRef}
-                        inputProps={{ 
-                          "id": "icd11-input",
-                          "data-ctw-ino": "1",
-                          autoComplete: "off"
-                        }}
-                        onChange={(e) => setConsultData(prev => ({ ...prev, diagnosis: e.target.value }))}
-                        placeholder="Search ICD-11 Diagnosis..." 
-                        variant="outlined"
-                        sx={{ 
-                          bgcolor: 'white',
-                          '& .MuiOutlinedInput-root': {
-                            borderRadius: 2
-                          }
-                        }}
-                      />
-                      {/* WHO ECT Search Results Window */}
-                      <Box 
-                        className="ctw-window" 
-                        data-ctw-ino="1" 
-                        sx={{ 
-                          position: 'absolute', 
-                          top: '100%', 
-                          left: 0, 
-                          right: 0, 
-                          zIndex: 9999,
-                          bgcolor: 'white',
-                          boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                          borderRadius: '0 0 8px 8px',
-                          border: '1px solid #e2e8f0',
-                          borderTop: 'none',
-                          maxHeight: '400px',
-                          overflowY: 'auto'
-                        }}
-                      />
-                    </Box>
+                    <Autocomplete
+                      freeSolo
+                      options={icdData}
+                      getOptionLabel={(option) => typeof option === 'string' ? option : `${option.code} - ${option.name}`}
+                      filterOptions={(options, params) => {
+                        const inputValue = params.inputValue.toLowerCase();
+                        if (!inputValue) return [];
+                        return options.filter((option) => {
+                          const nameMatch = option.name?.toLowerCase().includes(inputValue);
+                          const keywordsMatch = option.keywords?.some((k: string) => k.toLowerCase().includes(inputValue));
+                          const codeMatch = option.code?.toLowerCase().includes(inputValue);
+                          return nameMatch || keywordsMatch || codeMatch;
+                        }).slice(0, 50);
+                      }}
+                      value={consultData.provisionalDiagnosisMajor?.[0] || null}
+                      onChange={(_, newValue) => {
+                        if (!newValue) {
+                          setConsultData(prev => ({ ...prev, provisionalDiagnosisMajor: [] }));
+                        } else {
+                          const mappedValue = typeof newValue === 'string' ? newValue : `${newValue.code} - ${newValue.name}`;
+                          setConsultData(prev => ({ ...prev, provisionalDiagnosisMajor: [mappedValue] }));
+                        }
+                      }}
+                      renderInput={(params) => (
+                        <TextField 
+                          {...params}
+                          placeholder="Search Major Diagnosis..." 
+                          variant="outlined"
+                          sx={{ 
+                            bgcolor: 'white',
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2
+                            }
+                          }}
+                        />
+                      )}
+                      renderOption={(props, option) => {
+                        const { key, ...otherProps } = props as any;
+                        return (
+                          <li key={option.code} {...otherProps}>
+                            <Box>
+                              <Typography variant="body1">{option.code} - {option.name}</Typography>
+                              {option.keywords && option.keywords.length > 0 && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {option.keywords.join(', ')}
+                                </Typography>
+                              )}
+                            </Box>
+                          </li>
+                        );
+                      }}
+                    />
+                  </Box>
+
+                  <Box sx={{ mt: 3 }}>
+                    <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>
+                      Section 3b — Provisional Diagnosis (ICD-11) (minor)
+                    </Typography>
+                    <Autocomplete
+                      multiple
+                      freeSolo
+                      options={icdData}
+                      getOptionLabel={(option) => typeof option === 'string' ? option : `${option.code} - ${option.name}`}
+                      filterOptions={(options, params) => {
+                        const inputValue = params.inputValue.toLowerCase();
+                        if (!inputValue) return [];
+                        return options.filter((option) => {
+                          const nameMatch = option.name?.toLowerCase().includes(inputValue);
+                          const keywordsMatch = option.keywords?.some((k: string) => k.toLowerCase().includes(inputValue));
+                          const codeMatch = option.code?.toLowerCase().includes(inputValue);
+                          return nameMatch || keywordsMatch || codeMatch;
+                        }).slice(0, 50);
+                      }}
+                      value={consultData.provisionalDiagnosisMinor || []}
+                      onChange={(_, newValue) => {
+                        const mappedValues = newValue.map((item: any) => {
+                          if (typeof item === 'string') return item;
+                          return `${item.code} - ${item.name}`;
+                        });
+                        setConsultData(prev => ({ ...prev, provisionalDiagnosisMinor: mappedValues }));
+                      }}
+                      renderInput={(params) => (
+                        <TextField 
+                          {...params}
+                          placeholder="Search Minor Diagnosis..." 
+                          variant="outlined"
+                          sx={{ 
+                            bgcolor: 'white',
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2
+                            }
+                          }}
+                        />
+                      )}
+                      renderOption={(props, option) => {
+                        const { key, ...otherProps } = props as any;
+                        return (
+                          <li key={option.code} {...otherProps}>
+                            <Box>
+                              <Typography variant="body1">{option.code} - {option.name}</Typography>
+                              {option.keywords && option.keywords.length > 0 && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {option.keywords.join(', ')}
+                                </Typography>
+                              )}
+                            </Box>
+                          </li>
+                        );
+                      }}
+                    />
                   </Box>
 
                   <Divider />
@@ -1939,7 +1933,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
             <Button 
               variant="contained" 
               color="warning"
-              disabled={isFinalizing || !consultData.diagnosis}
+              disabled={isFinalizing || !consultData.provisionalDiagnosisMajor || consultData.provisionalDiagnosisMajor.length === 0}
               onClick={() => handleSave({ isComplete: true })}
             >
               Complete Diagnosis
@@ -1951,7 +1945,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
                   variant="contained" 
                   color="primary" 
                   onClick={() => handleFinalize('WAITING_FOR_PHARMACY')} 
-                  disabled={isFinalizing || !consultData.diagnosis || !areAllSectionsComplete()}
+                  disabled={isFinalizing || !consultData.provisionalDiagnosisMajor || consultData.provisionalDiagnosisMajor.length === 0 || !areAllSectionsComplete()}
                 >
                   {isFinalizing ? <CircularProgress size={24} color="inherit" /> : "Complete & Send to Pharmacy"}
                 </Button>

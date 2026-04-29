@@ -43,6 +43,7 @@ const sanitizeSummary = (data: any): DailySummary => {
       lab_based: { '<5%': 0, '5-10%': 0, '10-20%': 0, '20-30%': 0, '>=30%': 0 },
       non_lab_based: { '<5%': 0, '5-10%': 0, '10-20%': 0, '20-30%': 0, '>=30%': 0 }
     },
+    comorbidity_map: data.comorbidity_map || {},
     last_updated: data.last_updated || Timestamp.now()
   };
 };
@@ -128,6 +129,22 @@ const generatePreviewData = (): DailySummary[] => {
         'Common Cold (CA0Z)': 10 + Math.floor(Math.random() * 10),
         'COPD (CA22)': 2 + Math.floor(Math.random() * 3),
         'Osteoarthritis (FA01)': 4 + Math.floor(Math.random() * 4)
+      },
+      comorbidity_map: {
+        'Hypertension (BA00)': {
+          '_total': { 'Type 2 Diabetes (5A11)': 3 + Math.floor(Math.random() * 3), 'Osteoarthritis (FA01)': 2, 'Anemia': 1 },
+          'Male': { 'Type 2 Diabetes (5A11)': 1, 'Osteoarthritis (FA01)': 1 },
+          'Female': { 'Type 2 Diabetes (5A11)': 2, 'Osteoarthritis (FA01)': 1, 'Anemia': 1 },
+          '40-59': { 'Type 2 Diabetes (5A11)': 2, 'Osteoarthritis (FA01)': 1 },
+          '60+': { 'Type 2 Diabetes (5A11)': 1, 'Osteoarthritis (FA01)': 1, 'Anemia': 1 }
+        },
+        'Type 2 Diabetes (5A11)': {
+          '_total': { 'Hypertension (BA00)': 3 + Math.floor(Math.random() * 3), 'Vision Impairment': 1 },
+          'Male': { 'Hypertension (BA00)': 2, 'Vision Impairment': 0 },
+          'Female': { 'Hypertension (BA00)': 1, 'Vision Impairment': 1 },
+          '40-59': { 'Hypertension (BA00)': 1, 'Vision Impairment': 0 },
+          '60+': { 'Hypertension (BA00)': 2, 'Vision Impairment': 1 }
+        }
       },
       avg_wait_times: {
         reg_to_vitals: 5 + Math.floor(Math.random() * 10),

@@ -244,6 +244,8 @@ export interface DiagnosisRecord {
   clinic_id: string;
   country_id: string;
   diagnosis: string;
+  provisionalDiagnosisMajor?: string[];
+  provisionalDiagnosisMinor?: string[];
   notes: string;
   treatment_notes?: string;
   chief_complaint?: string;

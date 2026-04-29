@@ -27,6 +27,7 @@ import OperationalThroughput from '../components/analytics/OperationalThroughput
 import NCDCohortTracking from '../components/analytics/NCDCohortTracking';
 import PharmacySupplyIntelligence from '../components/analytics/PharmacySupplyIntelligence';
 import ReferralAnalysis from '../components/analytics/ReferralAnalysis';
+import ComorbidityAnalysis from '../components/analytics/ComorbidityAnalysis';
 import GeminiInsightsSidebar from '../components/analytics/GeminiInsightsSidebar';
 import MaternalHealthTracker from '../components/analytics/MaternalHealthTracker';
 import PediatricNutrition from '../components/analytics/PediatricNutrition';
@@ -110,16 +111,35 @@ const AdvancedAnalytics: React.FC = () => {
     
     // Merge disease prevalence
     const diseaseMap: Record<string, number> = {};
+    const comorbidityMap: Record<string, any> = {};
+    
     summaries.forEach(s => {
+      // Merge Disease Prevalence
       Object.entries(s.disease_prevalence || {}).forEach(([code, count]) => {
         diseaseMap[code] = (diseaseMap[code] || 0) + (count as number);
       });
+      
+      // Merge Comorbidity Map
+      const sMap = (s as any).comorbidity_map || {};
+      for (const [major, majorData] of Object.entries(sMap)) {
+        if (!comorbidityMap[major]) comorbidityMap[major] = {};
+        
+        for (const [demographicSlice, minorsObj] of Object.entries((majorData as any))) {
+          if (!comorbidityMap[major][demographicSlice]) comorbidityMap[major][demographicSlice] = {};
+          
+          for (const [minor, count] of Object.entries((minorsObj as any))) {
+            comorbidityMap[major][demographicSlice][minor] = 
+              (comorbidityMap[major][demographicSlice][minor] || 0) + (count as number);
+          }
+        }
+      }
     });
 
     return {
       totalPatients,
       newPatients,
       diseaseMap,
+      comorbidityMap,
       summaries // Pass through for charts
     };
   }, [summaries]);
@@ -277,6 +297,10 @@ const AdvancedAnalytics: React.FC = () => {
                   </Grid>
 
                   {/* Modules */}
+                  <Grid size={{ xs: 12 }}>
+                    <ComorbidityAnalysis comorbidityMap={aggregatedData?.comorbidityMap} />
+                  </Grid>
+
                   <Grid size={{ xs: 12, md: 8 }}>
                     <DiseasePrevalence data={aggregatedData?.diseaseMap} />
                   </Grid>

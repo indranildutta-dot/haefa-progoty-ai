@@ -112,6 +112,8 @@ export const saveConsultation = async (
       clinicId: selectedClinic.id,
       prescriptions: prescriptionData?.prescriptions || [],
       diagnosis: diagnosisData.diagnosis,
+      provisionalDiagnosisMajor: diagnosisData.provisionalDiagnosisMajor || [],
+      provisionalDiagnosisMinor: diagnosisData.provisionalDiagnosisMinor || [],
       notes: diagnosisData.notes || "",
       treatment_notes: diagnosisData.treatment_notes || "",
       labInvestigations: diagnosisData.labInvestigations || [],

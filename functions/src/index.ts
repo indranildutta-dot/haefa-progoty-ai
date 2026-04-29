@@ -310,6 +310,8 @@ export const saveConsultation = onCall(async (request) => {
     clinicId?: string;
     prescriptions?: any[];
     diagnosis?: string;
+    provisionalDiagnosisMajor?: string[];
+    provisionalDiagnosisMinor?: string[];
     notes?: string;
     treatment_notes?: string;
     labInvestigations?: any[];
@@ -330,6 +332,8 @@ export const saveConsultation = onCall(async (request) => {
   const { 
     prescriptions = [], 
     diagnosis = "", 
+    provisionalDiagnosisMajor = [],
+    provisionalDiagnosisMinor = [],
     notes = "", 
     treatment_notes = "", 
     labInvestigations = [], 
@@ -384,12 +388,16 @@ export const saveConsultation = onCall(async (request) => {
           encounter_status: 'WAITING_FOR_PHARMACY',
           current_station: 'pharmacy',
           diagnosis,
+          provisionalDiagnosisMajor,
+          provisionalDiagnosisMinor,
           notes,
           last_updated: serverTime
         }));
       } else {
         transaction.update(visitRef, sanitizeData({
           diagnosis,
+          provisionalDiagnosisMajor,
+          provisionalDiagnosisMinor,
           notes,
           last_updated: serverTime
         }));
@@ -402,6 +410,8 @@ export const saveConsultation = onCall(async (request) => {
         patient_id: pId,
         clinic_id: cId,
         diagnosis,
+        provisionalDiagnosisMajor,
+        provisionalDiagnosisMinor,
         notes,
         treatment_notes,
         labInvestigations,
@@ -919,8 +929,19 @@ export const generateDailySummaries = onSchedule("every 24 hours", async (event)
     const triageCounts: Record<string, number> = {};
     const genderCounts: Record<string, number> = {};
     const diseaseMap: Record<string, number> = {};
+    const comorbidityMap: Record<string, any> = {};
     const medVolumes: Record<string, number> = {};
     const referralMap: Record<string, number> = {};
+    
+    // Batch fetch patients for demographic slicing
+    const patientIds = [...new Set(encountersSnap.docs.map(d => d.data().patient_id))].filter(Boolean);
+    const patientDataMap: Record<string, any> = {};
+    for (const pId of patientIds) {
+      const pSnap = await db.collection("patients").doc(String(pId)).get();
+      if (pSnap.exists) {
+        patientDataMap[String(pId)] = pSnap.data();
+      }
+    }
     
     let totalSbp = 0, totalDbp = 0, totalGluc = 0, ncdCount = 0;
     let ancVisits = 0, highRiskPreg = 0;
@@ -937,6 +958,42 @@ export const generateDailySummaries = onSchedule("every 24 hours", async (event)
       // Diagnosis
       if (encData.diagnosis) {
         diseaseMap[encData.diagnosis] = (diseaseMap[encData.diagnosis] || 0) + 1;
+      }
+      
+      const majors = encData.provisionalDiagnosisMajor || (encData.diagnosis ? [encData.diagnosis] : []);
+      const minors = encData.provisionalDiagnosisMinor || [];
+      
+      if (majors.length > 0 && minors.length > 0) {
+        const patient = patientDataMap[encData.patient_id] || {};
+        
+        let ageGroup = "Unknown";
+        if (patient.age_years !== undefined) {
+          if (patient.age_years < 18) ageGroup = "0-17";
+          else if (patient.age_years < 40) ageGroup = "18-39";
+          else if (patient.age_years < 60) ageGroup = "40-59";
+          else ageGroup = "60+";
+        }
+
+        const sex = patient.gender === 'male' ? 'Male' : (patient.gender === 'female' ? 'Female' : 'Unknown');
+        const nationality = patient.is_fdmn ? 'Rohingya' : 'Host Community';
+
+        for (const major of majors) {
+          if (!comorbidityMap[major]) {
+            comorbidityMap[major] = { _total: {} };
+          }
+          for (const minor of minors) {
+            comorbidityMap[major]._total[minor] = (comorbidityMap[major]._total[minor] || 0) + 1;
+            
+            if (!comorbidityMap[major][ageGroup]) comorbidityMap[major][ageGroup] = {};
+            comorbidityMap[major][ageGroup][minor] = (comorbidityMap[major][ageGroup][minor] || 0) + 1;
+
+            if (!comorbidityMap[major][sex]) comorbidityMap[major][sex] = {};
+            comorbidityMap[major][sex][minor] = (comorbidityMap[major][sex][minor] || 0) + 1;
+
+            if (!comorbidityMap[major][nationality]) comorbidityMap[major][nationality] = {};
+            comorbidityMap[major][nationality][minor] = (comorbidityMap[major][nationality][minor] || 0) + 1;
+          }
+        }
       }
 
       // NCD Metrics
@@ -975,6 +1032,7 @@ export const generateDailySummaries = onSchedule("every 24 hours", async (event)
       total_patients: totalPatients,
       triage_counts: triageCounts,
       disease_prevalence: diseaseMap,
+      comorbidity_map: comorbidityMap,
       ncd_metrics: {
         avg_sbp: ncdCount ? totalSbp / ncdCount : 0,
         avg_dbp: ncdCount ? totalDbp / ncdCount : 0,
