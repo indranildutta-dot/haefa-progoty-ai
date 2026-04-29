@@ -18,8 +18,8 @@ interface ReportSectionWrapperProps {
   color?: string;
 }
 
-const ReportSectionWrapper: React.FC<ReportSectionWrapperProps> = ({ title, subtitle, description, children, color = '#1e293b' }) => {
-  const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
+export default function ReportSectionWrapper({ title, subtitle, description, children, color = '#1e293b' }: ReportSectionWrapperProps) {
+  const [anchorEl, setAnchorEl] = React.useState<HTMLButtonElement | null>(null);
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
@@ -77,4 +77,4 @@ const ReportSectionWrapper: React.FC<ReportSectionWrapperProps> = ({ title, subt
   );
 };
 
-export default ReportSectionWrapper;
+

@@ -21,6 +21,7 @@ import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
 import { subscribeToQueue, updateQueueStatus, cancelQueueItem } from '../services/queueService';
 import { getPatientById } from '../services/patientService';
+import { getOfflineInventory } from '../services/localDataSync';
 import { getVitalsByEncounter, saveDispensationProgress } from '../services/encounterService';
 import { useAppStore } from '../store/useAppStore';
 import SaveIcon from '@mui/icons-material/Save';
@@ -109,10 +110,28 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     if (!selectedClinic) return;
     
     setIsInventoryLoading(true);
+    
+    // First attempt to load fast local cache
+    getOfflineInventory(selectedClinic.id).then(localItems => {
+        if (localItems && localItems.length > 0) {
+            const mapped = localItems.map(doc => ({
+                id: doc.id,
+                medication_id: doc.medication_id || doc.name || 'Unknown',
+                dosage: doc.dosage || '',
+                quantity: Number(doc.quantity) || 0,
+                category: doc.category || undefined,
+                last_restocked: doc.last_restocked || undefined
+            })) as InventoryItem[];
+            setInventory(prev => prev.length > 0 ? prev : mapped);
+            setIsInventoryLoading(false);
+        }
+    });
+
     const inventoryRef = collection(db, `clinics/${selectedClinic.id}/inventory`);
     const q = query(inventoryRef, orderBy('medication_id', 'asc'));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      if(snapshot.empty) return; // Keep offline cache if nothing loaded
       const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem));
       setInventory(items);
       setIsInventoryLoading(false);

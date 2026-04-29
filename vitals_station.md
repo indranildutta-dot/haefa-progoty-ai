@@ -99,8 +99,9 @@ A real-time synchronization mechanism in `VitalsStation.tsx` using a `useEffect`
 
 ## 4. Core Logic & Systems
 
-### Data Persistence (Smart Merging)
-To ensure data integrity across the three triage modes, the platform implements a **Smart Merging** strategy:
+### Data Persistence (Smart Merging) & Draft Auto-Save
+To ensure data integrity across the three triage modes, the platform implements a **Smart Merging** strategy and **Draft Auto-Save**:
+*   **Draft Auto-Save**: Managed by `useFormAutoSave`, inputs are temporarily buffered to `localforage` to prevent data loss on browser refresh or navigation.
 *   **Mode-Specific Blanking**: When a nurse starts a triage session, the form fields for the *current* mode are initialized as blank (NaN) to ensure a fresh reading.
 *   **Background Preservation**: Fields from *other* modes are fetched from the database and preserved in the background state. This ensures the top bar highlights remain accurate.
 *   **Incremental Saving**: The `saveVitals` service filters out `NaN` and `undefined` values before updating Firestore. This prevents "empty" fields in the current form from overwriting valid data recorded in previous stations.

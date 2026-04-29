@@ -91,6 +91,8 @@ export interface Patient {
   triage_level?: string;
   currentVitals?: VitalsRecord;
   chronic_diseases?: string[];
+  is_offline_registration?: boolean;
+  temporary_offline_id?: string;
 }
 
 // FIXED: Added missing properties requested by AI Studio
@@ -154,6 +156,7 @@ export interface QueueItem {
   created_at: Timestamp;
   updated_at?: Timestamp;
   station_entry_at?: Timestamp;
+  hasPendingWrites?: boolean;
 }
 
 export interface Encounter {
@@ -308,6 +311,7 @@ export interface QueuePatient {
   gender?: string;
   village?: string;
   bmiClass?: string;
+  hasPendingWrites?: boolean;
 }
 
 export interface AuditLog {

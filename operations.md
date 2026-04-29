@@ -19,12 +19,14 @@ Admins can toggle between multiple views:
 - **Completed Visits**: Total patients who have reached the final station (Pharmacy).
 - **Average Wait Time**: The mean time a patient spends in the queue today.
 
-## 4. Analytical Panels
+## 4. Analytical Panels & Advanced Analytics
 - **Patient Flow Funnel**: Visualizes the dropout rate at each clinical station.
 - **Clinic Bottleneck Panel**: Identifies which station has the longest average wait or the largest backlog.
 - **Wait Time Trend Chart**: D3-powered graph showing wait times over the course of the day.
 - **Triage Distribution**: Breakdown of patient acuity (Standard, Urgent, Emergency).
 - **Longest Wait List**: Individual tracking of patients who have exceeded wait thresholds (e.g., > 1 hour).
+- **Offline Sync Queue (Admin)**: Tracks "Lost" encounters from network blackouts and orphaned un-synced patients that were registered offline.
+- **Advanced Analytics Suite (NEW)**: High-level management modules that compute clinical outcomes, NCD cohort tracking, TB Surveillance, Disease Prevalence, Risk Stratifications, and Gemini-driven insights. It aggregates across countries or clinics.
 
 ## 5. Technical Requirements
 - **Data Source**: Aggregated from `patients`, `encounters`, and `queue` collections.

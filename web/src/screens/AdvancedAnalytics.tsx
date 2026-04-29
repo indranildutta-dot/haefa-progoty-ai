@@ -47,6 +47,7 @@ import InfoIcon from '@mui/icons-material/Info';
 // Services
 import { fetchDailySummaries, triggerAggregation } from '../services/analyticsService';
 import { DailySummary } from '../types';
+import StationLayout from '../components/StationLayout';
 
 // Internal Small Helper
 const SummaryCard: React.FC<{ title: string, value: any, label: string, color: string }> = ({ title, value, label, color }) => (
@@ -70,8 +71,6 @@ const SummaryCard: React.FC<{ title: string, value: any, label: string, color: s
     </Typography>
   </Paper>
 );
-
-import StationLayout from '../components/StationLayout';
 
 const AdvancedAnalytics: React.FC = () => {
   const navigate = useNavigate();

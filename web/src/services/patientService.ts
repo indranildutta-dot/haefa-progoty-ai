@@ -93,10 +93,26 @@ export const searchPatients = async (searchParams: {
   );
   
   const querySnapshot = await getDocs(q);
-  const allPatients = querySnapshot.docs.map(doc => ({
+  let allPatients = querySnapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data()
   })) as any[]; // Use any to handle legacy fields
+  
+  if (allPatients.length === 0) {
+    try {
+      const { searchPatientsOffline } = await import('./localDataSync');
+      const term = searchParams.given_name || searchParams.phone || searchParams.national_id || searchParams.rohingya_number || searchParams.nepal_id || searchParams.bhutanese_refugee_number || '';
+      if (term) {
+        const localMatches = await searchPatientsOffline(selectedClinic.id, term);
+        if (localMatches.length > 0) {
+          console.log("Found results in local mini index.");
+          allPatients = localMatches;
+        }
+      }
+    } catch (e) {
+      console.error("Local search fallback failed:", e);
+    }
+  }
   
   const results = allPatients.filter(patient => {
     let match = true;

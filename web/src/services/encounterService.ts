@@ -1,12 +1,13 @@
 import { 
   collection, 
-  addDoc, 
+  addDoc as firestoreAddDoc, 
   query, 
   where, 
   getDocs, 
   doc, 
   getDoc, 
-  updateDoc,
+  updateDoc as firestoreUpdateDoc,
+  setDoc as firestoreSetDoc,
   serverTimestamp,
   orderBy,
   limit,
@@ -27,12 +28,44 @@ import { getSession } from "../utils/session";
 import { logAction } from "./auditService";
 import { updateQueueMetric } from "./queueMetricsService";
 import { handleFirestoreError, OperationType } from "../utils/firestoreError";
+import { queueOfflineMutation } from "./backgroundRetryQueue";
 
 const ENCOUNTERS_COLLECTION = "encounters";
 const ENCOUNTERS_ARCHIVE_COLLECTION = "encounters_archive";
 const VITALS_COLLECTION = "vitals";
 const DIAGNOSES_COLLECTION = "diagnoses";
 const PRESCRIPTIONS_COLLECTION = "prescriptions";
+
+// Wrapper for safe offline mutation queuing
+const updateDoc = async (docRef: any, payload: any) => {
+  if (!navigator.onLine) {
+    const segments = docRef.path ? docRef.path.split('/') : ['unknown_collection'];
+    const collectionName = segments[segments.length - 2] || segments[0];
+    await queueOfflineMutation(collectionName, docRef.id, 'update', payload);
+    return;
+  }
+  return firestoreUpdateDoc(docRef, payload);
+};
+
+const setDoc = async (docRef: any, payload: any, options?: any) => {
+  if (!navigator.onLine) {
+    const segments = docRef.path ? docRef.path.split('/') : ['unknown_collection'];
+    const collectionName = segments[segments.length - 2] || segments[0];
+    await queueOfflineMutation(collectionName, docRef.id, 'set', payload);
+    return;
+  }
+  return firestoreSetDoc(docRef, payload, options);
+};
+
+const addDoc = async (colRef: any, payload: any) => {
+  if (!navigator.onLine) {
+    // Generate an ID for offline queue
+    const docRef = doc(colRef);
+    await queueOfflineMutation(colRef.id, docRef.id, 'set', payload);
+    return docRef;
+  }
+  return firestoreAddDoc(colRef, payload);
+};
 
 /**
  * Creates a new encounter and updates patient visit metrics.

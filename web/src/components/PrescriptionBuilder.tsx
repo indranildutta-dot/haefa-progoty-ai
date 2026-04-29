@@ -15,6 +15,8 @@ import CalculateIcon from '@mui/icons-material/Calculate';
 import MedicationIcon from '@mui/icons-material/Medication';
 import PostAddIcon from '@mui/icons-material/PostAdd';
 
+import { getOfflineInventory } from '../services/localDataSync';
+
 interface Prescription {
   medicationId: string;
   medicationName: string;
@@ -36,8 +38,24 @@ const PrescriptionBuilder: React.FC<{ onPrescriptionChange?: (p: Prescription[])
 
   useEffect(() => {
     if (!selectedClinic?.id) return;
+    
+    // First attempt to load fast local cache
+    getOfflineInventory(selectedClinic.id).then(localItems => {
+        if (localItems && localItems.length > 0) {
+            const mapped = localItems.map(doc => ({
+                id: doc.id,
+                name: doc.medication_id || doc.name || 'Unknown',
+                dosage: doc.dosage || '',
+                stock: Number(doc.quantity) || 0
+            }));
+            // Only set if we don't already have live data
+            setInventoryMeds(prev => prev.length > 0 ? prev : mapped);
+        }
+    });
+
     const inventoryRef = collection(db, "clinics", selectedClinic.id, "inventory");
     const unsubscribe = onSnapshot(inventoryRef, (snapshot) => {
+      if (snapshot.empty) return; // if empty (or offline with no firestore cache), keep localForage cache
       const items = snapshot.docs.map(doc => ({
         id: doc.id,
         name: doc.data().medication_id || doc.data().name || 'Unknown',
@@ -45,6 +63,8 @@ const PrescriptionBuilder: React.FC<{ onPrescriptionChange?: (p: Prescription[])
         stock: Number(doc.data().quantity) || 0
       }));
       setInventoryMeds(items);
+    }, (error) => {
+      console.warn("Inventory snapshot error, relying on local cache:", error);
     });
     return () => unsubscribe();
   }, [selectedClinic]);

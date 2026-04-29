@@ -129,6 +129,7 @@ The "SEND TO PHARMACY" button is enabled only when:
 
 ### Post-Finalization
 *   Consultation data is persisted to Firestore.
+*   The `localforage` Draft Auto-Save (handled by `useFormAutoSave`) is cleared out to avoid staleness.
 *   Patient status in the queue is updated to `WAITING_FOR_PHARMACY`.
 *   The doctor is returned to the waiting list view.
 

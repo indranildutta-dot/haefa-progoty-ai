@@ -76,7 +76,7 @@ Fast patient movement
 
 Minimal typing
 
-Support for clinics with no internet (future)
+Support for clinics with poor or no internet (via PWA Service Worker, localforage draft auto-saving, and background Firestore mutation retry queue)
 
 Safe medication prescribing
 

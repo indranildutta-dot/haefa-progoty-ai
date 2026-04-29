@@ -354,6 +354,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
   const [currentPatientId, setCurrentPatientId] = useState<string>(doc(collection(db, 'patients')).id);
   const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState(0);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
 
   const steps = ['Basic Information', 'Identity & Credentials', 'Address & Contact'];
 
@@ -658,8 +659,32 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
     if (!selectedClinic || !selectedCountry) return;
     setLoading(true);
     try {
+      let finalNationalId = newPatient.national_id;
+      let finalFcn = newPatient.fcn_number;
+      let finalNepalId = newPatient.nepal_id;
+      let finalRefugeeId = newPatient.bhutanese_refugee_number;
+      let isOffline = isOfflineMode;
+      let tempOfflineId = '';
+
+      if (isOfflineMode) {
+         tempOfflineId = `OFFLINE-${currentPatientId.slice(0, 8).toUpperCase()}`;
+         if (selectedCountry.id === 'BD') {
+            if (newPatient.is_fdmn && !finalFcn) finalFcn = tempOfflineId;
+            else if (!newPatient.is_fdmn && !finalNationalId) finalNationalId = tempOfflineId;
+         } else if (selectedCountry.id === 'NP') {
+            if (!finalNepalId) finalNepalId = tempOfflineId;
+            if (!finalRefugeeId) finalRefugeeId = tempOfflineId;
+         }
+      }
+
       const patientData: any = {
         ...newPatient,
+        national_id: finalNationalId,
+        fcn_number: finalFcn,
+        nepal_id: finalNepalId,
+        bhutanese_refugee_number: finalRefugeeId,
+        is_offline_registration: isOffline,
+        temporary_offline_id: isOffline ? tempOfflineId : null,
         estimated_birth_year: newPatient.estimated_birth_year ? Number(newPatient.estimated_birth_year) : null,
         country_id: selectedCountry.id,
         clinic_id: selectedClinic.id,
@@ -730,7 +755,32 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
       case 0:
         return (
           <Grid container spacing={4}>
-            <Grid size={{ xs: 12 }}><Box sx={{ mb: 6, display: 'flex', justifyContent: 'center' }}><PatientPhotoCapture patientId={currentPatientId} onPhotoUploaded={setPatientPhotoUrl} currentPhoto={patientPhotoUrl} isNewPatient={!editingPatientId} /></Box></Grid>
+            <Grid size={{ xs: 12 }}>
+              <Paper variant="outlined" sx={{ p: 2, mb: 2, bgcolor: isOfflineMode ? '#fef2f2' : 'white', borderColor: isOfflineMode ? '#ef4444' : 'divider' }}>
+                 <FormControlLabel
+                   control={
+                     <Switch 
+                       checked={isOfflineMode} 
+                       onChange={(e) => setIsOfflineMode(e.target.checked)} 
+                       color="error"
+                     />
+                   }
+                   label={
+                     <Typography sx={{ fontWeight: 'bold', color: isOfflineMode ? '#ef4444' : 'text.primary' }}>
+                       Offline Registration Mode (Temporary ID Generation)
+                     </Typography>
+                   }
+                 />
+                 {isOfflineMode && (
+                   <Typography variant="body2" color="error">
+                     WARNING: Network is down. A temporary ID will be assigned. This profile MUST be merged later via the Admin Dashboard.
+                   </Typography>
+                 )}
+              </Paper>
+              <Box sx={{ mb: 6, display: 'flex', justifyContent: 'center' }}>
+                <PatientPhotoCapture patientId={currentPatientId} onPhotoUploaded={setPatientPhotoUrl} currentPhoto={patientPhotoUrl} isNewPatient={!editingPatientId} />
+              </Box>
+            </Grid>
             <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth label="Given Name" required value={newPatient.given_name || ''} onChange={(e) => handleFieldChange('given_name', e.target.value)} InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}} InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 }}} sx={{ bgcolor: 'white' }} /></Grid>
             <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth label="Middle Name" value={newPatient.middle_name || ''} onChange={(e) => handleFieldChange('middle_name', e.target.value)} InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}} InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 }}} sx={{ bgcolor: 'white' }} /></Grid>
             <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth label="Family Name" required value={newPatient.family_name || ''} onChange={(e) => handleFieldChange('family_name', e.target.value)} InputProps={{ sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }}} InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 }}} sx={{ bgcolor: 'white' }} /></Grid>

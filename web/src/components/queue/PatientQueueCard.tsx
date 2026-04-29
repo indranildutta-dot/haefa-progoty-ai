@@ -1,5 +1,6 @@
 import React from 'react';
-import { Box, Typography, Avatar, Chip } from '@mui/material';
+import { Box, Typography, Avatar, Chip, keyframes, Tooltip } from '@mui/material';
+import CloudSyncIcon from '@mui/icons-material/CloudSync';
 import { QueuePatient } from '../../types';
 
 interface PatientQueueCardProps {
@@ -7,6 +8,12 @@ interface PatientQueueCardProps {
   onClick: (patient: QueuePatient) => void;
   isNew?: boolean;
 }
+
+const pulseAnim = keyframes`
+  0% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.8; }
+`;
 
 const PatientQueueCard: React.FC<PatientQueueCardProps> = ({ patient, onClick, isNew }) => {
   const waitMinutes = Math.floor((new Date().getTime() - patient.createdAt.toDate().getTime()) / 60000);
@@ -72,8 +79,22 @@ const PatientQueueCard: React.FC<PatientQueueCardProps> = ({ patient, onClick, i
           {patient.patientName?.charAt(0) || '?'}
         </Avatar>
         
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ flex: 1, minWidth: 0, position: 'relative' }}>
+          {patient.hasPendingWrites && (
+            <Tooltip title="Syncing changes to cloud...">
+              <CloudSyncIcon 
+                color="info" 
+                sx={{ 
+                  position: 'absolute', 
+                  right: -5, 
+                  top: -5, 
+                  fontSize: 18,
+                  animation: `${pulseAnim} 1.5s ease-in-out infinite`
+                }} 
+              />
+            </Tooltip>
+          )}
+          <Box sx={{ display: 'flex', flexDirection: 'column', pr: patient.hasPendingWrites ? 2 : 0 }}>
             <Typography variant="subtitle2" fontWeight="900" noWrap sx={{ fontSize: '0.9rem', lineHeight: 1.1, color: 'text.primary' }}>
               {firstName}
             </Typography>

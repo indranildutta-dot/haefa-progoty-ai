@@ -51,7 +51,11 @@ const QueueBoard: React.FC<{ countryId: string }> = ({ countryId }) => {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       try {
-        const allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as QueueItem[];
+        const allItems = snapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          hasPendingWrites: doc.metadata.hasPendingWrites,
+          ...doc.data() 
+        })) as QueueItem[];
         
         // Filter status in memory
         const items = allItems.filter(item => item.status !== 'COMPLETED');
@@ -105,7 +109,8 @@ const QueueBoard: React.FC<{ countryId: string }> = ({ countryId }) => {
         ageDisplay: calculateAgeDisplay(p),
         gender: p?.gender,
         village: p?.village,
-        bmiClass: item.bmi_class
+        bmiClass: item.bmi_class,
+        hasPendingWrites: item.hasPendingWrites
       } as any;
     });
   }, [rawQueueItems, patientsCache]);

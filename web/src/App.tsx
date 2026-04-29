@@ -19,6 +19,8 @@ import AdminDashboard from './screens/AdminDashboard';
 import AdvancedAnalytics from './screens/AdvancedAnalytics';
 
 import { CircularProgress, Box, Typography, Container, Paper } from '@mui/material';
+import NetworkStatusIndicator from './components/NetworkStatusIndicator';
+import { processOfflineQueue } from './services/backgroundRetryQueue';
 
 const App: React.FC = () => {
   const { user, userProfile, setUser, selectedCountry, selectedClinic, clearCountry, setSession } = useAppStore();
@@ -87,8 +89,10 @@ const App: React.FC = () => {
   };
 
   return (
-    <Routes>
-      {/* STEP 1: GLOBAL LANDING & COUNTRY SELECTION */}
+    <>
+      <NetworkStatusIndicator />
+      <Routes>
+        {/* STEP 1: GLOBAL LANDING & COUNTRY SELECTION */}
       <Route path="/" element={<LandingPage />} />
 
       {/* STEP 2: LOGIN - Guarded by Country Selection */}
@@ -161,6 +165,7 @@ const App: React.FC = () => {
       {/* CATCH-ALL REDIRECT */}
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
+    </>
   );
 };
 
