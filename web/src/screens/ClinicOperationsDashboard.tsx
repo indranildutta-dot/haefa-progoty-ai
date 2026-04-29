@@ -17,7 +17,9 @@ import {
   IconButton,
   Menu,
   Alert,
-  AlertTitle
+  AlertTitle,
+  Tabs,
+  Tab
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -27,6 +29,7 @@ import ListAltIcon from '@mui/icons-material/ListAlt';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import SyncProblemIcon from '@mui/icons-material/SyncProblem';
 import { collection, query, where, onSnapshot, addDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
@@ -44,6 +47,7 @@ import PatientFlowFunnel from '../components/admin/PatientFlowFunnel';
 import WaitTimeTrendChart from '../components/admin/WaitTimeTrendChart';
 import TriageDistributionPanel from '../components/admin/TriageDistributionPanel';
 import LongestWaitPanel from '../components/admin/LongestWaitPanel';
+import OfflineSyncQueue from '../components/admin/OfflineSyncQueue';
 
 interface ClinicOperationsDashboardProps {
   countryId: string;
@@ -58,6 +62,7 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
   const [scope, setScope] = useState<Scope>('current_clinic');
   const [selectedScopeId, setSelectedScopeId] = useState<string>('');
   const [vitalsMenuAnchor, setVitalsMenuAnchor] = useState<null | HTMLElement>(null);
+  const [activeTab, setActiveTab] = useState(0);
   
   const today = new Date().toISOString().split('T')[0];
   
@@ -568,7 +573,16 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
         </Paper>
       )}
 
-      <Grid container spacing={isMobile ? 2 : 3} sx={{ mb: 4 }}>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={activeTab} onChange={(e, val) => setActiveTab(val)}>
+          <Tab icon={<DashboardIcon sx={{mr: 0.5}}/>} iconPosition="start" label="Live Metrics" sx={{ fontWeight: 'bold' }} />
+          <Tab icon={<SyncProblemIcon sx={{mr: 0.5}}/>} iconPosition="start" label="Sync & Conflicts" sx={{ fontWeight: 'bold' }} />
+        </Tabs>
+      </Box>
+
+      {activeTab === 0 && (
+        <>
+          <Grid container spacing={isMobile ? 2 : 3} sx={{ mb: 4 }}>
         <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
           <StatCard title="Patients" value={metrics.totalPatientsToday} icon={<PeopleIcon />} color="primary" />
         </Grid>
@@ -728,6 +742,12 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
           )}
         </Grid>
       </Paper>
+        </>
+      )}
+
+      {activeTab === 1 && (
+        <OfflineSyncQueue />
+      )}
     </StationLayout>
   );
 };

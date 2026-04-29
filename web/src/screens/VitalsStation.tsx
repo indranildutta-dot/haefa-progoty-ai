@@ -33,6 +33,8 @@ import StationLayout from '../components/StationLayout';
 import StationSearchHeader from '../components/StationSearchHeader';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import CancelQueueDialog from '../components/CancelQueueDialog';
+import { useQueueNotifier } from '../hooks/useQueueNotifier';
+import { useFormAutoSave } from '../hooks/useFormAutoSave';
 
 interface VitalsStationProps {
   countryId: string;
@@ -47,6 +49,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<QueueItem | null>(null);
   const [highlightedPatientIds, setHighlightedPatientIds] = useState<string[]>([]);
+  const { newArrivalIds } = useQueueNotifier(waitingList);
 
   const { isMobile, isTablet } = useResponsiveLayout();
 
@@ -105,6 +108,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
   };
 
   const [vitals, setVitals] = useState<any>(initialVitals);
+  const { clearSavedData } = useFormAutoSave(`vitalsDraft_${selectedQueueItem?.encounter_id || 'new'}`, vitals, setVitals, !!selectedQueueItem);
   const [glucoseUnit, setGlucoseUnit] = useState<'mg/dL' | 'mmol/L'>('mg/dL');
   const [hbUnit, setHbUnit] = useState<'g/dL' | 'g/L'>('g/dL');
 
@@ -475,6 +479,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
       }
       
       // Reset
+      clearSavedData();
       setSelectedPatient(null);
       setSelectedQueueItem(null);
     } catch (err) {
@@ -508,15 +513,16 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
               </TableHead>
               <TableBody>
                 {waitingList.map(item => {
-                  const isHighlighted = highlightedPatientIds.includes(item.patient_id);
+                  const isHighlighted = highlightedPatientIds.includes(item.patient_id as string);
+                  const isNew = newArrivalIds.includes(item.id as string);
                   return (
                     <TableRow 
                       key={item.id} 
                       hover 
                       sx={{ 
-                        bgcolor: isHighlighted ? '#fef9c3' : 'inherit',
-                        transition: 'background-color 0.3s ease',
-                        borderLeft: isHighlighted ? '6px solid #facc15' : 'none'
+                        bgcolor: isHighlighted ? '#fef9c3' : isNew ? '#dcfce7' : 'inherit',
+                        transition: 'background-color 0.5s ease',
+                        borderLeft: isHighlighted ? '6px solid #facc15' : isNew ? '6px solid #22c55e' : 'none'
                       }}
                     >
                       <TableCell>
@@ -1191,7 +1197,10 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                 <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <Button 
                     fullWidth variant="outlined" color="inherit" size="large" 
-                    startIcon={<CancelIcon />} onClick={() => setSelectedPatient(null)}
+                    startIcon={<CancelIcon />} onClick={() => {
+                      clearSavedData();
+                      setSelectedPatient(null);
+                    }}
                     sx={{ height: 60, borderRadius: 3, fontWeight: 800 }}
                   >
                     Cancel

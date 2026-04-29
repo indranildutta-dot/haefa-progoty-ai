@@ -51,6 +51,8 @@ export interface Patient {
   bhutanese_refugee_number?: string;
   nepal_id?: string;
   patient_type?: string;
+  allergies?: string | string[];
+  blood_group?: string;
   address_type?: 'home' | 'refugee camp';
   is_fdmn?: boolean;
   camp_name?: string;
@@ -451,5 +453,6 @@ export interface DailySummary {
     lab_based: Record<string, number>; // "<5%": 10, "5-10%": 5, etc.
     non_lab_based: Record<string, number>;
   };
+  comorbidity_map?: Record<string, any>;
   last_updated: Timestamp;
 }

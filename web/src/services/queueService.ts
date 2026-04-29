@@ -66,8 +66,11 @@ export const addToQueue = async (queueData: Omit<QueueItem, 'id' | 'created_at' 
       station_entry_at: serverTimestamp()
     };
     console.log("Queue item data to add:", data);
-    docRef = await addDoc(collection(db, QUEUE_ACTIVE_COLLECTION), data);
-    console.log(`Queue item created with ID: ${docRef.id}`);
+    // Use the patient_id as the deterministic document ID to prevent offline duplicate conflicts
+    const queueDocRef = doc(db, QUEUE_ACTIVE_COLLECTION, queueData.patient_id!);
+    await setDoc(queueDocRef, data, { merge: true });
+    console.log(`Queue item created with ID: ${queueDocRef.id}`);
+    docRef = queueDocRef;
   } catch (e) {
     console.error("Error adding to queue:", e);
     handleFirestoreError(e, OperationType.WRITE, QUEUE_ACTIVE_COLLECTION);

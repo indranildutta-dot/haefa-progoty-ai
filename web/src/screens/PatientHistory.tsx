@@ -29,6 +29,7 @@ import { useAppStore } from '../store/useAppStore';
 import { searchPatients, getPatientById } from '../services/patientService';
 import { getPatientFullHistory } from '../services/encounterService';
 import StationLayout from '../components/StationLayout';
+import { parseFatQrData } from '../utils/qrUtils';
 import QrScannerModal from '../components/QrScannerModal';
 import PrintPrescriptionDialog from '../components/PrintPrescriptionDialog';
 import { Patient, Encounter, VitalsRecord, DiagnosisRecord, PrescriptionRecord } from '../types';
@@ -125,9 +126,15 @@ const PatientHistory: React.FC = () => {
     if (!data) return;
     setLoadingHistory(true);
     try {
-      const patient = await getPatientById(data);
+      const hydratedPatient = parseFatQrData(data);
+      const searchId = hydratedPatient ? hydratedPatient.id : data;
+      
+      const patient = await getPatientById(searchId as string);
       if (patient) {
         handleSelectPatient(patient);
+      } else if (hydratedPatient && hydratedPatient.given_name) {
+        notify("Offline mode: Patient hydrated from QR", "warning");
+        handleSelectPatient(hydratedPatient as Patient);
       } else {
         notify("Patient not found", "error");
         setLoadingHistory(false);

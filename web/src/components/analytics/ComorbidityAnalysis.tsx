@@ -41,8 +41,8 @@ const ComorbidityAnalysis: React.FC<ComorbidityAnalysisProps> = ({ comorbidityMa
   const majorOptions = useMemo(() => {
     if (!comorbidityMap) return [];
     return Object.keys(comorbidityMap).sort((a, b) => {
-      const aTotal = Object.values(comorbidityMap[a]?._total || {}).reduce((sum: any, val: any) => sum + val, 0);
-      const bTotal = Object.values(comorbidityMap[b]?._total || {}).reduce((sum: any, val: any) => sum + val, 0);
+      const aTotal = Object.values(comorbidityMap[a]?._total || {}).reduce((sum: number, val: any) => sum + (val as number), 0 as number) as number;
+      const bTotal = Object.values(comorbidityMap[b]?._total || {}).reduce((sum: number, val: any) => sum + (val as number), 0 as number) as number;
       return bTotal - aTotal;
     });
   }, [comorbidityMap]);
@@ -197,7 +197,7 @@ const ComorbidityAnalysis: React.FC<ComorbidityAnalysisProps> = ({ comorbidityMa
       </Box>
 
       <Grid container spacing={4}>
-        <Grid item xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, height: 400 }}>
             <Typography variant="overline" fontWeight={800} color="text.secondary" sx={{ display: 'block', mb: 2 }}>
               Top 10 Co-occurring Minor Conditions for {selectedMajor}
@@ -226,7 +226,7 @@ const ComorbidityAnalysis: React.FC<ComorbidityAnalysisProps> = ({ comorbidityMa
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, bgcolor: '#f8fafc', height: 400, display: 'flex', flexDirection: 'column' }}>
              <Typography variant="overline" color="primary" fontWeight={900} sx={{ mb: 2 }}>
                 <AutoAwesomeIcon sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle', mb: 0.5 }} />
@@ -248,7 +248,7 @@ const ComorbidityAnalysis: React.FC<ComorbidityAnalysisProps> = ({ comorbidityMa
           </Paper>
         </Grid>
         
-        <Grid item xs={12}>
+        <Grid size={{ xs: 12 }}>
            <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, overflowX: 'auto' }}>
             <Typography variant="overline" fontWeight={800} color="text.secondary" sx={{ display: 'block', mb: 2 }}>
               Comorbidity Heatmap (Top 5 Majors vs Top 5 Minors)

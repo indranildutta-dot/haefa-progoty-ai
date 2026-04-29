@@ -182,3 +182,9 @@ export const getPatientById = async (id: string): Promise<Patient | null> => {
   }
   return null;
 };
+
+export const getPatientAllergies = async (patientId: string): Promise<any[]> => {
+  const q = query(collection(db, "patient_allergies"), where("patient_id", "==", patientId));
+  const snap = await getDocs(q);
+  return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+};

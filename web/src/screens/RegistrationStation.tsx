@@ -46,10 +46,12 @@ import QrScannerModal from '../components/QrScannerModal';
 import { 
   searchPatients, 
   updatePatient,
-  getPatientById
+  getPatientById,
+  getPatientAllergies
 } from '../services/patientService';
 import { 
-  createEncounter 
+  createEncounter,
+  getLatestVitals
 } from '../services/encounterService';
 import { 
   addToQueue,
@@ -77,6 +79,7 @@ import {
   getDocs
 } from 'firebase/firestore';
 import QRCode from 'qrcode';
+import { generateFatQrData, parseFatQrData } from '../utils/qrUtils';
 import { useReactToPrint } from 'react-to-print';
 import { 
   getCountryConfig 
@@ -85,6 +88,7 @@ import StationLayout from '../components/StationLayout';
 import { 
   useResponsiveLayout 
 } from '../hooks/useResponsiveLayout';
+import { useFormAutoSave } from '../hooks/useFormAutoSave';
 
 // =============================================================================
 // PATIENT SEARCH RESULT ITEM (Tablet-Optimized)
@@ -398,6 +402,8 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
   };
 
   const [newPatient, setNewPatient] = useState(initialPatientState);
+  
+  const { clearSavedData } = useFormAutoSave('registrationDraft', newPatient, setNewPatient, !editingPatientId);
   const [validationErrors, setValidationErrors] = useState({
     national_id: '',
     rohingya_number: '',
@@ -540,8 +546,15 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
     try {
       let results: Patient[] = [];
       if (qrData) {
-        const p = await getPatientById(qrData);
-        if (p) results = [p];
+        const hydratedPatient = parseFatQrData(qrData);
+        const searchId = hydratedPatient ? hydratedPatient.id : qrData;
+        const p = await getPatientById(searchId as string);
+        if (p) {
+          results = [p];
+        } else if (hydratedPatient && hydratedPatient.given_name) {
+          notify("Offline mode: Patient hydrated from QR", "warning");
+          results = [hydratedPatient as Patient];
+        }
       } else {
         results = await searchPatients({ ...searchParams });
       }
@@ -584,16 +597,26 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
   };
 
   const handleReprint = async (p: Patient) => {
-    const qrToken = `HAEFA-${p.id!.slice(0, 8)}`;
-    const qrCodeDataUrl = await QRCode.toDataURL(qrToken);
-    setBadgeData({
-      patientId: p.id!,
-      name: `${p.given_name} ${p.family_name}`,
-      qrCode: qrCodeDataUrl,
-      photoUrl: p.photo_url,
-      clinicName: selectedClinic?.name
-    });
-    setShowBadgeModal(true);
+    try {
+      const vitals = await getLatestVitals(p.id!);
+      const allergiesData = await getPatientAllergies(p.id!);
+      
+      const qrString = generateFatQrData(p, {
+        bloodGroup: vitals?.blood_group,
+        allergies: allergiesData.map(a => a.medicationName)
+      });
+      const qrCodeDataUrl = await QRCode.toDataURL(qrString);
+      setBadgeData({
+        patientId: p.id!,
+        name: `${p.given_name} ${p.family_name}`,
+        qrCode: qrCodeDataUrl,
+        photoUrl: p.photo_url,
+        clinicName: selectedClinic?.name
+      });
+      setShowBadgeModal(true);
+    } catch (e) {
+      console.error("Error generating enriched QR during reprint", e);
+    }
   };
 
   const handleEditPatient = (patient: Patient) => {
@@ -646,8 +669,9 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
       if (!editingPatientId) {
         patientData.created_at = serverTimestamp();
         await setDoc(doc(db, 'patients', currentPatientId), patientData);
+        const qrString = generateFatQrData({id: currentPatientId, ...patientData} as Patient);
+        const qrCodeDataUrl = await QRCode.toDataURL(qrString);
         const qrToken = `HAEFA-${currentPatientId.slice(0, 8)}`;
-        const qrCodeDataUrl = await QRCode.toDataURL(qrToken);
         await setDoc(doc(db, 'badge_tokens', qrToken), {
           patient_id: currentPatientId,
           created_at: serverTimestamp(),
@@ -680,6 +704,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
       }
       
       setNewPatient(initialPatientState);
+      clearSavedData();
       setPatientPhotoUrl(undefined);
       setCurrentPatientId(doc(collection(db, 'patients')).id);
       setActiveStep(0);
@@ -1254,6 +1279,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
                             onClick={() => {
                               setEditingPatientId(null);
                               setNewPatient(initialPatientState);
+                              clearSavedData();
                               setPatientPhotoUrl(undefined);
                               setCurrentPatientId(doc(collection(db, 'patients')).id);
                               setActiveStep(0);

@@ -26,7 +26,8 @@ import { useAppStore } from '../store/useAppStore';
 import SaveIcon from '@mui/icons-material/Save';
 import StationLayout from '../components/StationLayout';
 import StationSearchHeader from '../components/StationSearchHeader';
-import PatientContextBar from '../components/PatientContextBar'; 
+import PatientContextBar from '../components/PatientContextBar';
+import { useQueueNotifier } from '../hooks/useQueueNotifier'; 
 import CancelQueueDialog from '../components/CancelQueueDialog';
 import PrintPrescriptionDialog from '../components/PrintPrescriptionDialog';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -67,6 +68,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const [isSavingProgress, setIsSavingProgress] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<any>(null);
   const [highlightedPatientIds, setHighlightedPatientIds] = useState<string[]>([]);
+  const { newArrivalIds } = useQueueNotifier(waitingList);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [lastEncounterId, setLastEncounterId] = useState<string | null>(null);
   
@@ -645,15 +647,16 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
               </TableHead>
               <TableBody>
                 {waitingList.map(item => {
-                  const isHighlighted = highlightedPatientIds.includes(item.patient_id);
+                  const isHighlighted = highlightedPatientIds.includes(item.patient_id as string);
+                  const isNew = newArrivalIds.includes(item.id as string);
                   return (
                     <TableRow 
                       key={item.id} 
                       hover
                       sx={{ 
-                        bgcolor: isHighlighted ? '#fef9c3' : 'inherit',
-                        transition: 'background-color 0.3s ease',
-                        borderLeft: isHighlighted ? '6px solid #facc15' : 'none'
+                        bgcolor: isHighlighted ? '#fef9c3' : isNew ? '#dcfce7' : 'inherit',
+                        transition: 'background-color 0.5s ease',
+                        borderLeft: isHighlighted ? '6px solid #facc15' : isNew ? '6px solid #22c55e' : 'none'
                       }}
                     >
                       <TableCell>{formatWaitTime(item.station_entry_at || item.created_at)}</TableCell>

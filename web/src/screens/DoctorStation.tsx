@@ -77,9 +77,11 @@ import StationSearchHeader from '../components/StationSearchHeader';
 import PatientContextBar from '../components/PatientContextBar';
 import PatientHistoryTimeline from '../components/PatientHistoryTimeline';
 import VitalsSnapshot from '../components/VitalsSnapshot';
+import { useQueueNotifier } from '../hooks/useQueueNotifier';
 import CancelQueueDialog from '../components/CancelQueueDialog';
 import PrintPrescriptionDialog from '../components/PrintPrescriptionDialog';
 import PrescriptionBuilder from '../components/PrescriptionBuilder';
+import { useFormAutoSave } from '../hooks/useFormAutoSave';
 import icdData from '../data/icd11PrimaryCareSouthAsia.json';
 
 // ICD-11 Library (Types only, scripts are in index.html)
@@ -1418,6 +1420,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
   const [openCancelDialog, setOpenCancelDialog] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<any>(null);
   const [highlightedPatientIds, setHighlightedPatientIds] = useState<string[]>([]);
+  const { newArrivalIds } = useQueueNotifier(waitingList);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [lastEncounterId, setLastEncounterId] = useState<string | null>(null);
 
@@ -1438,7 +1441,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
     }
   };
   
-  const [consultData, setConsultData] = useState<ConsultationData>({ 
+  const initialConsultData: ConsultationData = { 
     diagnosis: '', 
     provisionalDiagnosisMajor: [],
     provisionalDiagnosisMinor: [],
@@ -1448,7 +1451,10 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
     assessment: initialClinicalAssessment,
     labInvestigations: [],
     referrals: []
-  });
+  };
+
+  const [consultData, setConsultData] = useState<ConsultationData>(initialConsultData);
+  const { clearSavedData } = useFormAutoSave(`doctorDraft_${selectedItem?.encounter_id || 'new'}`, consultData, setConsultData, !!selectedItem);
 
   const icdInputRef = useRef<HTMLInputElement>(null);
 
@@ -1569,6 +1575,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
         await updateQueueStatus(selectedItem.id, 'WAITING_FOR_PHARMACY' as any);
         setLastEncounterId(selectedItem.encounter_id);
         setShowPrintDialog(true);
+        clearSavedData();
         setSelectedItem(null);
         setSelectedPatient(null);
         notify("Consultation finalized.", "success");
@@ -1578,6 +1585,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
         // Save Progress: Move back to READY_FOR_DOCTOR but preserve wait timer
         await updateQueueStatus(selectedItem.id, 'READY_FOR_DOCTOR' as any, true);
         notify("Progress saved. Patient returned to waiting queue.", "info");
+        clearSavedData();
         setSelectedItem(null);
         setSelectedPatient(null);
       }
@@ -1671,8 +1679,19 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {waitingList.map(item => (
-                  <TableRow key={item.id} hover>
+                {waitingList.map(item => {
+                  const isHighlighted = highlightedPatientIds.includes(item.patient_id as string);
+                  const isNew = newArrivalIds.includes(item.id as string);
+                  return (
+                  <TableRow 
+                    key={item.id} 
+                    hover
+                    sx={{ 
+                      bgcolor: isHighlighted ? '#fef9c3' : isNew ? '#dcfce7' : 'inherit',
+                      transition: 'background-color 0.5s ease',
+                      borderLeft: isHighlighted ? '6px solid #facc15' : isNew ? '6px solid #22c55e' : 'none'
+                    }}
+                  >
                     <TableCell>
                       <Stack direction="row" spacing={1} alignItems="center">
                         <TimerIcon sx={{ fontSize: 16, color: 'text.secondary' }} /> 
@@ -1724,7 +1743,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
                       </Stack>
                     </TableCell>
                   </TableRow>
-                ))}
+                )})}
               </TableBody>
             </Table>
           </TableContainer>
@@ -1977,7 +1996,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
           <Typography variant="h6" fontWeight="900" gutterBottom>Cancel Consultation?</Typography>
           <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
             <Button variant="outlined" onClick={() => setOpenCancelDialog(false)}>No</Button>
-            <Button variant="contained" color="error" onClick={() => { setOpenCancelDialog(false); setSelectedItem(null); }}>Yes, Cancel</Button>
+            <Button variant="contained" color="error" onClick={() => { setOpenCancelDialog(false); clearSavedData(); setSelectedItem(null); setSelectedPatient(null); }}>Yes, Cancel</Button>
           </Stack>
         </Box>
       </Dialog>

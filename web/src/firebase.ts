@@ -51,6 +51,23 @@ try {
   db = getFirestore(app);
 }
 
+// Enable Offline Persistence
+if (isFirebaseConfigValid) {
+  try {
+    enableIndexedDbPersistence(db).then(() => {
+      console.log("HAEFA: Offline persistence enabled.");
+    }).catch((err: any) => {
+      if (err.code == 'failed-precondition') {
+        console.warn("HAEFA: Multiple tabs open, persistence can only be enabled in one tab at a a time.");
+      } else if (err.code == 'unimplemented') {
+        console.warn("HAEFA: The current browser doesn't support offline persistence.");
+      }
+    });
+  } catch (e) {
+    console.error("HAEFA: Error enabling persistence:", e);
+  }
+}
+
 // Initialize other services
 export const auth = getAuth(app);
 export const storage = isFirebaseConfigValid && firebaseConfig.storageBucket ? getStorage(app) : null;

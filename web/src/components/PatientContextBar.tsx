@@ -204,6 +204,7 @@ const PatientContextBar: React.FC = () => {
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
           <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', textTransform: 'uppercase', bgcolor: '#f1f5f9', px: 1, borderRadius: 1 }}>
             {selectedPatient.gender} • {ageDisplay || '??'}
+            {((selectedPatient as any).blood_group || vitals?.blood_group) && ` • ${((selectedPatient as any).blood_group || vitals?.blood_group)}`}
           </Typography>
         </Box>
       </Box>
@@ -251,14 +252,24 @@ const PatientContextBar: React.FC = () => {
         )}
 
         {/* Allergy Alert */}
-        {!!vitals?.allergies && (Array.isArray(vitals.allergies) ? vitals.allergies.length > 0 : String(vitals.allergies).length > 0) && (
-          <Tooltip title={`Allergies: ${Array.isArray(vitals.allergies) ? vitals.allergies.join(', ') : vitals.allergies}`}>
-            <Chip 
-              icon={<WarningIcon style={{ color: 'white', fontSize: 16 }} />}
-              label="ALLERGIES"
-              sx={{ bgcolor: '#e11d48', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
-            />
-          </Tooltip>
+        {(!!vitals?.allergies || !!selectedPatient?.allergies) && (
+          (() => {
+             const sourceAllergies = selectedPatient?.allergies || vitals?.allergies;
+             const isArr = Array.isArray(sourceAllergies);
+             const hasAllergies = isArr ? sourceAllergies.length > 0 : String(sourceAllergies).length > 0;
+             if (hasAllergies) {
+               return (
+                  <Tooltip title={`Allergies: ${isArr ? sourceAllergies.join(', ') : sourceAllergies}`}>
+                    <Chip 
+                      icon={<WarningIcon style={{ color: 'white', fontSize: 16 }} />}
+                      label="ALLERGIES"
+                      sx={{ bgcolor: '#e11d48', color: 'white', fontWeight: 900, borderRadius: 1.5, height: 28, fontSize: '0.7rem' }}
+                    />
+                  </Tooltip>
+               );
+             }
+             return null;
+          })()
         )}
 
         {/* Social History Alerts */}

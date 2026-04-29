@@ -5,9 +5,10 @@ import { QueuePatient } from '../../types';
 interface PatientQueueCardProps {
   patient: QueuePatient;
   onClick: (patient: QueuePatient) => void;
+  isNew?: boolean;
 }
 
-const PatientQueueCard: React.FC<PatientQueueCardProps> = ({ patient, onClick }) => {
+const PatientQueueCard: React.FC<PatientQueueCardProps> = ({ patient, onClick, isNew }) => {
   const waitMinutes = Math.floor((new Date().getTime() - patient.createdAt.toDate().getTime()) / 60000);
   
   const formatWaitTime = (minutes: number) => {
@@ -42,14 +43,14 @@ const PatientQueueCard: React.FC<PatientQueueCardProps> = ({ patient, onClick })
       sx={{ 
         p: 1, 
         mb: 1, 
-        bgcolor: 'background.paper', 
+        bgcolor: isNew ? '#dcfce7' : 'background.paper', 
         borderRadius: 3, 
         border: '1.5px solid',
-        borderColor: 'divider',
+        borderColor: isNew ? '#22c55e' : 'divider',
         cursor: 'pointer',
         boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-        '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.main', transform: 'translateY(-2px)' },
-        transition: 'all 0.2s ease',
+        '&:hover': { bgcolor: isNew ? '#bbf7d0' : 'action.hover', borderColor: 'primary.main', transform: 'translateY(-2px)' },
+        transition: 'all 0.5s ease',
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',

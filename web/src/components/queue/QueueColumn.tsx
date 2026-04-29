@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Typography, Paper, Skeleton } from '@mui/material';
 import { QueuePatient } from '../../types';
 import PatientQueueCard from './PatientQueueCard';
+import { useQueueNotifier } from '../../hooks/useQueueNotifier';
 
 interface QueueColumnProps {
   title: string;
@@ -12,6 +13,8 @@ interface QueueColumnProps {
 }
 
 const QueueColumn: React.FC<QueueColumnProps> = ({ title, patients, onPatientClick, headerColor = 'grey.200', loading = false }) => {
+  const { newArrivalIds } = useQueueNotifier(patients);
+
   return (
     <Paper 
       elevation={0} 
@@ -59,7 +62,7 @@ const QueueColumn: React.FC<QueueColumnProps> = ({ title, patients, onPatientCli
           </Typography>
         ) : (
           patients.map(patient => (
-            <PatientQueueCard key={patient.encounterId} patient={patient} onClick={onPatientClick} />
+            <PatientQueueCard key={patient.encounterId} patient={patient} onClick={onPatientClick} isNew={newArrivalIds.includes(patient.queueId as string)} />
           ))
         )}
       </Box>

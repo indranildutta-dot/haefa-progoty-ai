@@ -27,6 +27,7 @@ import { getLatestEncounter, createEncounter } from '../services/encounterServic
 import { Patient, QueueItem, EncounterStatus } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { getSession } from '../utils/session';
+import { parseFatQrData } from '../utils/qrUtils';
 import QrScannerModal from './QrScannerModal';
 
 interface StationSearchHeaderProps {
@@ -157,10 +158,15 @@ const StationSearchHeader: React.FC<StationSearchHeaderProps> = ({
     
     setLoading(true);
     try {
-      // QR code data is expected to be the patient ID
-      const patient = await getPatientById(data);
+      const hydratedPatient = parseFatQrData(data);
+      const searchId = hydratedPatient ? hydratedPatient.id : data;
+      
+      const patient = await getPatientById(searchId as string);
       if (patient) {
         handleSelectPatient(patient);
+      } else if (hydratedPatient && hydratedPatient.given_name) {
+        notify("Offline mode: Patient hydrated from QR", "warning");
+        handleSelectPatient(hydratedPatient as Patient);
       } else {
         notify("Patient not found from QR code", "error");
       }
