@@ -182,7 +182,7 @@ const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTe
   };
 
   return (
-    <Box ref={ref} id="prescription-content" sx={{ 
+    <Box className="printable" ref={ref} id="prescription-content" sx={{ 
       p: 4, 
       bgcolor: 'white', 
       minHeight: '297mm', 

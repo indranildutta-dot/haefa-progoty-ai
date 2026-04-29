@@ -1339,7 +1339,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
            display: 'block'
         }
       }}>
-        <div ref={badgeRef} id="health-card-print-area">
+        <div ref={badgeRef} className="printable" id="health-card-print-area">
            <style>{`
              @page {
                size: 3.63in 2.37in;
