@@ -1,0 +1,517 @@
+[
+  {
+    "code": "CA04",
+    "name": "Acute tracheitis",
+    "keywords": ["trachea infection", "windpipe infection", "cough", "throat pain"]
+  },
+  {
+    "code": "CA05",
+    "name": "Acute upper respiratory infection, unspecified",
+    "keywords": ["urti", "upper respiratory", "common cold", "cough and cold"]
+  },
+  {
+    "code": "CA20",
+    "name": "Acute bronchitis",
+    "keywords": ["chest cold", "bronchitis", "wet cough", "chest congestion"]
+  },
+  {
+    "code": "CA21",
+    "name": "Acute bronchiolitis",
+    "keywords": ["wheezing baby", "bronchiolitis", "infant cough", "rsv"]
+  },
+  {
+    "code": "CA40.0",
+    "name": "Viral pneumonia",
+    "keywords": ["viral lung infection", "pneumonia", "chest infection", "fever"]
+  },
+  {
+    "code": "CA40.1",
+    "name": "Bacterial pneumonia",
+    "keywords": ["bacterial lung infection", "bacterial pneumonia", "productive cough", "lung consolidation"]
+  },
+  {
+    "code": "CB26",
+    "name": "Pleurisy",
+    "keywords": ["pleuritis", "chest pain on breathing", "lung lining inflammation", "pleurisy"]
+  },
+  {
+    "code": "CB41",
+    "name": "Bronchiectasis",
+    "keywords": ["chronic cough", "lots of phlegm", "damaged airways", "bronchiectasis"]
+  },
+  {
+    "code": "CA24",
+    "name": "Bronchospasm",
+    "keywords": ["wheeze", "airway spasm", "difficulty breathing", "tight chest"]
+  },
+  {
+    "code": "DA24.0",
+    "name": "Gastric ulcer",
+    "keywords": ["stomach ulcer", "gastric pain", "burning stomach", "ulcer"]
+  },
+  {
+    "code": "DA24.1",
+    "name": "Duodenal ulcer",
+    "keywords": ["duodenal pain", "hunger pain", "ulcer", "stomach burning"]
+  },
+  {
+    "code": "DB61",
+    "name": "Anal fissure",
+    "keywords": ["pain during stool", "cut in anus", "bleeding fissure", "anal pain"]
+  },
+  {
+    "code": "DB62",
+    "name": "Anal fistula",
+    "keywords": ["pus from anus", "anal infection", "fistula", "anal tract"]
+  },
+  {
+    "code": "DD90",
+    "name": "Constipation",
+    "keywords": ["hard stool", "cant pass stool", "infrequent bowel movement", "straining"]
+  },
+  {
+    "code": "DA41",
+    "name": "Noninfective gastroenteritis",
+    "keywords": ["stomach upset", "loose stool", "indigestion diarrheoa", "tummy upset"]
+  },
+  {
+    "code": "9A00.0",
+    "name": "Viral conjunctivitis",
+    "keywords": ["pink eye", "eye infection", "red eye viral", "watery eye"]
+  },
+  {
+    "code": "9A00.1",
+    "name": "Bacterial conjunctivitis",
+    "keywords": ["sticky eye", "yellow discharge eye", "bacterial pink eye", "crusty eye"]
+  },
+  {
+    "code": "9A01",
+    "name": "Allergic conjunctivitis",
+    "keywords": ["itchy eyes", "eye allergy", "red itchy eye", "hay fever eye"]
+  },
+  {
+    "code": "9A71",
+    "name": "Pterygium",
+    "keywords": ["surfer's eye", "tissue on eye", "fleshy growth eye", "pterygium"]
+  },
+  {
+    "code": "9A70",
+    "name": "Pinguecula",
+    "keywords": ["yellow spot eye", "eye bump", "conjunctival nodule", "pinguecula"]
+  },
+  {
+    "code": "9A05.0",
+    "name": "Hordeolum",
+    "keywords": ["stye", "eyelid bump", "pimple on eye", "eyelid infection"]
+  },
+  {
+    "code": "9A05.1",
+    "name": "Chalazion",
+    "keywords": ["eyelid cyst", "painless eyelid bump", "meibomian cyst", "chalazion"]
+  },
+  {
+    "code": "9A20",
+    "name": "Blepharitis",
+    "keywords": ["inflamed eyelids", "crusty eyelids", "swollen eyelids", "eyelid dandruff"]
+  },
+  {
+    "code": "9B00",
+    "name": "Age-related cataract",
+    "keywords": ["senile cataract", "old age cataract", "cloudy lens", "safeti motiyabind"]
+  },
+  {
+    "code": "9D00.0",
+    "name": "Myopia",
+    "keywords": ["nearsighted", "short sight", "minus number glasses", "cant see far"]
+  },
+  {
+    "code": "9D00.1",
+    "name": "Hypermetropia",
+    "keywords": ["farsighted", "long sight", "plus number glasses", "cant see near"]
+  },
+  {
+    "code": "9D00.2",
+    "name": "Astigmatism",
+    "keywords": ["cylindrical power", "blurred vision", "distorted vision", "astigmatism"]
+  },
+  {
+    "code": "9D00.3",
+    "name": "Presbyopia",
+    "keywords": ["reading glasses", "old age vision", "near vision loss", "presbyopia"]
+  },
+  {
+    "code": "AA00.0",
+    "name": "Acute suppurative otitis media",
+    "keywords": ["acute ear infection", "pus in ear", "middle ear infection", "ear pain"]
+  },
+  {
+    "code": "AA00.1",
+    "name": "Chronic suppurative otitis media",
+    "keywords": ["csom", "chronic ear discharge", "hole in eardrum", "running ear"]
+  },
+  {
+    "code": "AB10",
+    "name": "Otitis externa",
+    "keywords": ["swimmers ear", "outer ear infection", "ear canal pain", "ear drops"]
+  },
+  {
+    "code": "AB11",
+    "name": "Impacted cerumen",
+    "keywords": ["earwax", "wax block", "blocked ear", "ear cleaning"]
+  },
+  {
+    "code": "AA30",
+    "name": "Eustachian tube dysfunction",
+    "keywords": ["blocked ear tube", "popping ear", "airplane ear", "muffled hearing"]
+  },
+  {
+    "code": "AA31",
+    "name": "Tinnitus",
+    "keywords": ["ringing in ear", "buzzing ear", "hissing sound", "tinnitus"]
+  },
+  {
+    "code": "DA02",
+    "name": "Periodontitis",
+    "keywords": ["gum disease", "loose teeth", "pyria", "pyorrhea"]
+  },
+  {
+    "code": "DA0A",
+    "name": "Tooth impaction",
+    "keywords": ["impacted tooth", "wisdom tooth pain", "stuck tooth", "third molar"]
+  },
+  {
+    "code": "DA0C",
+    "name": "Apical periodontitis",
+    "keywords": ["dental abscess", "pus in tooth", "tooth root infection", "swollen face tooth"]
+  },
+  {
+    "code": "DA0E",
+    "name": "Loss of teeth",
+    "keywords": ["missing tooth", "tooth extraction", "edentulous", "no teeth"]
+  },
+  {
+    "code": "DA14",
+    "name": "Oral mucosal ulceration",
+    "keywords": ["mouth ulcer", "canker sore", "aphthous ulcer", "painful mouth"]
+  },
+  {
+    "code": "GC08.0",
+    "name": "Acute cystitis",
+    "keywords": ["bladder infection", "painful urination", "lower uti", "frequent urine"]
+  },
+  {
+    "code": "GC01",
+    "name": "Prostatitis",
+    "keywords": ["prostate infection", "pelvic pain man", "prostatitis", "painful ejaculation"]
+  },
+  {
+    "code": "GC02",
+    "name": "Urethritis",
+    "keywords": ["urethra infection", "burning urine", "urethral discharge", "urethritis"]
+  },
+  {
+    "code": "GB71",
+    "name": "Calculus of ureter",
+    "keywords": ["ureteric stone", "ureteral stone", "severe flank pain", "stone in tube"]
+  },
+  {
+    "code": "GB72",
+    "name": "Calculus of lower urinary tract",
+    "keywords": ["bladder stone", "urinary stone", "stone in bladder", "lower tract stone"]
+  },
+  {
+    "code": "1A00",
+    "name": "Cholera",
+    "keywords": ["watery diarrhea", "rice water stool", "severe dehydration", "food poisoning"]
+  },
+  {
+    "code": "1A01",
+    "name": "Intestinal infection due to other Vibrio",
+    "keywords": ["vibrio", "shellfish food poisoning", "gastroenteritis", "seafood poisoning"]
+  },
+  {
+    "code": "1A06",
+    "name": "Cryptosporidiosis",
+    "keywords": ["waterborne diarrhea", "crypto", "watery diarrhea", "parasite diarrhea"]
+  },
+  {
+    "code": "1A09",
+    "name": "Infection due to other Salmonella",
+    "keywords": ["salmonellosis", "salmonella", "food poisoning", "diarrhea"]
+  },
+  {
+    "code": "1A11",
+    "name": "Campylobacter enteritis",
+    "keywords": ["campylobacter", "bacterial diarrhea", "foodborne illness", "stomach cramp"]
+  },
+  {
+    "code": "GB41",
+    "name": "Chronic kidney disease, stage 1",
+    "keywords": ["ckd stage 1", "early kidney disease", "kidney damage normal gfr", "protein in urine"]
+  },
+  {
+    "code": "GB41.0",
+    "name": "Chronic kidney disease, stage 2",
+    "keywords": ["ckd stage 2", "mild kidney disease", "mild gfr decrease", "renal insufficiency"]
+  },
+  {
+    "code": "GB41.1",
+    "name": "Chronic kidney disease, stage 3",
+    "keywords": ["ckd stage 3", "moderate kidney disease", "moderate gfr drop", "kidney issue"]
+  },
+  {
+    "code": "GB41.2",
+    "name": "Chronic kidney disease, stage 4",
+    "keywords": ["ckd stage 4", "severe kidney disease", "pre dialysis", "low gfr"]
+  },
+  {
+    "code": "GB41.3",
+    "name": "Chronic kidney disease, stage 5",
+    "keywords": ["end stage renal disease", "esrd", "dialysis needed", "kidney failure"]
+  },
+  {
+    "code": "1A20",
+    "name": "Intestinal infection due to rotavirus",
+    "keywords": ["rotavirus", "baby diarrhea", "infant vomiting diarrhea", "viral gastro"]
+  },
+  {
+    "code": "1A21",
+    "name": "Intestinal infection due to norovirus",
+    "keywords": ["norovirus", "stomach flu", "winter vomiting bug", "cruise ship virus"]
+  },
+  {
+    "code": "1A22",
+    "name": "Intestinal infection due to adenovirus",
+    "keywords": ["enteric adenovirus", "child diarrhea", "viral intestinal infection", "diarrhea"]
+  },
+  {
+    "code": "GA34",
+    "name": "Abnormal uterine bleeding",
+    "keywords": ["aub", "irregular bleeding", "spotting between periods", "heavy menstrual bleeding"]
+  },
+  {
+    "code": "GA34.0",
+    "name": "Menorrhagia",
+    "keywords": ["heavy periods", "prolonged periods", "excessive menstrual blood", "heavy flow"]
+  },
+  {
+    "code": "GA34.1",
+    "name": "Metrorrhagia",
+    "keywords": ["intermenstrual bleeding", "spotting", "bleeding between periods", "metrorrhagia"]
+  },
+  {
+    "code": "GA34.2",
+    "name": "Oligomenorrhoea",
+    "keywords": ["infrequent periods", "delayed periods", "missed periods", "scanty periods"]
+  },
+  {
+    "code": "GA34.3",
+    "name": "Polymenorrhoea",
+    "keywords": ["frequent periods", "short menstrual cycle", "periods too often", "frequent bleeding"]
+  },
+  {
+    "code": "1B40",
+    "name": "Erysipelas",
+    "keywords": ["st anthony fire", "red skin plaque", "streptococcal skin", "superficial cellulitis"]
+  },
+  {
+    "code": "EA02",
+    "name": "Folliculitis",
+    "keywords": ["hair follicle infection", "razor bumps", "pus filled bumps", "folliculitis"]
+  },
+  {
+    "code": "EA03",
+    "name": "Furuncle",
+    "keywords": ["boil", "pus bump", "deep hair follicle infection", "skin abscess"]
+  },
+  {
+    "code": "EA04",
+    "name": "Carbuncle",
+    "keywords": ["cluster of boils", "large skin abscess", "multiple furuncles", "infected boils"]
+  },
+  {
+    "code": "EB00",
+    "name": "Urticaria",
+    "keywords": ["hives", "nettle rash", "itchy welts", "skin allergy marks"]
+  },
+  {
+    "code": "2C61",
+    "name": "Malignant neoplasm of prostate",
+    "keywords": ["prostate cancer", "prostate tumor", "pca", "prostate lump"]
+  },
+  {
+    "code": "2E41",
+    "name": "Benign neoplasm of breast",
+    "keywords": ["fibroadenoma", "benign breast lump", "non cancerous breast lump", "breast cyst"]
+  },
+  {
+    "code": "2E42",
+    "name": "Benign neoplasm of ovary",
+    "keywords": ["ovarian cyst", "benign ovarian tumor", "non cancerous cyst", "ovary lump"]
+  },
+  {
+    "code": "DB50",
+    "name": "Inguinal hernia",
+    "keywords": ["groin hernia", "bulge in scrotum", "inguinal swelling", "groin rupture"]
+  },
+  {
+    "code": "DB51",
+    "name": "Femoral hernia",
+    "keywords": ["thigh hernia", "bulge in upper thigh", "femoral swelling", "hernia in leg crease"]
+  },
+  {
+    "code": "DB52",
+    "name": "Umbilical hernia",
+    "keywords": ["navel hernia", "belly button bulge", "umbilical swelling", "outie belly button hernia"]
+  },
+  {
+    "code": "DB53",
+    "name": "Ventral hernia",
+    "keywords": ["abdominal wall hernia", "incisional hernia", "surgical scar hernia", "stomach hernia"]
+  },
+  {
+    "code": "CB00",
+    "name": "Pneumothorax",
+    "keywords": ["collapsed lung", "air in chest", "sudden chest pain", "spontaneous pneumothorax"]
+  },
+  {
+    "code": "CC00",
+    "name": "Obstructive sleep apnoea",
+    "keywords": ["osa", "snoring", "stopping breathing in sleep", "sleep apnea"]
+  },
+  {
+    "code": "CA82",
+    "name": "Pulmonary embolism",
+    "keywords": ["blood clot in lung", "pe", "sudden breathlessness", "chest pain clot"]
+  },
+  {
+    "code": "1B21",
+    "name": "Buruli ulcer",
+    "keywords": ["mycobacterium ulcerans", "flesh eating bacteria infection", "chronic painless ulcer", "bairnsdale ulcer"]
+  },
+  {
+    "code": "6C42",
+    "name": "Disorders due to use of cocaine",
+    "keywords": ["cocaine addiction", "coke abuse", "stimulant disorder", "crack addiction"]
+  },
+  {
+    "code": "6C43",
+    "name": "Disorders due to use of stimulants including amphetamines or methamphetamine",
+    "keywords": ["meth addiction", "speed abuse", "amphetamine disorder", "crystal meth"]
+  },
+  {
+    "code": "8A40",
+    "name": "Multiple sclerosis",
+    "keywords": ["ms", "demyelination", "neurological weakness", "vision loss muscle weakness"]
+  },
+  {
+    "code": "LD20",
+    "name": "Fragile X syndrome",
+    "keywords": ["genetic intellectual disability", "fragile x", "inherited mental retardation", "developmental delay"]
+  },
+  {
+    "code": "MA10",
+    "name": "Palpitations",
+    "keywords": ["heart pounding", "fast heartbeat perception", "fluttering chest", "skipped beats"]
+  },
+  {
+    "code": "MD00",
+    "name": "Heartburn",
+    "keywords": ["burning chest", "acid feeling in chest", "pyrosis", "sour belch burning"]
+  },
+  {
+    "code": "MD01",
+    "name": "Dysphagia",
+    "keywords": ["difficulty swallowing", "food getting stuck", "cant swallow", "choking on food"]
+  },
+  {
+    "code": "ME01",
+    "name": "Jaundice",
+    "keywords": ["icterus", "yellow skin", "yellow eyes", "excess bilirubin"]
+  },
+  {
+    "code": "MF00",
+    "name": "Headache, unspecified",
+    "keywords": ["head pain", "headache", "cephalalgia", "aching head"]
+  },
+  {
+    "code": "MG20",
+    "name": "Malaise",
+    "keywords": ["feeling unwell", "under the weather", "general discomfort", "rundown"]
+  },
+  {
+    "code": "MG25",
+    "name": "Night sweats",
+    "keywords": ["sweating at night", "drenching sweats", "sleep hyperhidrosis", "waking up sweaty"]
+  },
+  {
+    "code": "MG31",
+    "name": "Acute pain",
+    "keywords": ["sudden pain", "short term pain", "sharp pain", "new pain"]
+  },
+  {
+    "code": "MA02",
+    "name": "Hypothermia",
+    "keywords": ["low body temperature", "freezing", "hypothermia", "extreme cold exposure"]
+  },
+  {
+    "code": "EE00",
+    "name": "Alopecia areata",
+    "keywords": ["patchy hair loss", "bald spots", "autoimmune hair loss", "alopecia"]
+  },
+  {
+    "code": "EE01",
+    "name": "Androgenetic alopecia",
+    "keywords": ["male pattern baldness", "thinning hair", "receding hairline", "female pattern baldness"]
+  },
+  {
+    "code": "EE02",
+    "name": "Telogen effluvium",
+    "keywords": ["stress hair loss", "hair falling out", "diffuse shedding", "temporary hair loss"]
+  },
+  {
+    "code": "FB50",
+    "name": "Plantar fasciitis",
+    "keywords": ["heel pain", "bottom of foot pain", "morning foot pain", "heel spur pain"]
+  },
+  {
+    "code": "FB51",
+    "name": "Achilles tendinopathy",
+    "keywords": ["heel cord pain", "achilles tendonitis", "back of heel pain", "tendon inflammation"]
+  },
+  {
+    "code": "ED80",
+    "name": "Rosacea",
+    "keywords": ["red face", "facial flushing", "visible blood vessels face", "acne rosacea"]
+  },
+  {
+    "code": "EA81",
+    "name": "Seborrhoeic dermatitis",
+    "keywords": ["dandruff", "cradle cap", "flaky scalp", "red itchy scalp"]
+  },
+  {
+    "code": "MC81",
+    "name": "Sciatica",
+    "keywords": ["leg pain from back", "sciatic nerve pain", "shooting leg pain", "nerve pain leg"]
+  },
+  {
+    "code": "KA80",
+    "name": "Neonatal jaundice",
+    "keywords": ["yellow baby", "newborn jaundice", "high bilirubin baby", "physiologic jaundice"]
+  },
+  {
+    "code": "KA81",
+    "name": "Neonatal hypoglycaemia",
+    "keywords": ["low blood sugar baby", "neonatal hypoglycemia", "jittery newborn", "low glucose infant"]
+  },
+  {
+    "code": "GB50",
+    "name": "Nephrotic syndrome",
+    "keywords": ["protein leak kidneys", "swollen face and legs", "frothy urine", "heavy proteinuria"]
+  },
+  {
+    "code": "GB51",
+    "name": "Acute nephritic syndrome",
+    "keywords": ["blood in urine", "glomerulonephritis", "post strep kidney issue", "tea colored urine"]
+  }
+]

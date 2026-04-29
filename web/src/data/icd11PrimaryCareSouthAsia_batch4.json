@@ -1,0 +1,512 @@
+[
+  {
+    "code": "8A61",
+    "name": "Generalised epilepsy",
+    "keywords": ["grand mal", "full body seizure", "epilepsy fit", "convulsion"]
+  },
+  {
+    "code": "8A62",
+    "name": "Focal epilepsy",
+    "keywords": ["partial seizure", "focal fit", "temporal lobe epilepsy", "staring spell"]
+  },
+  {
+    "code": "8A66",
+    "name": "Status epilepticus",
+    "keywords": ["prolonged seizure", "continuous fits", "emergency seizure", "non-stop convulsion"]
+  },
+  {
+    "code": "8A01",
+    "name": "Secondary parkinsonism",
+    "keywords": ["drug induced tremor", "parkinsons like", "stiffness", "slow movement"]
+  },
+  {
+    "code": "8A21",
+    "name": "Vascular dementia",
+    "keywords": ["post stroke dementia", "memory loss after stroke", "vascular cognitive impairment", "brain circulation"]
+  },
+  {
+    "code": "8A22",
+    "name": "Dementia with Lewy bodies",
+    "keywords": ["lewy body dementia", "hallucinations dementia", "memory loss with rigidity", "parkinsonian dementia"]
+  },
+  {
+    "code": "8B81",
+    "name": "Bell palsy",
+    "keywords": ["facial paralysis", "crooked mouth", "facial weakness", "bells palsy"]
+  },
+  {
+    "code": "8A41",
+    "name": "Clinically isolated syndrome",
+    "keywords": ["early ms", "multiple sclerosis start", "neurological episode", "cis"]
+  },
+  {
+    "code": "AA31",
+    "name": "Vertigo",
+    "keywords": ["spinning sensation", "dizziness", "balance loss", "head spinning"]
+  },
+  {
+    "code": "AB20",
+    "name": "Benign paroxysmal positional vertigo",
+    "keywords": ["bppv", "positional vertigo", "dizzy when lying down", "ear crystals"]
+  },
+  {
+    "code": "AB21",
+    "name": "Meniere disease",
+    "keywords": ["vertigo with hearing loss", "ringing in ear", "menieres", "inner ear fluid"]
+  },
+  {
+    "code": "8A81.0",
+    "name": "Episodic tension-type headache",
+    "keywords": ["stress headache", "tight band around head", "tension ache", "muscle tension headache"]
+  },
+  {
+    "code": "8A81.1",
+    "name": "Chronic tension-type headache",
+    "keywords": ["daily headache", "constant head pain", "chronic stress headache", "persistent tension"]
+  },
+  {
+    "code": "8A82",
+    "name": "Cluster headache",
+    "keywords": ["severe eye pain headache", "suicide headache", "clustering headache", "one sided severe headache"]
+  },
+  {
+    "code": "6B40",
+    "name": "Post-traumatic stress disorder",
+    "keywords": ["ptsd", "trauma flashbacks", "nightmares trauma", "severe stress reaction"]
+  },
+  {
+    "code": "6B41",
+    "name": "Complex post-traumatic stress disorder",
+    "keywords": ["chronic trauma", "complex ptsd", "c-ptsd", "childhood trauma"]
+  },
+  {
+    "code": "6B01",
+    "name": "Panic disorder",
+    "keywords": ["panic attacks", "sudden fear", "heart racing panic", "anxiety attacks"]
+  },
+  {
+    "code": "6B02",
+    "name": "Agoraphobia",
+    "keywords": ["fear of crowds", "fear of leaving house", "panic outdoors", "open space fear"]
+  },
+  {
+    "code": "6C40.0",
+    "name": "Episode of harmful use of alcohol",
+    "keywords": ["binge drinking", "harmful drinking", "alcohol abuse", "drunk"]
+  },
+  {
+    "code": "6C40.1",
+    "name": "Harmful pattern of use of alcohol",
+    "keywords": ["regular heavy drinking", "alcohol problem", "drinking habit warning", "alcohol abuse"]
+  },
+  {
+    "code": "6C40.2",
+    "name": "Alcohol dependence",
+    "keywords": ["alcoholism", "alcohol addiction", "withdrawal symptoms", "cant stop drinking"]
+  },
+  {
+    "code": "6C41.0",
+    "name": "Episode of harmful use of cannabis",
+    "keywords": ["bad trip weed", "cannabis abuse episode", "marijuana problem", "acute weed paranoia"]
+  },
+  {
+    "code": "6C41.2",
+    "name": "Cannabis dependence",
+    "keywords": ["weed addiction", "hash addiction", "marijuana dependency", "cannabis withdrawal"]
+  },
+  {
+    "code": "6C47.0",
+    "name": "Episode of harmful use of nicotine",
+    "keywords": ["smoking health issue", "tobacco poisoning", "nicotine overdose", "harmful smoking"]
+  },
+  {
+    "code": "6C47.2",
+    "name": "Nicotine dependence",
+    "keywords": ["smoking addiction", "tobacco addiction", "chain smoker", "nicotine craving"]
+  },
+  {
+    "code": "6C20",
+    "name": "Bodily distress disorder",
+    "keywords": ["somatoform disorder", "physical pain from stress", "psychosomatic", "unexplained medical symptoms"]
+  },
+  {
+    "code": "6B20",
+    "name": "Obsessive-compulsive disorder",
+    "keywords": ["ocd", "repetitive tasks", "checking things", "intrusive thoughts"]
+  },
+  {
+    "code": "6A71",
+    "name": "Recurrent depressive disorder",
+    "keywords": ["clinical depression", "major depressive disorder", "mdd", "frequent severe sadness"]
+  },
+  {
+    "code": "6A60",
+    "name": "Bipolar type I disorder",
+    "keywords": ["manic depression", "bipolar 1", "extreme mood swings", "mania"]
+  },
+  {
+    "code": "6A61",
+    "name": "Bipolar type II disorder",
+    "keywords": ["bipolar 2", "hypomania and depression", "mood disorder", "bipolar"]
+  },
+  {
+    "code": "GA10.0",
+    "name": "Endometriosis of uterus",
+    "keywords": ["adenomyosis", "uterine endometriosis", "painful heavy periods", "bulky uterus"]
+  },
+  {
+    "code": "GA10.1",
+    "name": "Endometriosis of ovary",
+    "keywords": ["chocolate cyst", "endometrioma", "ovary cyst pain", "ovarian endometriosis"]
+  },
+  {
+    "code": "GA10.2",
+    "name": "Endometriosis of pelvic peritoneum",
+    "keywords": ["pelvic endometriosis", "severe pelvic pain", "infertile endometriosis", "peritoneal spots"]
+  },
+  {
+    "code": "5A80.0",
+    "name": "Polycystic ovary syndrome, classic",
+    "keywords": ["pcos classic", "no periods pcos", "ovarian cysts", "hormonal imbalance"]
+  },
+  {
+    "code": "GA30.0",
+    "name": "Premenstrual tension syndrome",
+    "keywords": ["pms", "pmdd", "mood swings before period", "premenstrual syndrome"]
+  },
+  {
+    "code": "GA30.5",
+    "name": "Female climacteric states",
+    "keywords": ["perimenopause", "hot flushes", "night sweats menopause", "menopausal transition"]
+  },
+  {
+    "code": "GA00.0",
+    "name": "Acute pelvic inflammatory disease",
+    "keywords": ["acute pid", "pelvic infection sudden", "severe lower belly pain", "fever and pelvic pain"]
+  },
+  {
+    "code": "GA00.1",
+    "name": "Chronic pelvic inflammatory disease",
+    "keywords": ["chronic pid", "ongoing pelvic pain", "recurring pelvic infection", "tubal infection"]
+  },
+  {
+    "code": "GA01",
+    "name": "Salpingitis or oophoritis",
+    "keywords": ["tube infection", "ovary infection", "adnexitis", "fallopian tube swollen"]
+  },
+  {
+    "code": "GA02",
+    "name": "Inflammatory disease of uterus",
+    "keywords": ["endometritis", "uterus lining infection", "postpartum uterine infection", "foul discharge"]
+  },
+  {
+    "code": "GA03",
+    "name": "Inflammatory disease of cervix uteri",
+    "keywords": ["cervicitis", "cervix infection", "bleeding after sex", "cervical discharge"]
+  },
+  {
+    "code": "GC00.0",
+    "name": "Benign prostatic hyperplasia with lower urinary tract symptoms",
+    "keywords": ["bph with symptoms", "prostate enlargement", "frequent night urination", "poor urine flow"]
+  },
+  {
+    "code": "HA20.0",
+    "name": "Erectile dysfunction of organic origin",
+    "keywords": ["physical ed", "impotence related to diabetes", "medication ed", "blood flow ed"]
+  },
+  {
+    "code": "HA20.1",
+    "name": "Erectile dysfunction of psychogenic origin",
+    "keywords": ["psychological ed", "performance anxiety ed", "stress induced ed", "mental impotence"]
+  },
+  {
+    "code": "GA31.0",
+    "name": "Primary amenorrhoea",
+    "keywords": ["never had period", "delayed puberty female", "no menarche", "primary amenorrhea"]
+  },
+  {
+    "code": "GA31.1",
+    "name": "Secondary amenorrhoea",
+    "keywords": ["periods stopped", "missed periods 3 months", "secondary amenorrhea", "no menstruation"]
+  },
+  {
+    "code": "GA32",
+    "name": "Hypomenorrhoea",
+    "keywords": ["light periods", "scanty periods", "very little bleeding", "short period"]
+  },
+  {
+    "code": "HA00.0",
+    "name": "Azoospermia",
+    "keywords": ["no sperm", "zero sperm count", "male infertility zero sperm", "azoospermia"]
+  },
+  {
+    "code": "HA00.1",
+    "name": "Oligozoospermia",
+    "keywords": ["low sperm count", "poor sperm production", "oligozoospermia", "male subfertility"]
+  },
+  {
+    "code": "HA01",
+    "name": "Male hypogonadism",
+    "keywords": ["low testosterone", "low T", "hypogonadism", "male hormone deficiency"]
+  },
+  {
+    "code": "GA34.5",
+    "name": "Postmenopausal bleeding",
+    "keywords": ["bleeding after menopause", "blood after periods stopped", "pmb", "warning sign postmenopausal"]
+  },
+  {
+    "code": "GA20",
+    "name": "Vaginitis",
+    "keywords": ["vaginal inflammation", "yeast vaginitis", "bacterial vaginosis", "vaginal itching"]
+  },
+  {
+    "code": "GA21",
+    "name": "Vulvitis",
+    "keywords": ["vulva inflammation", "external genital itching", "redness vulva", "vulvitis"]
+  },
+  {
+    "code": "1F23.1",
+    "name": "Vulvovaginal candidiasis",
+    "keywords": ["vaginal yeast infection", "thrush down there", "white cottage cheese discharge", "candidal vaginitis"]
+  },
+  {
+    "code": "1D03",
+    "name": "Acute hepatitis D",
+    "keywords": ["delta hepatitis", "hepatitis d", "liver infection with hep b"]
+  },
+  {
+    "code": "5A02",
+    "name": "Thyroiditis",
+    "keywords": ["hashimotos", "thyroid inflammation", "neck pain thyroid", "autoimmune thyroid"]
+  },
+  {
+    "code": "5A03",
+    "name": "Simple goitre",
+    "keywords": ["enlarged thyroid", "swelling in front of neck", "non toxic goiter", "thyroid lump"]
+  },
+  {
+    "code": "GC05",
+    "name": "Overactive bladder",
+    "keywords": ["oab", "urge incontinence", "sudden need to pee", "bladder urgency"]
+  },
+  {
+    "code": "GC06",
+    "name": "Stress urinary incontinence",
+    "keywords": ["leaking urine when sneezing", "coughing urinary leak", "stress incontinence", "bladder leak"]
+  },
+  {
+    "code": "8A83",
+    "name": "Trigeminal neuralgia",
+    "keywords": ["severe face pain", "electric shock face", "trigeminal nerve pain", "tic douloureux"]
+  },
+  {
+    "code": "MB43",
+    "name": "Dysuria",
+    "keywords": ["pain passing urine", "burning pee", "painful urination", "difficulty urinating"]
+  },
+  {
+    "code": "MB44",
+    "name": "Urinary retention",
+    "keywords": ["cant empty bladder", "blocked urine", "retention of urine", "full bladder cant pee"]
+  },
+  {
+    "code": "MF55",
+    "name": "Syncope and collapse",
+    "keywords": ["fainting", "passing out", "blackout", "vasovagal"]
+  },
+  {
+    "code": "8B82",
+    "name": "Sciatic nerve lesion",
+    "keywords": ["sciatic nerve damage", "sciatica injury", "leg numbness from sciatic", "nerve lesion leg"]
+  },
+  {
+    "code": "8B83",
+    "name": "Median nerve lesion",
+    "keywords": ["median nerve damage", "carpal tunnel nerve injury", "hand numbness median"]
+  },
+  {
+    "code": "8D60",
+    "name": "Sleep apnoea",
+    "keywords": ["osa", "snoring loud", "breathing stops in sleep", "sleep apnea"]
+  },
+  {
+    "code": "8D61",
+    "name": "Narcolepsy",
+    "keywords": ["falling asleep suddenly", "excessive daytime sleepiness", "cataplexy", "narcolepsy"]
+  },
+  {
+    "code": "8D62",
+    "name": "Restless legs syndrome",
+    "keywords": ["rls", "creepy crawly legs", "urge to move legs", "night leg movement"]
+  },
+  {
+    "code": "1A41",
+    "name": "Viral enteritis",
+    "keywords": ["stomach flu", "viral gastroenteritis", "diarrhea viral"]
+  },
+  {
+    "code": "2C62",
+    "name": "Malignant neoplasm of colon",
+    "keywords": ["colon cancer", "bowel cancer", "colorectal cancer", "tumor in colon"]
+  },
+  {
+    "code": "2C63",
+    "name": "Malignant neoplasm of rectum",
+    "keywords": ["rectal cancer", "cancer of rectum", "bleeding per rectum tumor", "rectum malignancy"]
+  },
+  {
+    "code": "2C73",
+    "name": "Malignant neoplasm of stomach",
+    "keywords": ["gastric cancer", "stomach tumor", "malignancy of stomach", "stomach carcinoma"]
+  },
+  {
+    "code": "MB20",
+    "name": "Haemoptysis",
+    "keywords": ["coughing up blood", "blood in sputum", "spitting blood", "hemoptysis"]
+  },
+  {
+    "code": "MD82",
+    "name": "Haematemesis",
+    "keywords": ["vomiting blood", "blood in vomit", "coffee ground vomit", "hematemesis"]
+  },
+  {
+    "code": "MD83",
+    "name": "Melaena",
+    "keywords": ["black tarry stool", "blood in stool black", "melena", "upper gi bleed stool"]
+  },
+  {
+    "code": "MD84",
+    "name": "Haematochezia",
+    "keywords": ["bright red blood in stool", "fresh blood per rectum", "hematochezia", "lower gi bleed"]
+  },
+  {
+    "code": "MB41",
+    "name": "Haematuria",
+    "keywords": ["blood in urine", "red urine", "pink urine", "hematuria"]
+  },
+  {
+    "code": "6B60",
+    "name": "Dissociative identity disorder",
+    "keywords": ["multiple personality", "did", "split personality", "dissociation"]
+  },
+  {
+    "code": "6B61",
+    "name": "Dissociative amnesia",
+    "keywords": ["memory loss trauma", "psychogenic amnesia", "dissociative memory loss", "fugue state"]
+  },
+  {
+    "code": "6C4H",
+    "name": "Disorders due to use of multiple specified psychoactive substances",
+    "keywords": ["polysubstance abuse", "multiple drug addiction", "mixed drug abuse", "substance abuse"]
+  },
+  {
+    "code": "GB42",
+    "name": "Unspecified chronic kidney disease",
+    "keywords": ["ckd unspecified", "chronic renal failure", "kidney disease", "low gfr unknown stage"]
+  },
+  {
+    "code": "NE60",
+    "name": "Contact with venomous spiders",
+    "keywords": ["spider bite", "black widow bite", "tarantula bite", "venomous spider"]
+  },
+  {
+    "code": "NE62",
+    "name": "Contact with scorpion",
+    "keywords": ["scorpion sting", "scorpion bite", "poisonous scorpion"]
+  },
+  {
+    "code": "NE63",
+    "name": "Contact with venomous marine animals",
+    "keywords": ["jellyfish sting", "sea urchin sting", "stingray injury", "marine sting"]
+  },
+  {
+    "code": "ND54",
+    "name": "Exposure to extreme heat",
+    "keywords": ["heat stroke", "sun stroke", "heat exhaustion", "hyperthermia weather"]
+  },
+  {
+    "code": "ND55",
+    "name": "Exposure to extreme cold",
+    "keywords": ["frostbite", "trench foot", "freezing temperature exposure", "extreme cold"]
+  },
+  {
+    "code": "PB00",
+    "name": "Pedal cyclist injured in transport accident",
+    "keywords": ["bicycle accident", "cycle crash", "bike accident injury", "pedal cycle crash"]
+  },
+  {
+    "code": "PB10",
+    "name": "Motorcyclist injured in transport accident",
+    "keywords": ["bike accident", "motorcycle crash", "two wheeler accident", "scooter crash"]
+  },
+  {
+    "code": "ME05",
+    "name": "Ascites",
+    "keywords": ["fluid in abdomen", "swollen belly fluid", "water in stomach liver", "ascites"]
+  },
+  {
+    "code": "MG23",
+    "name": "Oedema",
+    "keywords": ["swelling", "water retention", "pitting edema", "swollen feet"]
+  },
+  {
+    "code": "FA05",
+    "name": "Osteoarthritis of spine",
+    "keywords": ["spinal osteoarthritis", "spondylosis", "wear and tear spine", "spinal arthritis"]
+  },
+  {
+    "code": "ND91",
+    "name": "Burn of trunk",
+    "keywords": ["chest burn", "abdomen burn", "back burn", "trunk burn"]
+  },
+  {
+    "code": "ND92",
+    "name": "Burn of upper limb",
+    "keywords": ["arm burn", "hand burn", "finger burn", "shoulder burn"]
+  },
+  {
+    "code": "ND93",
+    "name": "Burn of lower limb",
+    "keywords": ["leg burn", "foot burn", "thigh burn", "toe burn"]
+  },
+  {
+    "code": "NC10",
+    "name": "Fracture of skull or facial bones",
+    "keywords": ["skull fracture", "broken jaw", "broken nose", "fractured cheekbone"]
+  },
+  {
+    "code": "NC11",
+    "name": "Fracture of neck",
+    "keywords": ["broken neck", "cervical spine fracture", "neck bone break", "c spine fracture"]
+  },
+  {
+    "code": "NC12",
+    "name": "Fracture of rib, sternum or thoracic spine",
+    "keywords": ["broken rib", "cracked rib", "chest bone fracture", "thoracic fracture"]
+  },
+  {
+    "code": "NC31",
+    "name": "Fracture of shoulder or upper arm",
+    "keywords": ["broken humerus", "collarbone fracture", "clavicle break", "shoulder fracture"]
+  },
+  {
+    "code": "NC33",
+    "name": "Fracture at wrist or hand level",
+    "keywords": ["broken wrist", "colles fracture", "broken finger", "hand fracture"]
+  },
+  {
+    "code": "NC51",
+    "name": "Fracture of femur",
+    "keywords": ["broken thigh bone", "femur fracture", "hip fracture", "broken leg top"]
+  },
+  {
+    "code": "NC52",
+    "name": "Fracture of lower leg",
+    "keywords": ["tibia fracture", "fibula fracture", "broken calf bone", "broken leg bottom"]
+  },
+  {
+    "code": "NC53",
+    "name": "Fracture of foot or ankle",
+    "keywords": ["broken ankle", "broken toe", "metatarsal fracture", "foot fracture"]
+  }
+]

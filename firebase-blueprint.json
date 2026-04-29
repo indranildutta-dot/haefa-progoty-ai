@@ -177,6 +177,10 @@
     "inventory_logs": {
       "schema": "InventoryLog",
       "description": "Audit trail for inventory changes"
+    },
+    "icd11_common": {
+      "schema": "object",
+      "description": "Global dictionary of ICD-11 codes"
     }
   }
 }

@@ -366,5 +366,9 @@ service cloud.firestore {
       allow read: if isApproved() && (isGlobalAdmin() || isStaff(resource.data.clinic_id));
       allow write: if isApproved() && (isGlobalAdmin() || isStaff(request.resource.data.clinic_id));
     }
+    match /icd11_common/{code} {
+      allow read: if isAuthenticated();
+      allow write: if isGlobalAdmin();
+    }
   }
 }

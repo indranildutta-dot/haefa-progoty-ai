@@ -1,0 +1,502 @@
+[
+  {
+    "code": "EA80.0",
+    "name": "Infantile atopic dermatitis",
+    "keywords": ["baby eczema", "infant rash", "dry skin baby", "atopy"]
+  },
+  {
+    "code": "EB01",
+    "name": "Acute urticaria",
+    "keywords": ["sudden hives", "skin allergy", "allergic rash", "itchy welts"]
+  },
+  {
+    "code": "EB02",
+    "name": "Chronic urticaria",
+    "keywords": ["long term hives", "chronic skin allergy", "urticaria", "persistent welts"]
+  },
+  {
+    "code": "ED81",
+    "name": "Rhinophyma",
+    "keywords": ["bulbous nose", "rosacea nose", "red enlarged nose", "strawberry nose"]
+  },
+  {
+    "code": "1F22.0",
+    "name": "Tinea capitis",
+    "keywords": ["scalp ringworm", "fungal scalp", "hair loss fungus", "scalp infection"]
+  },
+  {
+    "code": "1F22.1",
+    "name": "Tinea pedis",
+    "keywords": ["athletes foot", "foot fungus", "toe web infection", "itchy feet fungus"]
+  },
+  {
+    "code": "1F22.2",
+    "name": "Tinea corporis",
+    "keywords": ["body ringworm", "circular fungal mark", "body fungus", "daud"]
+  },
+  {
+    "code": "1F22.3",
+    "name": "Tinea cruris",
+    "keywords": ["jock itch", "groin fungus", "private part itching", "inner thigh rash"]
+  },
+  {
+    "code": "1F22.4",
+    "name": "Tinea unguium",
+    "keywords": ["onychomycosis", "nail fungus", "yellow thick nail", "fungal nail"]
+  },
+  {
+    "code": "1F22.5",
+    "name": "Tinea manuum",
+    "keywords": ["hand fungus", "fungal infection hand", "palmar fungus", "scaly hands"]
+  },
+  {
+    "code": "EA90.0",
+    "name": "Psoriasis vulgaris",
+    "keywords": ["plaque psoriasis", "thick scaly skin", "silvery scales", "psoriasis"]
+  },
+  {
+    "code": "EA90.1",
+    "name": "Guttate psoriasis",
+    "keywords": ["teardrop psoriasis", "rash after strep", "small scaly spots", "guttate"]
+  },
+  {
+    "code": "EA00.0",
+    "name": "Bullous impetigo",
+    "keywords": ["large blisters", "staph skin infection", "fluid filled sores", "bullous"]
+  },
+  {
+    "code": "EA00.1",
+    "name": "Non-bullous impetigo",
+    "keywords": ["honey colored crust", "school sores", "face sores child", "impetigo"]
+  },
+  {
+    "code": "1E40",
+    "name": "Viral warts",
+    "keywords": ["verruca", "skin growths", "hpv wart", "massey"]
+  },
+  {
+    "code": "1E40.0",
+    "name": "Plantar warts",
+    "keywords": ["foot wart", "verruca plantaris", "bottom of foot growth", "painful wart foot"]
+  },
+  {
+    "code": "1E40.1",
+    "name": "Common warts",
+    "keywords": ["hand warts", "verruca vulgaris", "common wart", "rough skin bump"]
+  },
+  {
+    "code": "1D62",
+    "name": "Herpes simplex infections",
+    "keywords": ["cold sore", "fever blister", "HSV", "herpes"]
+  },
+  {
+    "code": "ED70.0",
+    "name": "Comedonal acne",
+    "keywords": ["blackheads", "whiteheads", "mild acne", "clogged pores"]
+  },
+  {
+    "code": "ED70.1",
+    "name": "Papulopustular acne",
+    "keywords": ["pimple with pus", "red zits", "moderate acne", "pus spots"]
+  },
+  {
+    "code": "ED70.2",
+    "name": "Nodulocystic acne",
+    "keywords": ["cystic acne", "severe acne", "deep painful pimples", "acne nodules"]
+  },
+  {
+    "code": "ED90.0",
+    "name": "Non-segmental vitiligo",
+    "keywords": ["widespread white patches", "generalized vitiligo", "bilateral vitiligo", "leucoderma"]
+  },
+  {
+    "code": "ED90.1",
+    "name": "Segmental vitiligo",
+    "keywords": ["one sided white patch", "localized vitiligo", "vitiligo patch", "safed daag"]
+  },
+  {
+    "code": "EE00.0",
+    "name": "Alopecia areata, patchy",
+    "keywords": ["bald spots on head", "patchy baldness", "coin shaped hair loss", "alopecia"]
+  },
+  {
+    "code": "EE00.1",
+    "name": "Alopecia totalis",
+    "keywords": ["total scalp hair loss", "complete baldness", "no hair on head", "alopecia totalis"]
+  },
+  {
+    "code": "EE00.2",
+    "name": "Alopecia universalis",
+    "keywords": ["loss of all body hair", "no eyebrows or eyelashes", "complete hair loss", "universalis"]
+  },
+  {
+    "code": "ME84.0",
+    "name": "Cervicalgia",
+    "keywords": ["neck pain", "stiff neck", "neck ache", "cervical spondylosis"]
+  },
+  {
+    "code": "ME84.1",
+    "name": "Thoracic spine pain",
+    "keywords": ["upper back pain", "mid back pain", "thoracic pain", "spine pain"]
+  },
+  {
+    "code": "FA00",
+    "name": "Osteoarthritis of hip",
+    "keywords": ["hip arthritis", "hip joint pain", "wear and tear hip", "coxarthrosis"]
+  },
+  {
+    "code": "FA02",
+    "name": "Osteoarthritis of hand",
+    "keywords": ["finger arthritis", "hand joint pain", "swollen finger joints", "hand oa"]
+  },
+  {
+    "code": "FA03",
+    "name": "Osteoarthritis of other specified joint",
+    "keywords": ["shoulder arthritis", "ankle arthritis", "joint wear", "oa"]
+  },
+  {
+    "code": "FA20.0",
+    "name": "Seropositive rheumatoid arthritis",
+    "keywords": ["ra factor positive", "severe joint inflammation", "rheumatoid disease", "ra"]
+  },
+  {
+    "code": "FA20.1",
+    "name": "Seronegative rheumatoid arthritis",
+    "keywords": ["ra factor negative", "joint inflammation", "rheumatoid", "arthritis"]
+  },
+  {
+    "code": "FA25.0",
+    "name": "Idiopathic gout",
+    "keywords": ["primary gout", "high uric acid joint", "podagra", "gout attack"]
+  },
+  {
+    "code": "FA50.0",
+    "name": "Postmenopausal osteoporosis",
+    "keywords": ["bone thinning women", "menopause bone loss", "fragile bones", "osteoporosis"]
+  },
+  {
+    "code": "FA50.1",
+    "name": "Senile osteoporosis",
+    "keywords": ["old age bone loss", "elderly osteoporosis", "weak bones aging", "brittle bones"]
+  },
+  {
+    "code": "MG30.0",
+    "name": "Fibromyalgia",
+    "keywords": ["widespread muscle pain", "fatigue and pain", "tender points", "fibromyalgia"]
+  },
+  {
+    "code": "FB52",
+    "name": "Patellar tendinopathy",
+    "keywords": ["jumpers knee", "knee tendon pain", "pain below kneecap", "patellar tendonitis"]
+  },
+  {
+    "code": "FB53",
+    "name": "Bicipital tendinopathy",
+    "keywords": ["biceps tendonitis", "shoulder front pain", "biceps pain", "tendonitis"]
+  },
+  {
+    "code": "FB54",
+    "name": "Rotator cuff tendinopathy",
+    "keywords": ["rotator cuff pain", "supraspinatus tendonitis", "shoulder ache", "painful arc"]
+  },
+  {
+    "code": "FB55",
+    "name": "Lateral epicondylitis",
+    "keywords": ["tennis elbow", "outer elbow pain", "epicondylitis", "elbow tendonitis"]
+  },
+  {
+    "code": "FB56",
+    "name": "Medial epicondylitis",
+    "keywords": ["golfers elbow", "inner elbow pain", "epicondylitis", "tendonitis elbow"]
+  },
+  {
+    "code": "FA31.0",
+    "name": "Systemic lupus erythematosus with organ or system involvement",
+    "keywords": ["severe sle", "lupus with kidney", "multisystem lupus", "active lupus"]
+  },
+  {
+    "code": "FA32",
+    "name": "Drug-induced systemic lupus erythematosus",
+    "keywords": ["drug induced lupus", "medication lupus", "sle from drugs", "reversible lupus"]
+  },
+  {
+    "code": "EE20",
+    "name": "Acne keloidalis",
+    "keywords": ["bumps on back of neck", "keloid acne", "nuchal keloid", "hair bump scars"]
+  },
+  {
+    "code": "EE40",
+    "name": "Hidradenitis suppurativa",
+    "keywords": ["hs", "boils under arms", "groin boils", "acne inversa"]
+  },
+  {
+    "code": "EF00",
+    "name": "Melasma",
+    "keywords": ["pregnancy mask", "brown patches on face", "chloasma", "hyperpigmentation"]
+  },
+  {
+    "code": "EF01",
+    "name": "Postinflammatory hyperpigmentation",
+    "keywords": ["dark spots after acne", "pih", "scar darkening", "pigmentation"]
+  },
+  {
+    "code": "1G40",
+    "name": "Erythema nodsum",
+    "keywords": ["painful red bumps on legs", "shin nodules", "erythema", "nodules"]
+  },
+  {
+    "code": "ME60",
+    "name": "Muscle spasm",
+    "keywords": ["muscle cramp", "charley horse", "muscle twitch", "spasm"]
+  },
+  {
+    "code": "ME61",
+    "name": "Myalgia",
+    "keywords": ["muscle ache", "muscle pain", "sore muscles", "body ache muscle"]
+  },
+  {
+    "code": "ME62",
+    "name": "Muscle weakness",
+    "keywords": ["loss of strength", "weak muscles", "cant lift", "myasthenia symptom"]
+  },
+  {
+    "code": "MA20",
+    "name": "Swelling, mass or lump, not elsewhere classified",
+    "keywords": ["lump", "tumor suspect", "swelling", "unexplained mass"]
+  },
+  {
+    "code": "MA20.0",
+    "name": "Swelling, mass or lump of head or neck",
+    "keywords": ["neck lump", "head bump", "swollen neck mass", "head swelling"]
+  },
+  {
+    "code": "MA20.1",
+    "name": "Swelling, mass or lump of trunk",
+    "keywords": ["chest lump", "back lump", "abdominal wall mass", "trunk swelling"]
+  },
+  {
+    "code": "MA20.2",
+    "name": "Swelling, mass or lump of upper limb",
+    "keywords": ["arm mass", "armpit lump", "hand swelling", "upper limb lump"]
+  },
+  {
+    "code": "MA20.3",
+    "name": "Swelling, mass or lump of lower limb",
+    "keywords": ["leg swelling mass", "thigh lump", "foot mass", "lower limb lump"]
+  },
+  {
+    "code": "EF40",
+    "name": "Keloid scar",
+    "keywords": ["overgrown scar", "raised scar", "thick scar", "keloid"]
+  },
+  {
+    "code": "EF41",
+    "name": "Hypertrophic scar",
+    "keywords": ["thick red scar", "raised scar not keloid", "burn scar", "surgical scar"]
+  },
+  {
+    "code": "EE80",
+    "name": "Corns and callosities",
+    "keywords": ["corns", "foot callus", "thick skin on toe", "hard skin foot"]
+  },
+  {
+    "code": "EE81",
+    "name": "Acanthosis nigricans",
+    "keywords": ["dark thick skin neck", "insulin resistance skin", "dark armpits", "velvet skin"]
+  },
+  {
+    "code": "FA23",
+    "name": "Ankylosing spondylitis",
+    "keywords": ["bamboo spine", "stiff back arthritis", "sacroiliitis", "spine fusion"]
+  },
+  {
+    "code": "FA24",
+    "name": "Psoriatic arthritis",
+    "keywords": ["arthritis with psoriasis", "joint pain psoriasis", "dactylitis", "psoriatic arthropathy"]
+  },
+  {
+    "code": "FA30",
+    "name": "Sjogren syndrome",
+    "keywords": ["dry eyes and mouth", "sjogrens", "autoimmune dry gland", "sicca syndrome"]
+  },
+  {
+    "code": "FB30",
+    "name": "Bursitis",
+    "keywords": ["joint sac swelling", "painful bursa", "knee bursitis", "shoulder bursitis"]
+  },
+  {
+    "code": "FB31",
+    "name": "Olecranon bursitis",
+    "keywords": ["students elbow", "elbow swelling", "popeye elbow", "elbow bursa"]
+  },
+  {
+    "code": "FB32",
+    "name": "Prepatellar bursitis",
+    "keywords": ["housemaids knee", "knee swelling over cap", "kneecap bursitis", "knee bursa"]
+  },
+  {
+    "code": "FB40",
+    "name": "Ganglion cyst",
+    "keywords": ["wrist bump", "bible bump", "joint cyst", "tendon cyst"]
+  },
+  {
+    "code": "FB57",
+    "name": "De Quervain tenosynovitis",
+    "keywords": ["thumb wrist pain", "gamers thumb", "radial styloid tenosynovitis", "thumb tendonitis"]
+  },
+  {
+    "code": "FC00",
+    "name": "Kyphosis",
+    "keywords": ["hunchback", "forward rounded back", "spine curve out", "kyphotic"]
+  },
+  {
+    "code": "FC02",
+    "name": "Lordosis",
+    "keywords": ["swayback", "inward curve spine", "hollow back", "lordotic"]
+  },
+  {
+    "code": "FC30",
+    "name": "Flat foot",
+    "keywords": ["pes planus", "fallen arches", "no foot arch", "flat feet"]
+  },
+  {
+    "code": "FC31",
+    "name": "Clubfoot",
+    "keywords": ["talipes equinovarus", "twisted foot birth", "inward foot", "club foot"]
+  },
+  {
+    "code": "EA82",
+    "name": "Nummular dermatitis",
+    "keywords": ["discoid eczema", "coin shaped eczema", "round dry patches", "nummular eczema"]
+  },
+  {
+    "code": "EA83",
+    "name": "Dyshidrotic eczema",
+    "keywords": ["pompholyx", "blisters on hands", "itchy hand blisters", "sweaty hand eczema"]
+  },
+  {
+    "code": "EA84",
+    "name": "Stasis dermatitis",
+    "keywords": ["venous eczema", "varicose vein rash", "lower leg eczema", "poor circulation rash"]
+  },
+  {
+    "code": "EA85",
+    "name": "Lichen simplex chronicus",
+    "keywords": ["neurodermatitis", "thick itchy skin", "scratching rash", "leathery skin"]
+  },
+  {
+    "code": "1H20",
+    "name": "Bedbugs",
+    "keywords": ["bed bug bites", "cimicosis", "itchy bites from bed", "mattress bugs"]
+  },
+  {
+    "code": "1H21",
+    "name": "Pediculosis capitis",
+    "keywords": ["head lice", "nits in hair", "itchy scalp bugs", "lice"]
+  },
+  {
+    "code": "1F20",
+    "name": "Pityriasis versicolor",
+    "keywords": ["tinea versicolor", "white spots fungus", "sweat rash fungus", "sun spots"]
+  },
+  {
+    "code": "1F24",
+    "name": "Seborrhoeic dermatophytosis",
+    "keywords": ["fungal dandruff", "severe flaky scalp", "dermatophyte seborrhea", "scalp fungus"]
+  },
+  {
+    "code": "FA04",
+    "name": "Polyosteoarthritis",
+    "keywords": ["multiple joint arthritis", "generalized oa", "wear and tear all over", "polyarthritis"]
+  },
+  {
+    "code": "FA22",
+    "name": "Juvenile idiopathic arthritis",
+    "keywords": ["childhood arthritis", "jia", "swollen joints in child", "juvenile rheumatoid"]
+  },
+  {
+    "code": "FB5Z",
+    "name": "Tendinopathy, unspecified",
+    "keywords": ["tendon pain", "tendonitis", "sore tendon", "tendon inflammation"]
+  },
+  {
+    "code": "FA33",
+    "name": "Systemic sclerosis",
+    "keywords": ["scleroderma", "tight skin disease", "thickened skin", "crest syndrome"]
+  },
+  {
+    "code": "FA34",
+    "name": "Dermatomyositis",
+    "keywords": ["muscle weakness rash", "heliotrope rash", "gottron papules", "inflammatory myopathy"]
+  },
+  {
+    "code": "FA35",
+    "name": "Polymyositis",
+    "keywords": ["muscle inflammation", "proximal weakness", "myositis", "muscle autoimmune"]
+  },
+  {
+    "code": "EE21",
+    "name": "Rosacea fulminans",
+    "keywords": ["pyoderma faciale", "severe rosacea", "sudden cystic rosacea", "face abscess"]
+  },
+  {
+    "code": "EB0Z",
+    "name": "Urticaria, unspecified",
+    "keywords": ["hives", "welts", "allergy spots", "itchy bumps"]
+  },
+  {
+    "code": "EB10",
+    "name": "Angioedema",
+    "keywords": ["swollen lips allergy", "swollen eyes allergy", "deep hives", "allergic swelling"]
+  },
+  {
+    "code": "ED91",
+    "name": "Albinism",
+    "keywords": ["white skin genetic", "no pigment birth", "albino", "oculocutaneous albinism"]
+  },
+  {
+    "code": "EE0Z",
+    "name": "Alopecia, unspecified",
+    "keywords": ["hair loss", "baldness", "losing hair", "thinning hair"]
+  },
+  {
+    "code": "FB10",
+    "name": "Trigger finger",
+    "keywords": ["stenosing tenosynovitis", "finger stuck", "clicking finger", "locked finger"]
+  },
+  {
+    "code": "FC03",
+    "name": "Torticollis",
+    "keywords": ["wry neck", "twisted neck", "neck muscle spasm", "head tilt"]
+  },
+  {
+    "code": "FC32",
+    "name": "Hallux valgus",
+    "keywords": ["bunion", "big toe bump", "crooked big toe", "foot bone lump"]
+  },
+  {
+    "code": "FC33",
+    "name": "Hammer toe",
+    "keywords": ["bent toe", "curled toe", "toe deformity", "claw toe"]
+  },
+  {
+    "code": "ME80",
+    "name": "Pelvic pain",
+    "keywords": ["lower abdomen pain", "pelvic ache", "groin pain", "pain in pelvis"]
+  },
+  {
+    "code": "ME81",
+    "name": "Perineal pain",
+    "keywords": ["pain between legs", "saddle pain", "perineum pain", "groin area pain"]
+  },
+  {
+    "code": "ME82",
+    "name": "Sacrococcygeal pain",
+    "keywords": ["tailbone pain", "coccydynia", "pain at base of spine", "coccyx pain"]
+  },
+  {
+    "code": "MF52",
+    "name": "Clumsiness",
+    "keywords": ["dropping things", "uncoordinated", "gait issue", "frequent tripping"]
+  }
+]

@@ -1,0 +1,5838 @@
+[
+  {
+    "code": "1F41.0",
+    "name": "Dengue without warning signs",
+    "keywords": [
+      "dengue fever",
+      "mosquito bite",
+      "high fever",
+      "bone pain"
+    ]
+  },
+  {
+    "code": "1F41.1",
+    "name": "Dengue with warning signs",
+    "keywords": [
+      "severe dengue",
+      "abdominal pain",
+      "vomiting",
+      "bleeding"
+    ]
+  },
+  {
+    "code": "1F41.2",
+    "name": "Severe dengue",
+    "keywords": [
+      "dengue shock syndrome",
+      "dengue hemorrhagic fever",
+      "fluid accumulation"
+    ]
+  },
+  {
+    "code": "1F40",
+    "name": "Malaria due to Plasmodium falciparum",
+    "keywords": [
+      "falciparum malaria",
+      "severe malaria",
+      "fever and chills",
+      "mosquito"
+    ]
+  },
+  {
+    "code": "1F41",
+    "name": "Malaria due to Plasmodium vivax",
+    "keywords": [
+      "vivax malaria",
+      "relapsing malaria",
+      "fever",
+      "chills"
+    ]
+  },
+  {
+    "code": "1A07",
+    "name": "Typhoid fever",
+    "keywords": [
+      "enteric fever",
+      "typhoid",
+      "prolonged fever",
+      "contaminated food"
+    ]
+  },
+  {
+    "code": "1A08",
+    "name": "Paratyphoid fever",
+    "keywords": [
+      "paratyphoid",
+      "enteric fever",
+      "salmonella",
+      "fever"
+    ]
+  },
+  {
+    "code": "1B10",
+    "name": "Respiratory tuberculosis",
+    "keywords": [
+      "tb",
+      "pulmonary tuberculosis",
+      "chronic cough",
+      "blood in sputum",
+      "weight loss"
+    ]
+  },
+  {
+    "code": "1B11",
+    "name": "Tuberculosis of nervous system",
+    "keywords": [
+      "tb meningitis",
+      "brain tb",
+      "headache",
+      "fever"
+    ]
+  },
+  {
+    "code": "1B12",
+    "name": "Tuberculosis of other organs",
+    "keywords": [
+      "extrapulmonary tb",
+      "bone tb",
+      "lymph node tb",
+      "abdominal tb"
+    ]
+  },
+  {
+    "code": "1A00",
+    "name": "Cholera",
+    "keywords": [
+      "watery diarrhea",
+      "rice water stool",
+      "severe dehydration",
+      "food poisoning"
+    ]
+  },
+  {
+    "code": "1A40",
+    "name": "Acute gastroenteritis of presumed infectious origin",
+    "keywords": [
+      "food poisoning",
+      "loose motion",
+      "stomach bug",
+      "diarrhea and vomiting"
+    ]
+  },
+  {
+    "code": "1A03",
+    "name": "Shigellosis",
+    "keywords": [
+      "dysentery",
+      "bloody diarrhea",
+      "mucus in stool",
+      "shigella"
+    ]
+  },
+  {
+    "code": "1A04",
+    "name": "Amoebiasis",
+    "keywords": [
+      "amoebic dysentery",
+      "stomach pain",
+      "bloody stool",
+      "parasite"
+    ]
+  },
+  {
+    "code": "1A05",
+    "name": "Giardiasis",
+    "keywords": [
+      "giardia",
+      "foul smelling stool",
+      "stomach cramps",
+      "bloating"
+    ]
+  },
+  {
+    "code": "1D00",
+    "name": "Acute hepatitis A",
+    "keywords": [
+      "jaundice",
+      "yellow eyes",
+      "hepatitis A",
+      "liver infection"
+    ]
+  },
+  {
+    "code": "1D01",
+    "name": "Acute hepatitis B",
+    "keywords": [
+      "hepatitis B",
+      "jaundice",
+      "liver infection",
+      "blood borne"
+    ]
+  },
+  {
+    "code": "1D02",
+    "name": "Acute hepatitis C",
+    "keywords": [
+      "hepatitis C",
+      "liver disease",
+      "jaundice",
+      "blood borne"
+    ]
+  },
+  {
+    "code": "1D04",
+    "name": "Acute hepatitis E",
+    "keywords": [
+      "hepatitis E",
+      "water borne jaundice",
+      "pregnancy jaundice",
+      "yellow skin"
+    ]
+  },
+  {
+    "code": "1D44",
+    "name": "Rabies",
+    "keywords": [
+      "dog bite",
+      "hydrophobia",
+      "rabies virus",
+      "animal bite"
+    ]
+  },
+  {
+    "code": "1C14",
+    "name": "Tetanus",
+    "keywords": [
+      "lockjaw",
+      "muscle spasms",
+      "rusty nail",
+      "tetanus"
+    ]
+  },
+  {
+    "code": "1D11",
+    "name": "Japanese encephalitis",
+    "keywords": [
+      "brain fever",
+      "JE",
+      "mosquito",
+      "seizures"
+    ]
+  },
+  {
+    "code": "1D33",
+    "name": "Chikungunya virus disease",
+    "keywords": [
+      "chikungunya",
+      "severe joint pain",
+      "fever",
+      "mosquito"
+    ]
+  },
+  {
+    "code": "1D82",
+    "name": "COVID-19",
+    "keywords": [
+      "corona",
+      "covid",
+      "sars-cov-2",
+      "loss of smell",
+      "flu"
+    ]
+  },
+  {
+    "code": "1E30",
+    "name": "Influenza due to identified seasonal influenza virus",
+    "keywords": [
+      "flu",
+      "seasonal flu",
+      "fever and cough",
+      "body ache"
+    ]
+  },
+  {
+    "code": "1C02",
+    "name": "Leptospirosis",
+    "keywords": [
+      "rat fever",
+      "monsoon fever",
+      "jaundice and fever",
+      "cramp"
+    ]
+  },
+  {
+    "code": "1C32",
+    "name": "Scrub typhus",
+    "keywords": [
+      "mite bite",
+      "scrub typhus",
+      "eschar",
+      "fever"
+    ]
+  },
+  {
+    "code": "1F54.0",
+    "name": "Visceral leishmaniasis",
+    "keywords": [
+      "kala-azar",
+      "black fever",
+      "sandfly",
+      "enlarged spleen"
+    ]
+  },
+  {
+    "code": "1B20",
+    "name": "Leprosy",
+    "keywords": [
+      "hansen disease",
+      "skin patch",
+      "loss of sensation",
+      "leprosy"
+    ]
+  },
+  {
+    "code": "1F64",
+    "name": "Lymphatic filariasis",
+    "keywords": [
+      "elephantiasis",
+      "filaria",
+      "swollen leg",
+      "mosquito"
+    ]
+  },
+  {
+    "code": "1C62",
+    "name": "Human immunodeficiency virus disease",
+    "keywords": [
+      "hiv",
+      "aids",
+      "immunodeficiency",
+      "weak immunity"
+    ]
+  },
+  {
+    "code": "CA00",
+    "name": "Acute nasopharyngitis",
+    "keywords": [
+      "common cold",
+      "runny nose",
+      "sneezing",
+      "stuffy nose"
+    ]
+  },
+  {
+    "code": "CA01",
+    "name": "Acute tonsillitis",
+    "keywords": [
+      "tonsils",
+      "throat pain",
+      "swollen glands",
+      "difficulty swallowing"
+    ]
+  },
+  {
+    "code": "CA02",
+    "name": "Acute pharyngitis",
+    "keywords": [
+      "sore throat",
+      "throat infection",
+      "scratchy throat",
+      "pain"
+    ]
+  },
+  {
+    "code": "CA03",
+    "name": "Acute laryngitis",
+    "keywords": [
+      "hoarse voice",
+      "loss of voice",
+      "laryngitis",
+      "throat"
+    ]
+  },
+  {
+    "code": "CA08",
+    "name": "Allergic rhinitis",
+    "keywords": [
+      "hay fever",
+      "allergies",
+      "dust allergy",
+      "sneezing"
+    ]
+  },
+  {
+    "code": "CA0A",
+    "name": "Acute sinusitis",
+    "keywords": [
+      "sinus",
+      "facial pain",
+      "headache",
+      "nasal congestion"
+    ]
+  },
+  {
+    "code": "CA40",
+    "name": "Pneumonia",
+    "keywords": [
+      "lung infection",
+      "chest infection",
+      "breathing difficulty",
+      "cough with phlegm"
+    ]
+  },
+  {
+    "code": "CA22",
+    "name": "Chronic obstructive pulmonary disease",
+    "keywords": [
+      "copd",
+      "smokers cough",
+      "chronic bronchitis",
+      "emphysema"
+    ]
+  },
+  {
+    "code": "CA23",
+    "name": "Asthma",
+    "keywords": [
+      "wheezing",
+      "breathlessness",
+      "asthma attack",
+      "inhaler"
+    ]
+  },
+  {
+    "code": "BA00",
+    "name": "Essential hypertension",
+    "keywords": [
+      "high blood pressure",
+      "high bp",
+      "hypertension"
+    ]
+  },
+  {
+    "code": "BA40",
+    "name": "Angina pectoris",
+    "keywords": [
+      "chest pain",
+      "angina",
+      "heart pain",
+      "cardiac pain"
+    ]
+  },
+  {
+    "code": "BA41",
+    "name": "Acute myocardial infarction",
+    "keywords": [
+      "heart attack",
+      "mi",
+      "cardiac arrest",
+      "severe chest pain"
+    ]
+  },
+  {
+    "code": "BA81",
+    "name": "Heart failure",
+    "keywords": [
+      "congestive heart failure",
+      "chf",
+      "swollen legs",
+      "weak heart"
+    ]
+  },
+  {
+    "code": "8B20",
+    "name": "Ischaemic stroke",
+    "keywords": [
+      "stroke",
+      "brain stroke",
+      "paralysis",
+      "weakness on one side"
+    ]
+  },
+  {
+    "code": "8B00",
+    "name": "Intracerebral haemorrhage",
+    "keywords": [
+      "brain hemorrhage",
+      "bleeding in brain",
+      "hemorrhagic stroke",
+      "paralysis"
+    ]
+  },
+  {
+    "code": "5A11",
+    "name": "Type 2 diabetes mellitus",
+    "keywords": [
+      "diabetes",
+      "sugar disease",
+      "high blood sugar",
+      "type 2"
+    ]
+  },
+  {
+    "code": "5A10",
+    "name": "Type 1 diabetes mellitus",
+    "keywords": [
+      "type 1 diabetes",
+      "insulin dependent",
+      "juvenile diabetes",
+      "blood sugar"
+    ]
+  },
+  {
+    "code": "5A00",
+    "name": "Hypothyroidism",
+    "keywords": [
+      "thyroid",
+      "low thyroid",
+      "weight gain",
+      "underactive thyroid"
+    ]
+  },
+  {
+    "code": "5A01",
+    "name": "Hyperthyroidism",
+    "keywords": [
+      "overactive thyroid",
+      "weight loss",
+      "fast heart rate",
+      "hyperthyroid"
+    ]
+  },
+  {
+    "code": "3A00",
+    "name": "Iron deficiency anaemia",
+    "keywords": [
+      "anemia",
+      "low hemoglobin",
+      "pale skin",
+      "iron deficiency",
+      "weakness"
+    ]
+  },
+  {
+    "code": "3A01.0",
+    "name": "Vitamin B12 deficiency anaemia",
+    "keywords": [
+      "b12 deficiency",
+      "pernicious anemia",
+      "nerve weakness",
+      "vitamin"
+    ]
+  },
+  {
+    "code": "5B51",
+    "name": "Severe acute malnutrition",
+    "keywords": [
+      "sam",
+      "wasting",
+      "marasmus",
+      "kwashiorkor",
+      "severe weight loss"
+    ]
+  },
+  {
+    "code": "5B52",
+    "name": "Moderate acute malnutrition",
+    "keywords": [
+      "mam",
+      "undernutrition",
+      "weak child",
+      "underweight"
+    ]
+  },
+  {
+    "code": "5B5B.0",
+    "name": "Vitamin A deficiency",
+    "keywords": [
+      "night blindness",
+      "vitamin A",
+      "eye problem",
+      "corneal ulcer"
+    ]
+  },
+  {
+    "code": "5B5C.0",
+    "name": "Vitamin D deficiency",
+    "keywords": [
+      "rickets",
+      "weak bones",
+      "vitamin D",
+      "bone pain"
+    ]
+  },
+  {
+    "code": "5B81",
+    "name": "Obesity",
+    "keywords": [
+      "overweight",
+      "fat",
+      "bmi high",
+      "weight gain"
+    ]
+  },
+  {
+    "code": "DA00",
+    "name": "Gingivitis",
+    "keywords": [
+      "bleeding gums",
+      "swollen gums",
+      "gum infection",
+      "dental"
+    ]
+  },
+  {
+    "code": "DA08",
+    "name": "Dental caries",
+    "keywords": [
+      "tooth decay",
+      "cavity",
+      "toothache",
+      "rotten tooth"
+    ]
+  },
+  {
+    "code": "DA22",
+    "name": "Gastro-oesophageal reflux disease",
+    "keywords": [
+      "gerd",
+      "acidity",
+      "heartburn",
+      "acid reflux"
+    ]
+  },
+  {
+    "code": "DA24",
+    "name": "Peptic ulcer disease",
+    "keywords": [
+      "gastric ulcer",
+      "stomach ulcer",
+      "burning stomach",
+      "ulcer"
+    ]
+  },
+  {
+    "code": "DA42",
+    "name": "Gastritis",
+    "keywords": [
+      "stomach inflammation",
+      "gastric pain",
+      "indigestion",
+      "gastric"
+    ]
+  },
+  {
+    "code": "DD91",
+    "name": "Irritable bowel syndrome",
+    "keywords": [
+      "ibs",
+      "spastic colon",
+      "frequent diarrhea",
+      "cramps"
+    ]
+  },
+  {
+    "code": "DB10",
+    "name": "Appendicitis",
+    "keywords": [
+      "appendix",
+      "lower right stomach pain",
+      "surgery",
+      "abdomen pain"
+    ]
+  },
+  {
+    "code": "DB60",
+    "name": "Haemorrhoids",
+    "keywords": [
+      "piles",
+      "bleeding during stool",
+      "anal pain",
+      "swollen veins"
+    ]
+  },
+  {
+    "code": "GC08",
+    "name": "Urinary tract infection, site not specified",
+    "keywords": [
+      "uti",
+      "burning urine",
+      "frequent urination",
+      "urine infection"
+    ]
+  },
+  {
+    "code": "GB70",
+    "name": "Urolithiasis",
+    "keywords": [
+      "kidney stones",
+      "renal calculus",
+      "loin pain",
+      "flank pain"
+    ]
+  },
+  {
+    "code": "GB61",
+    "name": "Chronic kidney disease",
+    "keywords": [
+      "ckd",
+      "kidney failure",
+      "creatinine high",
+      "renal poor"
+    ]
+  },
+  {
+    "code": "GC00",
+    "name": "Benign prostatic hyperplasia",
+    "keywords": [
+      "bph",
+      "enlarged prostate",
+      "urine dribbling",
+      "prostate"
+    ]
+  },
+  {
+    "code": "1F51",
+    "name": "Scabies",
+    "keywords": [
+      "severe itching",
+      "night itching",
+      "mites",
+      "skin infection"
+    ]
+  },
+  {
+    "code": "1F22",
+    "name": "Dermatophytosis",
+    "keywords": [
+      "ringworm",
+      "fungal infection",
+      "jock itch",
+      "tinea"
+    ]
+  },
+  {
+    "code": "EA80",
+    "name": "Atopic dermatitis",
+    "keywords": [
+      "eczema",
+      "dry red skin",
+      "allergic skin",
+      "itchy rash"
+    ]
+  },
+  {
+    "code": "EA90",
+    "name": "Psoriasis",
+    "keywords": [
+      "scaly skin",
+      "silvery scales",
+      "psoriasis",
+      "skin plaque"
+    ]
+  },
+  {
+    "code": "ED70",
+    "name": "Acne",
+    "keywords": [
+      "pimples",
+      "zits",
+      "acne vulgaris",
+      "face bumps"
+    ]
+  },
+  {
+    "code": "6A70",
+    "name": "Single episode depressive disorder",
+    "keywords": [
+      "depression",
+      "sadness",
+      "low mood",
+      "loss of interest"
+    ]
+  },
+  {
+    "code": "6B00",
+    "name": "Generalised anxiety disorder",
+    "keywords": [
+      "anxiety",
+      "worry",
+      "panic",
+      "stress"
+    ]
+  },
+  {
+    "code": "6A20",
+    "name": "Schizophrenia",
+    "keywords": [
+      "hallucinations",
+      "delusions",
+      "psychosis",
+      "schizo"
+    ]
+  },
+  {
+    "code": "7A00",
+    "name": "Insomnia",
+    "keywords": [
+      "sleeplessness",
+      "cant sleep",
+      "sleep disorder",
+      "wakeful"
+    ]
+  },
+  {
+    "code": "8A80",
+    "name": "Migraine",
+    "keywords": [
+      "half side headache",
+      "throbbing head",
+      "nausea headache",
+      "migraine"
+    ]
+  },
+  {
+    "code": "8A81",
+    "name": "Tension-type headache",
+    "keywords": [
+      "headache",
+      "head pain",
+      "stress headache",
+      "band like pain"
+    ]
+  },
+  {
+    "code": "8A60",
+    "name": "Epilepsy",
+    "keywords": [
+      "seizures",
+      "fits",
+      "convulsions",
+      "epilepsy"
+    ]
+  },
+  {
+    "code": "FA01",
+    "name": "Osteoarthritis of knee",
+    "keywords": [
+      "knee pain",
+      "joint wear",
+      "arthritis",
+      "joint stiffness"
+    ]
+  },
+  {
+    "code": "ME84.2",
+    "name": "Low back pain",
+    "keywords": [
+      "backache",
+      "lumbago",
+      "slip disc pain",
+      "lower back"
+    ]
+  },
+  {
+    "code": "FA20",
+    "name": "Rheumatoid arthritis",
+    "keywords": [
+      "joint swelling",
+      "morning stiffness",
+      "rheumatism",
+      "multiple joint pain"
+    ]
+  },
+  {
+    "code": "FA25",
+    "name": "Gout",
+    "keywords": [
+      "gouty arthritis",
+      "big toe pain",
+      "high uric acid",
+      "crystals"
+    ]
+  },
+  {
+    "code": "9B10",
+    "name": "Cataract",
+    "keywords": [
+      "cloudy vision",
+      "motiyabind",
+      "white eye",
+      "blurred vision"
+    ]
+  },
+  {
+    "code": "9C61",
+    "name": "Glaucoma",
+    "keywords": [
+      "kala motia",
+      "eye pressure",
+      "optic nerve damage",
+      "blindness risk"
+    ]
+  },
+  {
+    "code": "9D00",
+    "name": "Refractive error",
+    "keywords": [
+      "myopia",
+      "spectacles",
+      "glasses needed",
+      "blurry vision"
+    ]
+  },
+  {
+    "code": "AA00",
+    "name": "Otitis media",
+    "keywords": [
+      "ear infection",
+      "ear pain",
+      "ear discharge",
+      "middle ear"
+    ]
+  },
+  {
+    "code": "JA20",
+    "name": "Pre-eclampsia",
+    "keywords": [
+      "pregnancy bp",
+      "high blood pressure in pregnancy",
+      "protein in urine"
+    ]
+  },
+  {
+    "code": "JA21",
+    "name": "Eclampsia",
+    "keywords": [
+      "pregnancy seizures",
+      "convulsions in pregnancy",
+      "severe pre-eclampsia"
+    ]
+  },
+  {
+    "code": "JB40",
+    "name": "Postpartum haemorrhage",
+    "keywords": [
+      "bleeding after delivery",
+      "pph",
+      "heavy bleeding",
+      "maternal blood loss"
+    ]
+  },
+  {
+    "code": "KA41",
+    "name": "Neonatal sepsis",
+    "keywords": [
+      "newborn infection",
+      "baby fever",
+      "blood infection baby",
+      "lethargic newborn"
+    ]
+  },
+  {
+    "code": "KA21",
+    "name": "Preterm birth",
+    "keywords": [
+      "premature baby",
+      "born early",
+      "preemie",
+      "before 37 weeks"
+    ]
+  },
+  {
+    "code": "KA20",
+    "name": "Low birth weight",
+    "keywords": [
+      "lbw",
+      "small baby",
+      "underweight newborn",
+      "less than 2.5kg"
+    ]
+  },
+  {
+    "code": "GA30.2",
+    "name": "Dysmenorrhoea",
+    "keywords": [
+      "period pain",
+      "menstrual cramps",
+      "painful periods",
+      "pelvic pain"
+    ]
+  },
+  {
+    "code": "5A80.1",
+    "name": "Polycystic ovary syndrome",
+    "keywords": [
+      "pcos",
+      "pcod",
+      "irregular periods",
+      "ovarian cysts",
+      "hirsutism"
+    ]
+  },
+  {
+    "code": "GA00",
+    "name": "Pelvic inflammatory disease",
+    "keywords": [
+      "pid",
+      "lower abdominal pain women",
+      "vaginal discharge",
+      "pelvic infection"
+    ]
+  },
+  {
+    "code": "GA30.4",
+    "name": "Menopause",
+    "keywords": [
+      "hot flashes",
+      "periods stopped",
+      "postmenopausal",
+      "perimenopause"
+    ]
+  },
+  {
+    "code": "2C60",
+    "name": "Malignant neoplasm of breast",
+    "keywords": [
+      "breast cancer",
+      "breast lump",
+      "tumor",
+      "carcinoma breast"
+    ]
+  },
+  {
+    "code": "2C77",
+    "name": "Malignant neoplasm of cervix uteri",
+    "keywords": [
+      "cervical cancer",
+      "hpv cancer",
+      "cervix tumor",
+      "abnormal bleeding"
+    ]
+  },
+  {
+    "code": "2B10",
+    "name": "Malignant neoplasm of lip, oral cavity or pharynx",
+    "keywords": [
+      "oral cancer",
+      "mouth cancer",
+      "tobacco cancer",
+      "mouth ulcer non healing"
+    ]
+  },
+  {
+    "code": "2C25",
+    "name": "Malignant neoplasm of bronchus or lung",
+    "keywords": [
+      "lung cancer",
+      "smokers cancer",
+      "lung tumor",
+      "blood in cough"
+    ]
+  },
+  {
+    "code": "NE61",
+    "name": "Contact with venomous snakes",
+    "keywords": [
+      "snakebite",
+      "snake bite",
+      "cobra",
+      "viper",
+      "poisonous"
+    ]
+  },
+  {
+    "code": "ND67",
+    "name": "Contact with dog",
+    "keywords": [
+      "dog bite",
+      "stray dog",
+      "animal bite",
+      "canine bite"
+    ]
+  },
+  {
+    "code": "PA00",
+    "name": "Pedestrian injured in transport accident",
+    "keywords": [
+      "rta",
+      "road accident",
+      "hit by car",
+      "traffic collision"
+    ]
+  },
+  {
+    "code": "NE41",
+    "name": "Poisoning by organophosphate or carbamate insecticides",
+    "keywords": [
+      "op poisoning",
+      "pesticide poisoning",
+      "suicide attempt poison",
+      "farmer poison"
+    ]
+  },
+  {
+    "code": "ND90",
+    "name": "Burn of head or neck",
+    "keywords": [
+      "burns",
+      "fire injury",
+      "scald",
+      "thermal injury"
+    ]
+  },
+  {
+    "code": "NA07",
+    "name": "Intracranial injury",
+    "keywords": [
+      "head injury",
+      "concussion",
+      "brain trauma",
+      "skull hit"
+    ]
+  },
+  {
+    "code": "NC32",
+    "name": "Fracture of forearm",
+    "keywords": [
+      "broken arm",
+      "radius fracture",
+      "ulna fracture",
+      "hand bone break"
+    ]
+  },
+  {
+    "code": "NC54",
+    "name": "Sprain of ankle or foot",
+    "keywords": [
+      "twisted ankle",
+      "ligament tear",
+      "ankle pain",
+      "foot sprain"
+    ]
+  },
+  {
+    "code": "ND73",
+    "name": "Electrical injury",
+    "keywords": [
+      "electric shock",
+      "electrocution",
+      "lightning strike",
+      "burn"
+    ]
+  },
+  {
+    "code": "NE81",
+    "name": "Drowning or nonfatal submersion",
+    "keywords": [
+      "drowning",
+      "water submersion",
+      "near drowning",
+      "pool accident"
+    ]
+  },
+  {
+    "code": "1F23",
+    "name": "Candidiasis",
+    "keywords": [
+      "yeast infection",
+      "thrush",
+      "oral thrush",
+      "vaginal yeast"
+    ]
+  },
+  {
+    "code": "1D60",
+    "name": "Varicella",
+    "keywords": [
+      "chickenpox",
+      "fluid filled blisters",
+      "itchy rash",
+      "pox"
+    ]
+  },
+  {
+    "code": "1D61",
+    "name": "Zoster",
+    "keywords": [
+      "shingles",
+      "herpes zoster",
+      "painful rash",
+      "nerve pain"
+    ]
+  },
+  {
+    "code": "1C81",
+    "name": "Syphilis",
+    "keywords": [
+      "vd",
+      "std",
+      "chancre",
+      "syphilis sore"
+    ]
+  },
+  {
+    "code": "1C80",
+    "name": "Gonorrhoea",
+    "keywords": [
+      "clap",
+      "gonococcal infection",
+      "std discharge",
+      "burning pee"
+    ]
+  },
+  {
+    "code": "3B64",
+    "name": "Thalassaemia",
+    "keywords": [
+      "thalassemia major",
+      "blood disorder genetic",
+      "frequent transfusions",
+      "trait"
+    ]
+  },
+  {
+    "code": "2A20",
+    "name": "Leukaemia",
+    "keywords": [
+      "blood cancer",
+      "all",
+      "aml",
+      "cll",
+      "cml",
+      "abnormal wbc"
+    ]
+  },
+  {
+    "code": "4A40",
+    "name": "Allergic Contact Dermatitis",
+    "keywords": [
+      "contact allergy",
+      "skin allergy",
+      "rash from chemical",
+      "nickel allergy"
+    ]
+  },
+  {
+    "code": "6C40",
+    "name": "Disorders due to use of alcohol",
+    "keywords": [
+      "alcoholism",
+      "drinking problem",
+      "liver cirrhosis cause",
+      "alcohol addiction"
+    ]
+  },
+  {
+    "code": "6C41",
+    "name": "Disorders due to use of cannabis",
+    "keywords": [
+      "weed addiction",
+      "marijuana use",
+      "bhang addiction",
+      "ganja"
+    ]
+  },
+  {
+    "code": "6C44",
+    "name": "Disorders due to use of opioids",
+    "keywords": [
+      "heroin",
+      "opium",
+      "drug addiction",
+      "substance abuse"
+    ]
+  },
+  {
+    "code": "MC82",
+    "name": "Carpal tunnel syndrome",
+    "keywords": [
+      "wrist pain",
+      "numb fingers",
+      "typing injury",
+      "median nerve"
+    ]
+  },
+  {
+    "code": "MG30",
+    "name": "Chronic pain",
+    "keywords": [
+      "long term pain",
+      "unexplained pain",
+      "fibromyalgia",
+      "body ache"
+    ]
+  },
+  {
+    "code": "DB30",
+    "name": "Hernia",
+    "keywords": [
+      "inguinal hernia",
+      "umbilical hernia",
+      "bulge in groin",
+      "abdominal rupture"
+    ]
+  },
+  {
+    "code": "GB40",
+    "name": "Acute kidney failure",
+    "keywords": [
+      "aki",
+      "acute renal failure",
+      "sudden kidney stop",
+      "no urine"
+    ]
+  },
+  {
+    "code": "1B13",
+    "name": "Latent tuberculosis infection",
+    "keywords": [
+      "ltbi",
+      "inactive tb",
+      "tb exposure",
+      "mantoux positive"
+    ]
+  },
+  {
+    "code": "01",
+    "name": "Certain infectious or parasitic diseases",
+    "keywords": [
+      "infection general",
+      "parasite general",
+      "communicable",
+      "contagious"
+    ]
+  },
+  {
+    "code": "21",
+    "name": "Symptoms, signs or clinical findings, not elsewhere classified",
+    "keywords": [
+      "unknown cause",
+      "general symptom",
+      "undiagnosed",
+      "observation"
+    ]
+  },
+  {
+    "code": "MA01",
+    "name": "Fever of other or unknown origin",
+    "keywords": [
+      "fever unknown",
+      "fuo",
+      "pyrexia",
+      "high temp"
+    ]
+  },
+  {
+    "code": "MB21",
+    "name": "Cough",
+    "keywords": [
+      "chronic cough",
+      "dry cough",
+      "wet cough",
+      "hacking"
+    ]
+  },
+  {
+    "code": "MD81",
+    "name": "Abdominal pain",
+    "keywords": [
+      "stomach ache",
+      "belly pain",
+      "tummy ache",
+      "cramp"
+    ]
+  },
+  {
+    "code": "ME04",
+    "name": "Nausea or vomiting",
+    "keywords": [
+      "feeling sick",
+      "throwing up",
+      "puking",
+      "emesis"
+    ]
+  },
+  {
+    "code": "MG22",
+    "name": "Fatigue",
+    "keywords": [
+      "tiredness",
+      "exhaustion",
+      "lack of energy",
+      "weakness general"
+    ]
+  },
+  {
+    "code": "MD11",
+    "name": "Chest pain",
+    "keywords": [
+      "chest ache",
+      "tight chest",
+      "pain in heart area"
+    ]
+  },
+  {
+    "code": "MA00",
+    "name": "Chills",
+    "keywords": [
+      "shivering",
+      "rigors",
+      "feeling cold",
+      "feverish"
+    ]
+  },
+  {
+    "code": "MF50",
+    "name": "Dizziness or vertigo",
+    "keywords": [
+      "spinning",
+      "lightheaded",
+      "giddiness",
+      "faint feeling"
+    ]
+  },
+  {
+    "code": "MG42",
+    "name": "Loss of appetite",
+    "keywords": [
+      "anorexia",
+      "dont want to eat",
+      "no hunger",
+      "decreased appetite"
+    ]
+  },
+  {
+    "code": "MD80",
+    "name": "Constipation",
+    "keywords": [
+      "hard stool",
+      "cant pass stool",
+      "bowel block",
+      "infrequent stool"
+    ]
+  },
+  {
+    "code": "MD90",
+    "name": "Diarrhoea",
+    "keywords": [
+      "loose motions",
+      "watery stool",
+      "frequent stool",
+      "bowel upset"
+    ]
+  },
+  {
+    "code": "MA14",
+    "name": "Rash",
+    "keywords": [
+      "skin breakout",
+      "red bumps",
+      "spots",
+      "hives"
+    ]
+  },
+  {
+    "code": "1D81",
+    "name": "Severe acute respiratory syndrome",
+    "keywords": [
+      "sars",
+      "severe pneumonia",
+      "respiratory distress",
+      "corona"
+    ]
+  },
+  {
+    "code": "1E10",
+    "name": "Measles",
+    "keywords": [
+      "khasra",
+      "rubeloa",
+      "viral rash",
+      "measles fever"
+    ]
+  },
+  {
+    "code": "1E11",
+    "name": "Rubella",
+    "keywords": [
+      "german measles",
+      "three day measles",
+      "rubella rash",
+      "pregnancy risk"
+    ]
+  },
+  {
+    "code": "1E12",
+    "name": "Mumps",
+    "keywords": [
+      "swollen jaw",
+      "parotitis",
+      "salivary gland swelling",
+      "mumps"
+    ]
+  },
+  {
+    "code": "1A60",
+    "name": "Botulism",
+    "keywords": [
+      "food poisoning severe",
+      "paralysis botulinum",
+      "canned food",
+      "botulism"
+    ]
+  },
+  {
+    "code": "3B62",
+    "name": "Sickle cell disease",
+    "keywords": [
+      "sickle cell anemia",
+      "crisis",
+      "abnormal rbc",
+      "genetic blood"
+    ]
+  },
+  {
+    "code": "4A00",
+    "name": "Anaphylaxis",
+    "keywords": [
+      "severe allergy",
+      "shock allergic",
+      "throat swelling allergy",
+      "bee sting reaction"
+    ]
+  },
+  {
+    "code": "5A41",
+    "name": "Hyperlipidaemia",
+    "keywords": [
+      "high cholesterol",
+      "high triglycerides",
+      "hypercholesterolemia",
+      "lipids"
+    ]
+  },
+  {
+    "code": "5B5K",
+    "name": "Iodine deficiency",
+    "keywords": [
+      "goiter",
+      "swollen neck",
+      "hypothyroidism cause",
+      "iodine"
+    ]
+  },
+  {
+    "code": "8A00",
+    "name": "Parkinson disease",
+    "keywords": [
+      "tremors",
+      "shaking hands",
+      "slow movement",
+      "parkinsons"
+    ]
+  },
+  {
+    "code": "8A20",
+    "name": "Alzheimer disease",
+    "keywords": [
+      "dementia",
+      "memory loss",
+      "forgetfulness",
+      "old age brain"
+    ]
+  },
+  {
+    "code": "9A00",
+    "name": "Conjunctivitis",
+    "keywords": [
+      "pink eye",
+      "eye infection",
+      "red eye",
+      "sticky eye"
+    ]
+  },
+  {
+    "code": "9A04",
+    "name": "Trachoma",
+    "keywords": [
+      "chlamydia eye",
+      "blindness cause",
+      "rough eyelid",
+      "eye scarring"
+    ]
+  },
+  {
+    "code": "9D90",
+    "name": "Blindness or low vision",
+    "keywords": [
+      "visual impairment",
+      "cant see",
+      "blind",
+      "vision loss"
+    ]
+  },
+  {
+    "code": "EA00",
+    "name": "Impetigo",
+    "keywords": [
+      "school sores",
+      "honey colored crusts",
+      "bacterial skin",
+      "staph skin"
+    ]
+  },
+  {
+    "code": "EA01",
+    "name": "Cellulitis",
+    "keywords": [
+      "swollen red legs",
+      "skin infection deep",
+      "erysipelas",
+      "hot skin"
+    ]
+  },
+  {
+    "code": "ED90",
+    "name": "Vitiligo",
+    "keywords": [
+      "leucoderma",
+      "white patches",
+      "loss of pigment",
+      "safed daag"
+    ]
+  },
+  {
+    "code": "FA31",
+    "name": "Systemic lupus erythematosus",
+    "keywords": [
+      "sle",
+      "lupus",
+      "butterfly rash",
+      "autoimmune"
+    ]
+  },
+  {
+    "code": "FA50",
+    "name": "Osteoporosis",
+    "keywords": [
+      "brittle bones",
+      "bone loss",
+      "fracture risk",
+      "weak bones"
+    ]
+  },
+  {
+    "code": "FC01",
+    "name": "Scoliosis",
+    "keywords": [
+      "curved spine",
+      "back deformity",
+      "spinal curve",
+      "crooked back"
+    ]
+  },
+  {
+    "code": "GA10",
+    "name": "Endometriosis",
+    "keywords": [
+      "severe period pain",
+      "pelvic pain chronic",
+      "infertility female",
+      "endo"
+    ]
+  },
+  {
+    "code": "GA11",
+    "name": "Uterine fibroids",
+    "keywords": [
+      "leiomyoma",
+      "heavy periods",
+      "uterus tumor",
+      "fibroid"
+    ]
+  },
+  {
+    "code": "HA00",
+    "name": "Male infertility",
+    "keywords": [
+      "low sperm count",
+      "azoospermia",
+      "cant have baby man",
+      "male factor"
+    ]
+  },
+  {
+    "code": "HA20",
+    "name": "Erectile dysfunction",
+    "keywords": [
+      "ed",
+      "impotence",
+      "sexual dysfunction",
+      "weak erection"
+    ]
+  },
+  {
+    "code": "JA01",
+    "name": "Ectopic pregnancy",
+    "keywords": [
+      "tubal pregnancy",
+      "outside uterus",
+      "severe pelvic pain pregnant",
+      "ruptured tube"
+    ]
+  },
+  {
+    "code": "JA40",
+    "name": "Gestational diabetes",
+    "keywords": [
+      "pregnancy sugar",
+      "diabetes in pregnancy",
+      "high sugar pregnant",
+      "gdm"
+    ]
+  },
+  {
+    "code": "KA01",
+    "name": "Fetal growth restriction",
+    "keywords": [
+      "iugr",
+      "small fetus",
+      "growth retardation",
+      "poor growth"
+    ]
+  },
+  {
+    "code": "KA02",
+    "name": "Birth asphyxia",
+    "keywords": [
+      "baby didnt cry",
+      "lack of oxygen birth",
+      "hie",
+      "blue baby at birth"
+    ]
+  },
+  {
+    "code": "LA00",
+    "name": "Down syndrome",
+    "keywords": [
+      "trisomy 21",
+      "genetic mental retardation",
+      "mongolism",
+      "chromosomal"
+    ]
+  },
+  {
+    "code": "LA10",
+    "name": "Cleft lip",
+    "keywords": [
+      "harelip",
+      "split lip",
+      "facial defect birth",
+      "cleft"
+    ]
+  },
+  {
+    "code": "LA11",
+    "name": "Cleft palate",
+    "keywords": [
+      "hole in roof of mouth",
+      "feeding problem newborn",
+      "cleft roof",
+      "palate defect"
+    ]
+  },
+  {
+    "code": "LA80",
+    "name": "Congenital heart defect",
+    "keywords": [
+      "hole in heart",
+      "blue baby syndrome",
+      "vsD",
+      "asD"
+    ]
+  },
+  {
+    "code": "QA00",
+    "name": "General medical examination",
+    "keywords": [
+      "health checkup",
+      "routine check",
+      "physical exam",
+      "master health check"
+    ]
+  },
+  {
+    "code": "QA04",
+    "name": "Routine child health examination",
+    "keywords": [
+      "well baby check",
+      "growth monitoring",
+      "pediatric checkup",
+      "child exam"
+    ]
+  },
+  {
+    "code": "QC01",
+    "name": "Need for immunization",
+    "keywords": [
+      "vaccination",
+      "shots",
+      "immunization schedule",
+      "vaccine check"
+    ]
+  },
+  {
+    "code": "QC40",
+    "name": "Antenatal screening",
+    "keywords": [
+      "pregnancy checkup",
+      "anc check",
+      "prenatal visit",
+      "maternity check"
+    ]
+  },
+  {
+    "code": "QC43",
+    "name": "Postpartum care",
+    "keywords": [
+      "pnc check",
+      "after delivery check",
+      "postnatal care",
+      "mother checkup"
+    ]
+  },
+  {
+    "code": "QC71",
+    "name": "Family planning advice",
+    "keywords": [
+      "contraception counseling",
+      "birth control",
+      "spacing babies",
+      "copper t consult"
+    ]
+  },
+  {
+    "code": "CA04",
+    "name": "Acute tracheitis",
+    "keywords": [
+      "trachea infection",
+      "windpipe infection",
+      "cough",
+      "throat pain"
+    ]
+  },
+  {
+    "code": "CA05",
+    "name": "Acute upper respiratory infection, unspecified",
+    "keywords": [
+      "urti",
+      "upper respiratory",
+      "common cold",
+      "cough and cold"
+    ]
+  },
+  {
+    "code": "CA20",
+    "name": "Acute bronchitis",
+    "keywords": [
+      "chest cold",
+      "bronchitis",
+      "wet cough",
+      "chest congestion"
+    ]
+  },
+  {
+    "code": "CA21",
+    "name": "Acute bronchiolitis",
+    "keywords": [
+      "wheezing baby",
+      "bronchiolitis",
+      "infant cough",
+      "rsv"
+    ]
+  },
+  {
+    "code": "CA40.0",
+    "name": "Viral pneumonia",
+    "keywords": [
+      "viral lung infection",
+      "pneumonia",
+      "chest infection",
+      "fever"
+    ]
+  },
+  {
+    "code": "CA40.1",
+    "name": "Bacterial pneumonia",
+    "keywords": [
+      "bacterial lung infection",
+      "bacterial pneumonia",
+      "productive cough",
+      "lung consolidation"
+    ]
+  },
+  {
+    "code": "CB26",
+    "name": "Pleurisy",
+    "keywords": [
+      "pleuritis",
+      "chest pain on breathing",
+      "lung lining inflammation",
+      "pleurisy"
+    ]
+  },
+  {
+    "code": "CB41",
+    "name": "Bronchiectasis",
+    "keywords": [
+      "chronic cough",
+      "lots of phlegm",
+      "damaged airways",
+      "bronchiectasis"
+    ]
+  },
+  {
+    "code": "CA24",
+    "name": "Bronchospasm",
+    "keywords": [
+      "wheeze",
+      "airway spasm",
+      "difficulty breathing",
+      "tight chest"
+    ]
+  },
+  {
+    "code": "DA24.0",
+    "name": "Gastric ulcer",
+    "keywords": [
+      "stomach ulcer",
+      "gastric pain",
+      "burning stomach",
+      "ulcer"
+    ]
+  },
+  {
+    "code": "DA24.1",
+    "name": "Duodenal ulcer",
+    "keywords": [
+      "duodenal pain",
+      "hunger pain",
+      "ulcer",
+      "stomach burning"
+    ]
+  },
+  {
+    "code": "DB61",
+    "name": "Anal fissure",
+    "keywords": [
+      "pain during stool",
+      "cut in anus",
+      "bleeding fissure",
+      "anal pain"
+    ]
+  },
+  {
+    "code": "DB62",
+    "name": "Anal fistula",
+    "keywords": [
+      "pus from anus",
+      "anal infection",
+      "fistula",
+      "anal tract"
+    ]
+  },
+  {
+    "code": "DD90",
+    "name": "Constipation",
+    "keywords": [
+      "hard stool",
+      "cant pass stool",
+      "infrequent bowel movement",
+      "straining"
+    ]
+  },
+  {
+    "code": "DA41",
+    "name": "Noninfective gastroenteritis",
+    "keywords": [
+      "stomach upset",
+      "loose stool",
+      "indigestion diarrheoa",
+      "tummy upset"
+    ]
+  },
+  {
+    "code": "9A00.0",
+    "name": "Viral conjunctivitis",
+    "keywords": [
+      "pink eye",
+      "eye infection",
+      "red eye viral",
+      "watery eye"
+    ]
+  },
+  {
+    "code": "9A00.1",
+    "name": "Bacterial conjunctivitis",
+    "keywords": [
+      "sticky eye",
+      "yellow discharge eye",
+      "bacterial pink eye",
+      "crusty eye"
+    ]
+  },
+  {
+    "code": "9A01",
+    "name": "Allergic conjunctivitis",
+    "keywords": [
+      "itchy eyes",
+      "eye allergy",
+      "red itchy eye",
+      "hay fever eye"
+    ]
+  },
+  {
+    "code": "9A71",
+    "name": "Pterygium",
+    "keywords": [
+      "surfer's eye",
+      "tissue on eye",
+      "fleshy growth eye",
+      "pterygium"
+    ]
+  },
+  {
+    "code": "9A70",
+    "name": "Pinguecula",
+    "keywords": [
+      "yellow spot eye",
+      "eye bump",
+      "conjunctival nodule",
+      "pinguecula"
+    ]
+  },
+  {
+    "code": "9A05.0",
+    "name": "Hordeolum",
+    "keywords": [
+      "stye",
+      "eyelid bump",
+      "pimple on eye",
+      "eyelid infection"
+    ]
+  },
+  {
+    "code": "9A05.1",
+    "name": "Chalazion",
+    "keywords": [
+      "eyelid cyst",
+      "painless eyelid bump",
+      "meibomian cyst",
+      "chalazion"
+    ]
+  },
+  {
+    "code": "9A20",
+    "name": "Blepharitis",
+    "keywords": [
+      "inflamed eyelids",
+      "crusty eyelids",
+      "swollen eyelids",
+      "eyelid dandruff"
+    ]
+  },
+  {
+    "code": "9B00",
+    "name": "Age-related cataract",
+    "keywords": [
+      "senile cataract",
+      "old age cataract",
+      "cloudy lens",
+      "safeti motiyabind"
+    ]
+  },
+  {
+    "code": "9D00.0",
+    "name": "Myopia",
+    "keywords": [
+      "nearsighted",
+      "short sight",
+      "minus number glasses",
+      "cant see far"
+    ]
+  },
+  {
+    "code": "9D00.1",
+    "name": "Hypermetropia",
+    "keywords": [
+      "farsighted",
+      "long sight",
+      "plus number glasses",
+      "cant see near"
+    ]
+  },
+  {
+    "code": "9D00.2",
+    "name": "Astigmatism",
+    "keywords": [
+      "cylindrical power",
+      "blurred vision",
+      "distorted vision",
+      "astigmatism"
+    ]
+  },
+  {
+    "code": "9D00.3",
+    "name": "Presbyopia",
+    "keywords": [
+      "reading glasses",
+      "old age vision",
+      "near vision loss",
+      "presbyopia"
+    ]
+  },
+  {
+    "code": "AA00.0",
+    "name": "Acute suppurative otitis media",
+    "keywords": [
+      "acute ear infection",
+      "pus in ear",
+      "middle ear infection",
+      "ear pain"
+    ]
+  },
+  {
+    "code": "AA00.1",
+    "name": "Chronic suppurative otitis media",
+    "keywords": [
+      "csom",
+      "chronic ear discharge",
+      "hole in eardrum",
+      "running ear"
+    ]
+  },
+  {
+    "code": "AB10",
+    "name": "Otitis externa",
+    "keywords": [
+      "swimmers ear",
+      "outer ear infection",
+      "ear canal pain",
+      "ear drops"
+    ]
+  },
+  {
+    "code": "AB11",
+    "name": "Impacted cerumen",
+    "keywords": [
+      "earwax",
+      "wax block",
+      "blocked ear",
+      "ear cleaning"
+    ]
+  },
+  {
+    "code": "AA30",
+    "name": "Eustachian tube dysfunction",
+    "keywords": [
+      "blocked ear tube",
+      "popping ear",
+      "airplane ear",
+      "muffled hearing"
+    ]
+  },
+  {
+    "code": "AA31",
+    "name": "Tinnitus",
+    "keywords": [
+      "ringing in ear",
+      "buzzing ear",
+      "hissing sound",
+      "tinnitus"
+    ]
+  },
+  {
+    "code": "DA02",
+    "name": "Periodontitis",
+    "keywords": [
+      "gum disease",
+      "loose teeth",
+      "pyria",
+      "pyorrhea"
+    ]
+  },
+  {
+    "code": "DA0A",
+    "name": "Tooth impaction",
+    "keywords": [
+      "impacted tooth",
+      "wisdom tooth pain",
+      "stuck tooth",
+      "third molar"
+    ]
+  },
+  {
+    "code": "DA0C",
+    "name": "Apical periodontitis",
+    "keywords": [
+      "dental abscess",
+      "pus in tooth",
+      "tooth root infection",
+      "swollen face tooth"
+    ]
+  },
+  {
+    "code": "DA0E",
+    "name": "Loss of teeth",
+    "keywords": [
+      "missing tooth",
+      "tooth extraction",
+      "edentulous",
+      "no teeth"
+    ]
+  },
+  {
+    "code": "DA14",
+    "name": "Oral mucosal ulceration",
+    "keywords": [
+      "mouth ulcer",
+      "canker sore",
+      "aphthous ulcer",
+      "painful mouth"
+    ]
+  },
+  {
+    "code": "GC08.0",
+    "name": "Acute cystitis",
+    "keywords": [
+      "bladder infection",
+      "painful urination",
+      "lower uti",
+      "frequent urine"
+    ]
+  },
+  {
+    "code": "GC01",
+    "name": "Prostatitis",
+    "keywords": [
+      "prostate infection",
+      "pelvic pain man",
+      "prostatitis",
+      "painful ejaculation"
+    ]
+  },
+  {
+    "code": "GC02",
+    "name": "Urethritis",
+    "keywords": [
+      "urethra infection",
+      "burning urine",
+      "urethral discharge",
+      "urethritis"
+    ]
+  },
+  {
+    "code": "GB71",
+    "name": "Calculus of ureter",
+    "keywords": [
+      "ureteric stone",
+      "ureteral stone",
+      "severe flank pain",
+      "stone in tube"
+    ]
+  },
+  {
+    "code": "GB72",
+    "name": "Calculus of lower urinary tract",
+    "keywords": [
+      "bladder stone",
+      "urinary stone",
+      "stone in bladder",
+      "lower tract stone"
+    ]
+  },
+  {
+    "code": "1A01",
+    "name": "Intestinal infection due to other Vibrio",
+    "keywords": [
+      "vibrio",
+      "shellfish food poisoning",
+      "gastroenteritis",
+      "seafood poisoning"
+    ]
+  },
+  {
+    "code": "1A06",
+    "name": "Cryptosporidiosis",
+    "keywords": [
+      "waterborne diarrhea",
+      "crypto",
+      "watery diarrhea",
+      "parasite diarrhea"
+    ]
+  },
+  {
+    "code": "1A09",
+    "name": "Infection due to other Salmonella",
+    "keywords": [
+      "salmonellosis",
+      "salmonella",
+      "food poisoning",
+      "diarrhea"
+    ]
+  },
+  {
+    "code": "1A11",
+    "name": "Campylobacter enteritis",
+    "keywords": [
+      "campylobacter",
+      "bacterial diarrhea",
+      "foodborne illness",
+      "stomach cramp"
+    ]
+  },
+  {
+    "code": "GB41",
+    "name": "Chronic kidney disease, stage 1",
+    "keywords": [
+      "ckd stage 1",
+      "early kidney disease",
+      "kidney damage normal gfr",
+      "protein in urine"
+    ]
+  },
+  {
+    "code": "GB41.0",
+    "name": "Chronic kidney disease, stage 2",
+    "keywords": [
+      "ckd stage 2",
+      "mild kidney disease",
+      "mild gfr decrease",
+      "renal insufficiency"
+    ]
+  },
+  {
+    "code": "GB41.1",
+    "name": "Chronic kidney disease, stage 3",
+    "keywords": [
+      "ckd stage 3",
+      "moderate kidney disease",
+      "moderate gfr drop",
+      "kidney issue"
+    ]
+  },
+  {
+    "code": "GB41.2",
+    "name": "Chronic kidney disease, stage 4",
+    "keywords": [
+      "ckd stage 4",
+      "severe kidney disease",
+      "pre dialysis",
+      "low gfr"
+    ]
+  },
+  {
+    "code": "GB41.3",
+    "name": "Chronic kidney disease, stage 5",
+    "keywords": [
+      "end stage renal disease",
+      "esrd",
+      "dialysis needed",
+      "kidney failure"
+    ]
+  },
+  {
+    "code": "1A20",
+    "name": "Intestinal infection due to rotavirus",
+    "keywords": [
+      "rotavirus",
+      "baby diarrhea",
+      "infant vomiting diarrhea",
+      "viral gastro"
+    ]
+  },
+  {
+    "code": "1A21",
+    "name": "Intestinal infection due to norovirus",
+    "keywords": [
+      "norovirus",
+      "stomach flu",
+      "winter vomiting bug",
+      "cruise ship virus"
+    ]
+  },
+  {
+    "code": "1A22",
+    "name": "Intestinal infection due to adenovirus",
+    "keywords": [
+      "enteric adenovirus",
+      "child diarrhea",
+      "viral intestinal infection",
+      "diarrhea"
+    ]
+  },
+  {
+    "code": "GA34",
+    "name": "Abnormal uterine bleeding",
+    "keywords": [
+      "aub",
+      "irregular bleeding",
+      "spotting between periods",
+      "heavy menstrual bleeding"
+    ]
+  },
+  {
+    "code": "GA34.0",
+    "name": "Menorrhagia",
+    "keywords": [
+      "heavy periods",
+      "prolonged periods",
+      "excessive menstrual blood",
+      "heavy flow"
+    ]
+  },
+  {
+    "code": "GA34.1",
+    "name": "Metrorrhagia",
+    "keywords": [
+      "intermenstrual bleeding",
+      "spotting",
+      "bleeding between periods",
+      "metrorrhagia"
+    ]
+  },
+  {
+    "code": "GA34.2",
+    "name": "Oligomenorrhoea",
+    "keywords": [
+      "infrequent periods",
+      "delayed periods",
+      "missed periods",
+      "scanty periods"
+    ]
+  },
+  {
+    "code": "GA34.3",
+    "name": "Polymenorrhoea",
+    "keywords": [
+      "frequent periods",
+      "short menstrual cycle",
+      "periods too often",
+      "frequent bleeding"
+    ]
+  },
+  {
+    "code": "1B40",
+    "name": "Erysipelas",
+    "keywords": [
+      "st anthony fire",
+      "red skin plaque",
+      "streptococcal skin",
+      "superficial cellulitis"
+    ]
+  },
+  {
+    "code": "EA02",
+    "name": "Folliculitis",
+    "keywords": [
+      "hair follicle infection",
+      "razor bumps",
+      "pus filled bumps",
+      "folliculitis"
+    ]
+  },
+  {
+    "code": "EA03",
+    "name": "Furuncle",
+    "keywords": [
+      "boil",
+      "pus bump",
+      "deep hair follicle infection",
+      "skin abscess"
+    ]
+  },
+  {
+    "code": "EA04",
+    "name": "Carbuncle",
+    "keywords": [
+      "cluster of boils",
+      "large skin abscess",
+      "multiple furuncles",
+      "infected boils"
+    ]
+  },
+  {
+    "code": "EB00",
+    "name": "Urticaria",
+    "keywords": [
+      "hives",
+      "nettle rash",
+      "itchy welts",
+      "skin allergy marks"
+    ]
+  },
+  {
+    "code": "2C61",
+    "name": "Malignant neoplasm of prostate",
+    "keywords": [
+      "prostate cancer",
+      "prostate tumor",
+      "pca",
+      "prostate lump"
+    ]
+  },
+  {
+    "code": "2E41",
+    "name": "Benign neoplasm of breast",
+    "keywords": [
+      "fibroadenoma",
+      "benign breast lump",
+      "non cancerous breast lump",
+      "breast cyst"
+    ]
+  },
+  {
+    "code": "2E42",
+    "name": "Benign neoplasm of ovary",
+    "keywords": [
+      "ovarian cyst",
+      "benign ovarian tumor",
+      "non cancerous cyst",
+      "ovary lump"
+    ]
+  },
+  {
+    "code": "DB50",
+    "name": "Inguinal hernia",
+    "keywords": [
+      "groin hernia",
+      "bulge in scrotum",
+      "inguinal swelling",
+      "groin rupture"
+    ]
+  },
+  {
+    "code": "DB51",
+    "name": "Femoral hernia",
+    "keywords": [
+      "thigh hernia",
+      "bulge in upper thigh",
+      "femoral swelling",
+      "hernia in leg crease"
+    ]
+  },
+  {
+    "code": "DB52",
+    "name": "Umbilical hernia",
+    "keywords": [
+      "navel hernia",
+      "belly button bulge",
+      "umbilical swelling",
+      "outie belly button hernia"
+    ]
+  },
+  {
+    "code": "DB53",
+    "name": "Ventral hernia",
+    "keywords": [
+      "abdominal wall hernia",
+      "incisional hernia",
+      "surgical scar hernia",
+      "stomach hernia"
+    ]
+  },
+  {
+    "code": "CB00",
+    "name": "Pneumothorax",
+    "keywords": [
+      "collapsed lung",
+      "air in chest",
+      "sudden chest pain",
+      "spontaneous pneumothorax"
+    ]
+  },
+  {
+    "code": "CC00",
+    "name": "Obstructive sleep apnoea",
+    "keywords": [
+      "osa",
+      "snoring",
+      "stopping breathing in sleep",
+      "sleep apnea"
+    ]
+  },
+  {
+    "code": "CA82",
+    "name": "Pulmonary embolism",
+    "keywords": [
+      "blood clot in lung",
+      "pe",
+      "sudden breathlessness",
+      "chest pain clot"
+    ]
+  },
+  {
+    "code": "1B21",
+    "name": "Buruli ulcer",
+    "keywords": [
+      "mycobacterium ulcerans",
+      "flesh eating bacteria infection",
+      "chronic painless ulcer",
+      "bairnsdale ulcer"
+    ]
+  },
+  {
+    "code": "6C42",
+    "name": "Disorders due to use of cocaine",
+    "keywords": [
+      "cocaine addiction",
+      "coke abuse",
+      "stimulant disorder",
+      "crack addiction"
+    ]
+  },
+  {
+    "code": "6C43",
+    "name": "Disorders due to use of stimulants including amphetamines or methamphetamine",
+    "keywords": [
+      "meth addiction",
+      "speed abuse",
+      "amphetamine disorder",
+      "crystal meth"
+    ]
+  },
+  {
+    "code": "8A40",
+    "name": "Multiple sclerosis",
+    "keywords": [
+      "ms",
+      "demyelination",
+      "neurological weakness",
+      "vision loss muscle weakness"
+    ]
+  },
+  {
+    "code": "LD20",
+    "name": "Fragile X syndrome",
+    "keywords": [
+      "genetic intellectual disability",
+      "fragile x",
+      "inherited mental retardation",
+      "developmental delay"
+    ]
+  },
+  {
+    "code": "MA10",
+    "name": "Palpitations",
+    "keywords": [
+      "heart pounding",
+      "fast heartbeat perception",
+      "fluttering chest",
+      "skipped beats"
+    ]
+  },
+  {
+    "code": "MD00",
+    "name": "Heartburn",
+    "keywords": [
+      "burning chest",
+      "acid feeling in chest",
+      "pyrosis",
+      "sour belch burning"
+    ]
+  },
+  {
+    "code": "MD01",
+    "name": "Dysphagia",
+    "keywords": [
+      "difficulty swallowing",
+      "food getting stuck",
+      "cant swallow",
+      "choking on food"
+    ]
+  },
+  {
+    "code": "ME01",
+    "name": "Jaundice",
+    "keywords": [
+      "icterus",
+      "yellow skin",
+      "yellow eyes",
+      "excess bilirubin"
+    ]
+  },
+  {
+    "code": "MF00",
+    "name": "Headache, unspecified",
+    "keywords": [
+      "head pain",
+      "headache",
+      "cephalalgia",
+      "aching head"
+    ]
+  },
+  {
+    "code": "MG20",
+    "name": "Malaise",
+    "keywords": [
+      "feeling unwell",
+      "under the weather",
+      "general discomfort",
+      "rundown"
+    ]
+  },
+  {
+    "code": "MG25",
+    "name": "Night sweats",
+    "keywords": [
+      "sweating at night",
+      "drenching sweats",
+      "sleep hyperhidrosis",
+      "waking up sweaty"
+    ]
+  },
+  {
+    "code": "MG31",
+    "name": "Acute pain",
+    "keywords": [
+      "sudden pain",
+      "short term pain",
+      "sharp pain",
+      "new pain"
+    ]
+  },
+  {
+    "code": "MA02",
+    "name": "Hypothermia",
+    "keywords": [
+      "low body temperature",
+      "freezing",
+      "hypothermia",
+      "extreme cold exposure"
+    ]
+  },
+  {
+    "code": "EE00",
+    "name": "Alopecia areata",
+    "keywords": [
+      "patchy hair loss",
+      "bald spots",
+      "autoimmune hair loss",
+      "alopecia"
+    ]
+  },
+  {
+    "code": "EE01",
+    "name": "Androgenetic alopecia",
+    "keywords": [
+      "male pattern baldness",
+      "thinning hair",
+      "receding hairline",
+      "female pattern baldness"
+    ]
+  },
+  {
+    "code": "EE02",
+    "name": "Telogen effluvium",
+    "keywords": [
+      "stress hair loss",
+      "hair falling out",
+      "diffuse shedding",
+      "temporary hair loss"
+    ]
+  },
+  {
+    "code": "FB50",
+    "name": "Plantar fasciitis",
+    "keywords": [
+      "heel pain",
+      "bottom of foot pain",
+      "morning foot pain",
+      "heel spur pain"
+    ]
+  },
+  {
+    "code": "FB51",
+    "name": "Achilles tendinopathy",
+    "keywords": [
+      "heel cord pain",
+      "achilles tendonitis",
+      "back of heel pain",
+      "tendon inflammation"
+    ]
+  },
+  {
+    "code": "ED80",
+    "name": "Rosacea",
+    "keywords": [
+      "red face",
+      "facial flushing",
+      "visible blood vessels face",
+      "acne rosacea"
+    ]
+  },
+  {
+    "code": "EA81",
+    "name": "Seborrhoeic dermatitis",
+    "keywords": [
+      "dandruff",
+      "cradle cap",
+      "flaky scalp",
+      "red itchy scalp"
+    ]
+  },
+  {
+    "code": "MC81",
+    "name": "Sciatica",
+    "keywords": [
+      "leg pain from back",
+      "sciatic nerve pain",
+      "shooting leg pain",
+      "nerve pain leg"
+    ]
+  },
+  {
+    "code": "KA80",
+    "name": "Neonatal jaundice",
+    "keywords": [
+      "yellow baby",
+      "newborn jaundice",
+      "high bilirubin baby",
+      "physiologic jaundice"
+    ]
+  },
+  {
+    "code": "KA81",
+    "name": "Neonatal hypoglycaemia",
+    "keywords": [
+      "low blood sugar baby",
+      "neonatal hypoglycemia",
+      "jittery newborn",
+      "low glucose infant"
+    ]
+  },
+  {
+    "code": "GB50",
+    "name": "Nephrotic syndrome",
+    "keywords": [
+      "protein leak kidneys",
+      "swollen face and legs",
+      "frothy urine",
+      "heavy proteinuria"
+    ]
+  },
+  {
+    "code": "GB51",
+    "name": "Acute nephritic syndrome",
+    "keywords": [
+      "blood in urine",
+      "glomerulonephritis",
+      "post strep kidney issue",
+      "tea colored urine"
+    ]
+  },
+  {
+    "code": "EA80.0",
+    "name": "Infantile atopic dermatitis",
+    "keywords": [
+      "baby eczema",
+      "infant rash",
+      "dry skin baby",
+      "atopy"
+    ]
+  },
+  {
+    "code": "EB01",
+    "name": "Acute urticaria",
+    "keywords": [
+      "sudden hives",
+      "skin allergy",
+      "allergic rash",
+      "itchy welts"
+    ]
+  },
+  {
+    "code": "EB02",
+    "name": "Chronic urticaria",
+    "keywords": [
+      "long term hives",
+      "chronic skin allergy",
+      "urticaria",
+      "persistent welts"
+    ]
+  },
+  {
+    "code": "ED81",
+    "name": "Rhinophyma",
+    "keywords": [
+      "bulbous nose",
+      "rosacea nose",
+      "red enlarged nose",
+      "strawberry nose"
+    ]
+  },
+  {
+    "code": "1F22.0",
+    "name": "Tinea capitis",
+    "keywords": [
+      "scalp ringworm",
+      "fungal scalp",
+      "hair loss fungus",
+      "scalp infection"
+    ]
+  },
+  {
+    "code": "1F22.1",
+    "name": "Tinea pedis",
+    "keywords": [
+      "athletes foot",
+      "foot fungus",
+      "toe web infection",
+      "itchy feet fungus"
+    ]
+  },
+  {
+    "code": "1F22.2",
+    "name": "Tinea corporis",
+    "keywords": [
+      "body ringworm",
+      "circular fungal mark",
+      "body fungus",
+      "daud"
+    ]
+  },
+  {
+    "code": "1F22.3",
+    "name": "Tinea cruris",
+    "keywords": [
+      "jock itch",
+      "groin fungus",
+      "private part itching",
+      "inner thigh rash"
+    ]
+  },
+  {
+    "code": "1F22.4",
+    "name": "Tinea unguium",
+    "keywords": [
+      "onychomycosis",
+      "nail fungus",
+      "yellow thick nail",
+      "fungal nail"
+    ]
+  },
+  {
+    "code": "1F22.5",
+    "name": "Tinea manuum",
+    "keywords": [
+      "hand fungus",
+      "fungal infection hand",
+      "palmar fungus",
+      "scaly hands"
+    ]
+  },
+  {
+    "code": "EA90.0",
+    "name": "Psoriasis vulgaris",
+    "keywords": [
+      "plaque psoriasis",
+      "thick scaly skin",
+      "silvery scales",
+      "psoriasis"
+    ]
+  },
+  {
+    "code": "EA90.1",
+    "name": "Guttate psoriasis",
+    "keywords": [
+      "teardrop psoriasis",
+      "rash after strep",
+      "small scaly spots",
+      "guttate"
+    ]
+  },
+  {
+    "code": "EA00.0",
+    "name": "Bullous impetigo",
+    "keywords": [
+      "large blisters",
+      "staph skin infection",
+      "fluid filled sores",
+      "bullous"
+    ]
+  },
+  {
+    "code": "EA00.1",
+    "name": "Non-bullous impetigo",
+    "keywords": [
+      "honey colored crust",
+      "school sores",
+      "face sores child",
+      "impetigo"
+    ]
+  },
+  {
+    "code": "1E40",
+    "name": "Viral warts",
+    "keywords": [
+      "verruca",
+      "skin growths",
+      "hpv wart",
+      "massey"
+    ]
+  },
+  {
+    "code": "1E40.0",
+    "name": "Plantar warts",
+    "keywords": [
+      "foot wart",
+      "verruca plantaris",
+      "bottom of foot growth",
+      "painful wart foot"
+    ]
+  },
+  {
+    "code": "1E40.1",
+    "name": "Common warts",
+    "keywords": [
+      "hand warts",
+      "verruca vulgaris",
+      "common wart",
+      "rough skin bump"
+    ]
+  },
+  {
+    "code": "1D62",
+    "name": "Herpes simplex infections",
+    "keywords": [
+      "cold sore",
+      "fever blister",
+      "HSV",
+      "herpes"
+    ]
+  },
+  {
+    "code": "ED70.0",
+    "name": "Comedonal acne",
+    "keywords": [
+      "blackheads",
+      "whiteheads",
+      "mild acne",
+      "clogged pores"
+    ]
+  },
+  {
+    "code": "ED70.1",
+    "name": "Papulopustular acne",
+    "keywords": [
+      "pimple with pus",
+      "red zits",
+      "moderate acne",
+      "pus spots"
+    ]
+  },
+  {
+    "code": "ED70.2",
+    "name": "Nodulocystic acne",
+    "keywords": [
+      "cystic acne",
+      "severe acne",
+      "deep painful pimples",
+      "acne nodules"
+    ]
+  },
+  {
+    "code": "ED90.0",
+    "name": "Non-segmental vitiligo",
+    "keywords": [
+      "widespread white patches",
+      "generalized vitiligo",
+      "bilateral vitiligo",
+      "leucoderma"
+    ]
+  },
+  {
+    "code": "ED90.1",
+    "name": "Segmental vitiligo",
+    "keywords": [
+      "one sided white patch",
+      "localized vitiligo",
+      "vitiligo patch",
+      "safed daag"
+    ]
+  },
+  {
+    "code": "EE00.0",
+    "name": "Alopecia areata, patchy",
+    "keywords": [
+      "bald spots on head",
+      "patchy baldness",
+      "coin shaped hair loss",
+      "alopecia"
+    ]
+  },
+  {
+    "code": "EE00.1",
+    "name": "Alopecia totalis",
+    "keywords": [
+      "total scalp hair loss",
+      "complete baldness",
+      "no hair on head",
+      "alopecia totalis"
+    ]
+  },
+  {
+    "code": "EE00.2",
+    "name": "Alopecia universalis",
+    "keywords": [
+      "loss of all body hair",
+      "no eyebrows or eyelashes",
+      "complete hair loss",
+      "universalis"
+    ]
+  },
+  {
+    "code": "ME84.0",
+    "name": "Cervicalgia",
+    "keywords": [
+      "neck pain",
+      "stiff neck",
+      "neck ache",
+      "cervical spondylosis"
+    ]
+  },
+  {
+    "code": "ME84.1",
+    "name": "Thoracic spine pain",
+    "keywords": [
+      "upper back pain",
+      "mid back pain",
+      "thoracic pain",
+      "spine pain"
+    ]
+  },
+  {
+    "code": "FA00",
+    "name": "Osteoarthritis of hip",
+    "keywords": [
+      "hip arthritis",
+      "hip joint pain",
+      "wear and tear hip",
+      "coxarthrosis"
+    ]
+  },
+  {
+    "code": "FA02",
+    "name": "Osteoarthritis of hand",
+    "keywords": [
+      "finger arthritis",
+      "hand joint pain",
+      "swollen finger joints",
+      "hand oa"
+    ]
+  },
+  {
+    "code": "FA03",
+    "name": "Osteoarthritis of other specified joint",
+    "keywords": [
+      "shoulder arthritis",
+      "ankle arthritis",
+      "joint wear",
+      "oa"
+    ]
+  },
+  {
+    "code": "FA20.0",
+    "name": "Seropositive rheumatoid arthritis",
+    "keywords": [
+      "ra factor positive",
+      "severe joint inflammation",
+      "rheumatoid disease",
+      "ra"
+    ]
+  },
+  {
+    "code": "FA20.1",
+    "name": "Seronegative rheumatoid arthritis",
+    "keywords": [
+      "ra factor negative",
+      "joint inflammation",
+      "rheumatoid",
+      "arthritis"
+    ]
+  },
+  {
+    "code": "FA25.0",
+    "name": "Idiopathic gout",
+    "keywords": [
+      "primary gout",
+      "high uric acid joint",
+      "podagra",
+      "gout attack"
+    ]
+  },
+  {
+    "code": "FA50.0",
+    "name": "Postmenopausal osteoporosis",
+    "keywords": [
+      "bone thinning women",
+      "menopause bone loss",
+      "fragile bones",
+      "osteoporosis"
+    ]
+  },
+  {
+    "code": "FA50.1",
+    "name": "Senile osteoporosis",
+    "keywords": [
+      "old age bone loss",
+      "elderly osteoporosis",
+      "weak bones aging",
+      "brittle bones"
+    ]
+  },
+  {
+    "code": "MG30.0",
+    "name": "Fibromyalgia",
+    "keywords": [
+      "widespread muscle pain",
+      "fatigue and pain",
+      "tender points",
+      "fibromyalgia"
+    ]
+  },
+  {
+    "code": "FB52",
+    "name": "Patellar tendinopathy",
+    "keywords": [
+      "jumpers knee",
+      "knee tendon pain",
+      "pain below kneecap",
+      "patellar tendonitis"
+    ]
+  },
+  {
+    "code": "FB53",
+    "name": "Bicipital tendinopathy",
+    "keywords": [
+      "biceps tendonitis",
+      "shoulder front pain",
+      "biceps pain",
+      "tendonitis"
+    ]
+  },
+  {
+    "code": "FB54",
+    "name": "Rotator cuff tendinopathy",
+    "keywords": [
+      "rotator cuff pain",
+      "supraspinatus tendonitis",
+      "shoulder ache",
+      "painful arc"
+    ]
+  },
+  {
+    "code": "FB55",
+    "name": "Lateral epicondylitis",
+    "keywords": [
+      "tennis elbow",
+      "outer elbow pain",
+      "epicondylitis",
+      "elbow tendonitis"
+    ]
+  },
+  {
+    "code": "FB56",
+    "name": "Medial epicondylitis",
+    "keywords": [
+      "golfers elbow",
+      "inner elbow pain",
+      "epicondylitis",
+      "tendonitis elbow"
+    ]
+  },
+  {
+    "code": "FA31.0",
+    "name": "Systemic lupus erythematosus with organ or system involvement",
+    "keywords": [
+      "severe sle",
+      "lupus with kidney",
+      "multisystem lupus",
+      "active lupus"
+    ]
+  },
+  {
+    "code": "FA32",
+    "name": "Drug-induced systemic lupus erythematosus",
+    "keywords": [
+      "drug induced lupus",
+      "medication lupus",
+      "sle from drugs",
+      "reversible lupus"
+    ]
+  },
+  {
+    "code": "EE20",
+    "name": "Acne keloidalis",
+    "keywords": [
+      "bumps on back of neck",
+      "keloid acne",
+      "nuchal keloid",
+      "hair bump scars"
+    ]
+  },
+  {
+    "code": "EE40",
+    "name": "Hidradenitis suppurativa",
+    "keywords": [
+      "hs",
+      "boils under arms",
+      "groin boils",
+      "acne inversa"
+    ]
+  },
+  {
+    "code": "EF00",
+    "name": "Melasma",
+    "keywords": [
+      "pregnancy mask",
+      "brown patches on face",
+      "chloasma",
+      "hyperpigmentation"
+    ]
+  },
+  {
+    "code": "EF01",
+    "name": "Postinflammatory hyperpigmentation",
+    "keywords": [
+      "dark spots after acne",
+      "pih",
+      "scar darkening",
+      "pigmentation"
+    ]
+  },
+  {
+    "code": "1G40",
+    "name": "Erythema nodsum",
+    "keywords": [
+      "painful red bumps on legs",
+      "shin nodules",
+      "erythema",
+      "nodules"
+    ]
+  },
+  {
+    "code": "ME60",
+    "name": "Muscle spasm",
+    "keywords": [
+      "muscle cramp",
+      "charley horse",
+      "muscle twitch",
+      "spasm"
+    ]
+  },
+  {
+    "code": "ME61",
+    "name": "Myalgia",
+    "keywords": [
+      "muscle ache",
+      "muscle pain",
+      "sore muscles",
+      "body ache muscle"
+    ]
+  },
+  {
+    "code": "ME62",
+    "name": "Muscle weakness",
+    "keywords": [
+      "loss of strength",
+      "weak muscles",
+      "cant lift",
+      "myasthenia symptom"
+    ]
+  },
+  {
+    "code": "MA20",
+    "name": "Swelling, mass or lump, not elsewhere classified",
+    "keywords": [
+      "lump",
+      "tumor suspect",
+      "swelling",
+      "unexplained mass"
+    ]
+  },
+  {
+    "code": "MA20.0",
+    "name": "Swelling, mass or lump of head or neck",
+    "keywords": [
+      "neck lump",
+      "head bump",
+      "swollen neck mass",
+      "head swelling"
+    ]
+  },
+  {
+    "code": "MA20.1",
+    "name": "Swelling, mass or lump of trunk",
+    "keywords": [
+      "chest lump",
+      "back lump",
+      "abdominal wall mass",
+      "trunk swelling"
+    ]
+  },
+  {
+    "code": "MA20.2",
+    "name": "Swelling, mass or lump of upper limb",
+    "keywords": [
+      "arm mass",
+      "armpit lump",
+      "hand swelling",
+      "upper limb lump"
+    ]
+  },
+  {
+    "code": "MA20.3",
+    "name": "Swelling, mass or lump of lower limb",
+    "keywords": [
+      "leg swelling mass",
+      "thigh lump",
+      "foot mass",
+      "lower limb lump"
+    ]
+  },
+  {
+    "code": "EF40",
+    "name": "Keloid scar",
+    "keywords": [
+      "overgrown scar",
+      "raised scar",
+      "thick scar",
+      "keloid"
+    ]
+  },
+  {
+    "code": "EF41",
+    "name": "Hypertrophic scar",
+    "keywords": [
+      "thick red scar",
+      "raised scar not keloid",
+      "burn scar",
+      "surgical scar"
+    ]
+  },
+  {
+    "code": "EE80",
+    "name": "Corns and callosities",
+    "keywords": [
+      "corns",
+      "foot callus",
+      "thick skin on toe",
+      "hard skin foot"
+    ]
+  },
+  {
+    "code": "EE81",
+    "name": "Acanthosis nigricans",
+    "keywords": [
+      "dark thick skin neck",
+      "insulin resistance skin",
+      "dark armpits",
+      "velvet skin"
+    ]
+  },
+  {
+    "code": "FA23",
+    "name": "Ankylosing spondylitis",
+    "keywords": [
+      "bamboo spine",
+      "stiff back arthritis",
+      "sacroiliitis",
+      "spine fusion"
+    ]
+  },
+  {
+    "code": "FA24",
+    "name": "Psoriatic arthritis",
+    "keywords": [
+      "arthritis with psoriasis",
+      "joint pain psoriasis",
+      "dactylitis",
+      "psoriatic arthropathy"
+    ]
+  },
+  {
+    "code": "FA30",
+    "name": "Sjogren syndrome",
+    "keywords": [
+      "dry eyes and mouth",
+      "sjogrens",
+      "autoimmune dry gland",
+      "sicca syndrome"
+    ]
+  },
+  {
+    "code": "FB30",
+    "name": "Bursitis",
+    "keywords": [
+      "joint sac swelling",
+      "painful bursa",
+      "knee bursitis",
+      "shoulder bursitis"
+    ]
+  },
+  {
+    "code": "FB31",
+    "name": "Olecranon bursitis",
+    "keywords": [
+      "students elbow",
+      "elbow swelling",
+      "popeye elbow",
+      "elbow bursa"
+    ]
+  },
+  {
+    "code": "FB32",
+    "name": "Prepatellar bursitis",
+    "keywords": [
+      "housemaids knee",
+      "knee swelling over cap",
+      "kneecap bursitis",
+      "knee bursa"
+    ]
+  },
+  {
+    "code": "FB40",
+    "name": "Ganglion cyst",
+    "keywords": [
+      "wrist bump",
+      "bible bump",
+      "joint cyst",
+      "tendon cyst"
+    ]
+  },
+  {
+    "code": "FB57",
+    "name": "De Quervain tenosynovitis",
+    "keywords": [
+      "thumb wrist pain",
+      "gamers thumb",
+      "radial styloid tenosynovitis",
+      "thumb tendonitis"
+    ]
+  },
+  {
+    "code": "FC00",
+    "name": "Kyphosis",
+    "keywords": [
+      "hunchback",
+      "forward rounded back",
+      "spine curve out",
+      "kyphotic"
+    ]
+  },
+  {
+    "code": "FC02",
+    "name": "Lordosis",
+    "keywords": [
+      "swayback",
+      "inward curve spine",
+      "hollow back",
+      "lordotic"
+    ]
+  },
+  {
+    "code": "FC30",
+    "name": "Flat foot",
+    "keywords": [
+      "pes planus",
+      "fallen arches",
+      "no foot arch",
+      "flat feet"
+    ]
+  },
+  {
+    "code": "FC31",
+    "name": "Clubfoot",
+    "keywords": [
+      "talipes equinovarus",
+      "twisted foot birth",
+      "inward foot",
+      "club foot"
+    ]
+  },
+  {
+    "code": "EA82",
+    "name": "Nummular dermatitis",
+    "keywords": [
+      "discoid eczema",
+      "coin shaped eczema",
+      "round dry patches",
+      "nummular eczema"
+    ]
+  },
+  {
+    "code": "EA83",
+    "name": "Dyshidrotic eczema",
+    "keywords": [
+      "pompholyx",
+      "blisters on hands",
+      "itchy hand blisters",
+      "sweaty hand eczema"
+    ]
+  },
+  {
+    "code": "EA84",
+    "name": "Stasis dermatitis",
+    "keywords": [
+      "venous eczema",
+      "varicose vein rash",
+      "lower leg eczema",
+      "poor circulation rash"
+    ]
+  },
+  {
+    "code": "EA85",
+    "name": "Lichen simplex chronicus",
+    "keywords": [
+      "neurodermatitis",
+      "thick itchy skin",
+      "scratching rash",
+      "leathery skin"
+    ]
+  },
+  {
+    "code": "1H20",
+    "name": "Bedbugs",
+    "keywords": [
+      "bed bug bites",
+      "cimicosis",
+      "itchy bites from bed",
+      "mattress bugs"
+    ]
+  },
+  {
+    "code": "1H21",
+    "name": "Pediculosis capitis",
+    "keywords": [
+      "head lice",
+      "nits in hair",
+      "itchy scalp bugs",
+      "lice"
+    ]
+  },
+  {
+    "code": "1F20",
+    "name": "Pityriasis versicolor",
+    "keywords": [
+      "tinea versicolor",
+      "white spots fungus",
+      "sweat rash fungus",
+      "sun spots"
+    ]
+  },
+  {
+    "code": "1F24",
+    "name": "Seborrhoeic dermatophytosis",
+    "keywords": [
+      "fungal dandruff",
+      "severe flaky scalp",
+      "dermatophyte seborrhea",
+      "scalp fungus"
+    ]
+  },
+  {
+    "code": "FA04",
+    "name": "Polyosteoarthritis",
+    "keywords": [
+      "multiple joint arthritis",
+      "generalized oa",
+      "wear and tear all over",
+      "polyarthritis"
+    ]
+  },
+  {
+    "code": "FA22",
+    "name": "Juvenile idiopathic arthritis",
+    "keywords": [
+      "childhood arthritis",
+      "jia",
+      "swollen joints in child",
+      "juvenile rheumatoid"
+    ]
+  },
+  {
+    "code": "FB5Z",
+    "name": "Tendinopathy, unspecified",
+    "keywords": [
+      "tendon pain",
+      "tendonitis",
+      "sore tendon",
+      "tendon inflammation"
+    ]
+  },
+  {
+    "code": "FA33",
+    "name": "Systemic sclerosis",
+    "keywords": [
+      "scleroderma",
+      "tight skin disease",
+      "thickened skin",
+      "crest syndrome"
+    ]
+  },
+  {
+    "code": "FA34",
+    "name": "Dermatomyositis",
+    "keywords": [
+      "muscle weakness rash",
+      "heliotrope rash",
+      "gottron papules",
+      "inflammatory myopathy"
+    ]
+  },
+  {
+    "code": "FA35",
+    "name": "Polymyositis",
+    "keywords": [
+      "muscle inflammation",
+      "proximal weakness",
+      "myositis",
+      "muscle autoimmune"
+    ]
+  },
+  {
+    "code": "EE21",
+    "name": "Rosacea fulminans",
+    "keywords": [
+      "pyoderma faciale",
+      "severe rosacea",
+      "sudden cystic rosacea",
+      "face abscess"
+    ]
+  },
+  {
+    "code": "EB0Z",
+    "name": "Urticaria, unspecified",
+    "keywords": [
+      "hives",
+      "welts",
+      "allergy spots",
+      "itchy bumps"
+    ]
+  },
+  {
+    "code": "EB10",
+    "name": "Angioedema",
+    "keywords": [
+      "swollen lips allergy",
+      "swollen eyes allergy",
+      "deep hives",
+      "allergic swelling"
+    ]
+  },
+  {
+    "code": "ED91",
+    "name": "Albinism",
+    "keywords": [
+      "white skin genetic",
+      "no pigment birth",
+      "albino",
+      "oculocutaneous albinism"
+    ]
+  },
+  {
+    "code": "EE0Z",
+    "name": "Alopecia, unspecified",
+    "keywords": [
+      "hair loss",
+      "baldness",
+      "losing hair",
+      "thinning hair"
+    ]
+  },
+  {
+    "code": "FB10",
+    "name": "Trigger finger",
+    "keywords": [
+      "stenosing tenosynovitis",
+      "finger stuck",
+      "clicking finger",
+      "locked finger"
+    ]
+  },
+  {
+    "code": "FC03",
+    "name": "Torticollis",
+    "keywords": [
+      "wry neck",
+      "twisted neck",
+      "neck muscle spasm",
+      "head tilt"
+    ]
+  },
+  {
+    "code": "FC32",
+    "name": "Hallux valgus",
+    "keywords": [
+      "bunion",
+      "big toe bump",
+      "crooked big toe",
+      "foot bone lump"
+    ]
+  },
+  {
+    "code": "FC33",
+    "name": "Hammer toe",
+    "keywords": [
+      "bent toe",
+      "curled toe",
+      "toe deformity",
+      "claw toe"
+    ]
+  },
+  {
+    "code": "ME80",
+    "name": "Pelvic pain",
+    "keywords": [
+      "lower abdomen pain",
+      "pelvic ache",
+      "groin pain",
+      "pain in pelvis"
+    ]
+  },
+  {
+    "code": "ME81",
+    "name": "Perineal pain",
+    "keywords": [
+      "pain between legs",
+      "saddle pain",
+      "perineum pain",
+      "groin area pain"
+    ]
+  },
+  {
+    "code": "ME82",
+    "name": "Sacrococcygeal pain",
+    "keywords": [
+      "tailbone pain",
+      "coccydynia",
+      "pain at base of spine",
+      "coccyx pain"
+    ]
+  },
+  {
+    "code": "MF52",
+    "name": "Clumsiness",
+    "keywords": [
+      "dropping things",
+      "uncoordinated",
+      "gait issue",
+      "frequent tripping"
+    ]
+  },
+  {
+    "code": "8A61",
+    "name": "Generalised epilepsy",
+    "keywords": [
+      "grand mal",
+      "full body seizure",
+      "epilepsy fit",
+      "convulsion"
+    ]
+  },
+  {
+    "code": "8A62",
+    "name": "Focal epilepsy",
+    "keywords": [
+      "partial seizure",
+      "focal fit",
+      "temporal lobe epilepsy",
+      "staring spell"
+    ]
+  },
+  {
+    "code": "8A66",
+    "name": "Status epilepticus",
+    "keywords": [
+      "prolonged seizure",
+      "continuous fits",
+      "emergency seizure",
+      "non-stop convulsion"
+    ]
+  },
+  {
+    "code": "8A01",
+    "name": "Secondary parkinsonism",
+    "keywords": [
+      "drug induced tremor",
+      "parkinsons like",
+      "stiffness",
+      "slow movement"
+    ]
+  },
+  {
+    "code": "8A21",
+    "name": "Vascular dementia",
+    "keywords": [
+      "post stroke dementia",
+      "memory loss after stroke",
+      "vascular cognitive impairment",
+      "brain circulation"
+    ]
+  },
+  {
+    "code": "8A22",
+    "name": "Dementia with Lewy bodies",
+    "keywords": [
+      "lewy body dementia",
+      "hallucinations dementia",
+      "memory loss with rigidity",
+      "parkinsonian dementia"
+    ]
+  },
+  {
+    "code": "8B81",
+    "name": "Bell palsy",
+    "keywords": [
+      "facial paralysis",
+      "crooked mouth",
+      "facial weakness",
+      "bells palsy"
+    ]
+  },
+  {
+    "code": "8A41",
+    "name": "Clinically isolated syndrome",
+    "keywords": [
+      "early ms",
+      "multiple sclerosis start",
+      "neurological episode",
+      "cis"
+    ]
+  },
+  {
+    "code": "AB20",
+    "name": "Benign paroxysmal positional vertigo",
+    "keywords": [
+      "bppv",
+      "positional vertigo",
+      "dizzy when lying down",
+      "ear crystals"
+    ]
+  },
+  {
+    "code": "AB21",
+    "name": "Meniere disease",
+    "keywords": [
+      "vertigo with hearing loss",
+      "ringing in ear",
+      "menieres",
+      "inner ear fluid"
+    ]
+  },
+  {
+    "code": "8A81.0",
+    "name": "Episodic tension-type headache",
+    "keywords": [
+      "stress headache",
+      "tight band around head",
+      "tension ache",
+      "muscle tension headache"
+    ]
+  },
+  {
+    "code": "8A81.1",
+    "name": "Chronic tension-type headache",
+    "keywords": [
+      "daily headache",
+      "constant head pain",
+      "chronic stress headache",
+      "persistent tension"
+    ]
+  },
+  {
+    "code": "8A82",
+    "name": "Cluster headache",
+    "keywords": [
+      "severe eye pain headache",
+      "suicide headache",
+      "clustering headache",
+      "one sided severe headache"
+    ]
+  },
+  {
+    "code": "6B40",
+    "name": "Post-traumatic stress disorder",
+    "keywords": [
+      "ptsd",
+      "trauma flashbacks",
+      "nightmares trauma",
+      "severe stress reaction"
+    ]
+  },
+  {
+    "code": "6B41",
+    "name": "Complex post-traumatic stress disorder",
+    "keywords": [
+      "chronic trauma",
+      "complex ptsd",
+      "c-ptsd",
+      "childhood trauma"
+    ]
+  },
+  {
+    "code": "6B01",
+    "name": "Panic disorder",
+    "keywords": [
+      "panic attacks",
+      "sudden fear",
+      "heart racing panic",
+      "anxiety attacks"
+    ]
+  },
+  {
+    "code": "6B02",
+    "name": "Agoraphobia",
+    "keywords": [
+      "fear of crowds",
+      "fear of leaving house",
+      "panic outdoors",
+      "open space fear"
+    ]
+  },
+  {
+    "code": "6C40.0",
+    "name": "Episode of harmful use of alcohol",
+    "keywords": [
+      "binge drinking",
+      "harmful drinking",
+      "alcohol abuse",
+      "drunk"
+    ]
+  },
+  {
+    "code": "6C40.1",
+    "name": "Harmful pattern of use of alcohol",
+    "keywords": [
+      "regular heavy drinking",
+      "alcohol problem",
+      "drinking habit warning",
+      "alcohol abuse"
+    ]
+  },
+  {
+    "code": "6C40.2",
+    "name": "Alcohol dependence",
+    "keywords": [
+      "alcoholism",
+      "alcohol addiction",
+      "withdrawal symptoms",
+      "cant stop drinking"
+    ]
+  },
+  {
+    "code": "6C41.0",
+    "name": "Episode of harmful use of cannabis",
+    "keywords": [
+      "bad trip weed",
+      "cannabis abuse episode",
+      "marijuana problem",
+      "acute weed paranoia"
+    ]
+  },
+  {
+    "code": "6C41.2",
+    "name": "Cannabis dependence",
+    "keywords": [
+      "weed addiction",
+      "hash addiction",
+      "marijuana dependency",
+      "cannabis withdrawal"
+    ]
+  },
+  {
+    "code": "6C47.0",
+    "name": "Episode of harmful use of nicotine",
+    "keywords": [
+      "smoking health issue",
+      "tobacco poisoning",
+      "nicotine overdose",
+      "harmful smoking"
+    ]
+  },
+  {
+    "code": "6C47.2",
+    "name": "Nicotine dependence",
+    "keywords": [
+      "smoking addiction",
+      "tobacco addiction",
+      "chain smoker",
+      "nicotine craving"
+    ]
+  },
+  {
+    "code": "6C20",
+    "name": "Bodily distress disorder",
+    "keywords": [
+      "somatoform disorder",
+      "physical pain from stress",
+      "psychosomatic",
+      "unexplained medical symptoms"
+    ]
+  },
+  {
+    "code": "6B20",
+    "name": "Obsessive-compulsive disorder",
+    "keywords": [
+      "ocd",
+      "repetitive tasks",
+      "checking things",
+      "intrusive thoughts"
+    ]
+  },
+  {
+    "code": "6A71",
+    "name": "Recurrent depressive disorder",
+    "keywords": [
+      "clinical depression",
+      "major depressive disorder",
+      "mdd",
+      "frequent severe sadness"
+    ]
+  },
+  {
+    "code": "6A60",
+    "name": "Bipolar type I disorder",
+    "keywords": [
+      "manic depression",
+      "bipolar 1",
+      "extreme mood swings",
+      "mania"
+    ]
+  },
+  {
+    "code": "6A61",
+    "name": "Bipolar type II disorder",
+    "keywords": [
+      "bipolar 2",
+      "hypomania and depression",
+      "mood disorder",
+      "bipolar"
+    ]
+  },
+  {
+    "code": "GA10.0",
+    "name": "Endometriosis of uterus",
+    "keywords": [
+      "adenomyosis",
+      "uterine endometriosis",
+      "painful heavy periods",
+      "bulky uterus"
+    ]
+  },
+  {
+    "code": "GA10.1",
+    "name": "Endometriosis of ovary",
+    "keywords": [
+      "chocolate cyst",
+      "endometrioma",
+      "ovary cyst pain",
+      "ovarian endometriosis"
+    ]
+  },
+  {
+    "code": "GA10.2",
+    "name": "Endometriosis of pelvic peritoneum",
+    "keywords": [
+      "pelvic endometriosis",
+      "severe pelvic pain",
+      "infertile endometriosis",
+      "peritoneal spots"
+    ]
+  },
+  {
+    "code": "5A80.0",
+    "name": "Polycystic ovary syndrome, classic",
+    "keywords": [
+      "pcos classic",
+      "no periods pcos",
+      "ovarian cysts",
+      "hormonal imbalance"
+    ]
+  },
+  {
+    "code": "GA30.0",
+    "name": "Premenstrual tension syndrome",
+    "keywords": [
+      "pms",
+      "pmdd",
+      "mood swings before period",
+      "premenstrual syndrome"
+    ]
+  },
+  {
+    "code": "GA30.5",
+    "name": "Female climacteric states",
+    "keywords": [
+      "perimenopause",
+      "hot flushes",
+      "night sweats menopause",
+      "menopausal transition"
+    ]
+  },
+  {
+    "code": "GA00.0",
+    "name": "Acute pelvic inflammatory disease",
+    "keywords": [
+      "acute pid",
+      "pelvic infection sudden",
+      "severe lower belly pain",
+      "fever and pelvic pain"
+    ]
+  },
+  {
+    "code": "GA00.1",
+    "name": "Chronic pelvic inflammatory disease",
+    "keywords": [
+      "chronic pid",
+      "ongoing pelvic pain",
+      "recurring pelvic infection",
+      "tubal infection"
+    ]
+  },
+  {
+    "code": "GA01",
+    "name": "Salpingitis or oophoritis",
+    "keywords": [
+      "tube infection",
+      "ovary infection",
+      "adnexitis",
+      "fallopian tube swollen"
+    ]
+  },
+  {
+    "code": "GA02",
+    "name": "Inflammatory disease of uterus",
+    "keywords": [
+      "endometritis",
+      "uterus lining infection",
+      "postpartum uterine infection",
+      "foul discharge"
+    ]
+  },
+  {
+    "code": "GA03",
+    "name": "Inflammatory disease of cervix uteri",
+    "keywords": [
+      "cervicitis",
+      "cervix infection",
+      "bleeding after sex",
+      "cervical discharge"
+    ]
+  },
+  {
+    "code": "GC00.0",
+    "name": "Benign prostatic hyperplasia with lower urinary tract symptoms",
+    "keywords": [
+      "bph with symptoms",
+      "prostate enlargement",
+      "frequent night urination",
+      "poor urine flow"
+    ]
+  },
+  {
+    "code": "HA20.0",
+    "name": "Erectile dysfunction of organic origin",
+    "keywords": [
+      "physical ed",
+      "impotence related to diabetes",
+      "medication ed",
+      "blood flow ed"
+    ]
+  },
+  {
+    "code": "HA20.1",
+    "name": "Erectile dysfunction of psychogenic origin",
+    "keywords": [
+      "psychological ed",
+      "performance anxiety ed",
+      "stress induced ed",
+      "mental impotence"
+    ]
+  },
+  {
+    "code": "GA31.0",
+    "name": "Primary amenorrhoea",
+    "keywords": [
+      "never had period",
+      "delayed puberty female",
+      "no menarche",
+      "primary amenorrhea"
+    ]
+  },
+  {
+    "code": "GA31.1",
+    "name": "Secondary amenorrhoea",
+    "keywords": [
+      "periods stopped",
+      "missed periods 3 months",
+      "secondary amenorrhea",
+      "no menstruation"
+    ]
+  },
+  {
+    "code": "GA32",
+    "name": "Hypomenorrhoea",
+    "keywords": [
+      "light periods",
+      "scanty periods",
+      "very little bleeding",
+      "short period"
+    ]
+  },
+  {
+    "code": "HA00.0",
+    "name": "Azoospermia",
+    "keywords": [
+      "no sperm",
+      "zero sperm count",
+      "male infertility zero sperm",
+      "azoospermia"
+    ]
+  },
+  {
+    "code": "HA00.1",
+    "name": "Oligozoospermia",
+    "keywords": [
+      "low sperm count",
+      "poor sperm production",
+      "oligozoospermia",
+      "male subfertility"
+    ]
+  },
+  {
+    "code": "HA01",
+    "name": "Male hypogonadism",
+    "keywords": [
+      "low testosterone",
+      "low T",
+      "hypogonadism",
+      "male hormone deficiency"
+    ]
+  },
+  {
+    "code": "GA34.5",
+    "name": "Postmenopausal bleeding",
+    "keywords": [
+      "bleeding after menopause",
+      "blood after periods stopped",
+      "pmb",
+      "warning sign postmenopausal"
+    ]
+  },
+  {
+    "code": "GA20",
+    "name": "Vaginitis",
+    "keywords": [
+      "vaginal inflammation",
+      "yeast vaginitis",
+      "bacterial vaginosis",
+      "vaginal itching"
+    ]
+  },
+  {
+    "code": "GA21",
+    "name": "Vulvitis",
+    "keywords": [
+      "vulva inflammation",
+      "external genital itching",
+      "redness vulva",
+      "vulvitis"
+    ]
+  },
+  {
+    "code": "1F23.1",
+    "name": "Vulvovaginal candidiasis",
+    "keywords": [
+      "vaginal yeast infection",
+      "thrush down there",
+      "white cottage cheese discharge",
+      "candidal vaginitis"
+    ]
+  },
+  {
+    "code": "1D03",
+    "name": "Acute hepatitis D",
+    "keywords": [
+      "delta hepatitis",
+      "hepatitis d",
+      "liver infection with hep b"
+    ]
+  },
+  {
+    "code": "5A02",
+    "name": "Thyroiditis",
+    "keywords": [
+      "hashimotos",
+      "thyroid inflammation",
+      "neck pain thyroid",
+      "autoimmune thyroid"
+    ]
+  },
+  {
+    "code": "5A03",
+    "name": "Simple goitre",
+    "keywords": [
+      "enlarged thyroid",
+      "swelling in front of neck",
+      "non toxic goiter",
+      "thyroid lump"
+    ]
+  },
+  {
+    "code": "GC05",
+    "name": "Overactive bladder",
+    "keywords": [
+      "oab",
+      "urge incontinence",
+      "sudden need to pee",
+      "bladder urgency"
+    ]
+  },
+  {
+    "code": "GC06",
+    "name": "Stress urinary incontinence",
+    "keywords": [
+      "leaking urine when sneezing",
+      "coughing urinary leak",
+      "stress incontinence",
+      "bladder leak"
+    ]
+  },
+  {
+    "code": "8A83",
+    "name": "Trigeminal neuralgia",
+    "keywords": [
+      "severe face pain",
+      "electric shock face",
+      "trigeminal nerve pain",
+      "tic douloureux"
+    ]
+  },
+  {
+    "code": "MB43",
+    "name": "Dysuria",
+    "keywords": [
+      "pain passing urine",
+      "burning pee",
+      "painful urination",
+      "difficulty urinating"
+    ]
+  },
+  {
+    "code": "MB44",
+    "name": "Urinary retention",
+    "keywords": [
+      "cant empty bladder",
+      "blocked urine",
+      "retention of urine",
+      "full bladder cant pee"
+    ]
+  },
+  {
+    "code": "MF55",
+    "name": "Syncope and collapse",
+    "keywords": [
+      "fainting",
+      "passing out",
+      "blackout",
+      "vasovagal"
+    ]
+  },
+  {
+    "code": "8B82",
+    "name": "Sciatic nerve lesion",
+    "keywords": [
+      "sciatic nerve damage",
+      "sciatica injury",
+      "leg numbness from sciatic",
+      "nerve lesion leg"
+    ]
+  },
+  {
+    "code": "8B83",
+    "name": "Median nerve lesion",
+    "keywords": [
+      "median nerve damage",
+      "carpal tunnel nerve injury",
+      "hand numbness median"
+    ]
+  },
+  {
+    "code": "8D60",
+    "name": "Sleep apnoea",
+    "keywords": [
+      "osa",
+      "snoring loud",
+      "breathing stops in sleep",
+      "sleep apnea"
+    ]
+  },
+  {
+    "code": "8D61",
+    "name": "Narcolepsy",
+    "keywords": [
+      "falling asleep suddenly",
+      "excessive daytime sleepiness",
+      "cataplexy",
+      "narcolepsy"
+    ]
+  },
+  {
+    "code": "8D62",
+    "name": "Restless legs syndrome",
+    "keywords": [
+      "rls",
+      "creepy crawly legs",
+      "urge to move legs",
+      "night leg movement"
+    ]
+  },
+  {
+    "code": "1A41",
+    "name": "Viral enteritis",
+    "keywords": [
+      "stomach flu",
+      "viral gastroenteritis",
+      "diarrhea viral"
+    ]
+  },
+  {
+    "code": "2C62",
+    "name": "Malignant neoplasm of colon",
+    "keywords": [
+      "colon cancer",
+      "bowel cancer",
+      "colorectal cancer",
+      "tumor in colon"
+    ]
+  },
+  {
+    "code": "2C63",
+    "name": "Malignant neoplasm of rectum",
+    "keywords": [
+      "rectal cancer",
+      "cancer of rectum",
+      "bleeding per rectum tumor",
+      "rectum malignancy"
+    ]
+  },
+  {
+    "code": "2C73",
+    "name": "Malignant neoplasm of stomach",
+    "keywords": [
+      "gastric cancer",
+      "stomach tumor",
+      "malignancy of stomach",
+      "stomach carcinoma"
+    ]
+  },
+  {
+    "code": "MB20",
+    "name": "Haemoptysis",
+    "keywords": [
+      "coughing up blood",
+      "blood in sputum",
+      "spitting blood",
+      "hemoptysis"
+    ]
+  },
+  {
+    "code": "MD82",
+    "name": "Haematemesis",
+    "keywords": [
+      "vomiting blood",
+      "blood in vomit",
+      "coffee ground vomit",
+      "hematemesis"
+    ]
+  },
+  {
+    "code": "MD83",
+    "name": "Melaena",
+    "keywords": [
+      "black tarry stool",
+      "blood in stool black",
+      "melena",
+      "upper gi bleed stool"
+    ]
+  },
+  {
+    "code": "MD84",
+    "name": "Haematochezia",
+    "keywords": [
+      "bright red blood in stool",
+      "fresh blood per rectum",
+      "hematochezia",
+      "lower gi bleed"
+    ]
+  },
+  {
+    "code": "MB41",
+    "name": "Haematuria",
+    "keywords": [
+      "blood in urine",
+      "red urine",
+      "pink urine",
+      "hematuria"
+    ]
+  },
+  {
+    "code": "6B60",
+    "name": "Dissociative identity disorder",
+    "keywords": [
+      "multiple personality",
+      "did",
+      "split personality",
+      "dissociation"
+    ]
+  },
+  {
+    "code": "6B61",
+    "name": "Dissociative amnesia",
+    "keywords": [
+      "memory loss trauma",
+      "psychogenic amnesia",
+      "dissociative memory loss",
+      "fugue state"
+    ]
+  },
+  {
+    "code": "6C4H",
+    "name": "Disorders due to use of multiple specified psychoactive substances",
+    "keywords": [
+      "polysubstance abuse",
+      "multiple drug addiction",
+      "mixed drug abuse",
+      "substance abuse"
+    ]
+  },
+  {
+    "code": "GB42",
+    "name": "Unspecified chronic kidney disease",
+    "keywords": [
+      "ckd unspecified",
+      "chronic renal failure",
+      "kidney disease",
+      "low gfr unknown stage"
+    ]
+  },
+  {
+    "code": "NE60",
+    "name": "Contact with venomous spiders",
+    "keywords": [
+      "spider bite",
+      "black widow bite",
+      "tarantula bite",
+      "venomous spider"
+    ]
+  },
+  {
+    "code": "NE62",
+    "name": "Contact with scorpion",
+    "keywords": [
+      "scorpion sting",
+      "scorpion bite",
+      "poisonous scorpion"
+    ]
+  },
+  {
+    "code": "NE63",
+    "name": "Contact with venomous marine animals",
+    "keywords": [
+      "jellyfish sting",
+      "sea urchin sting",
+      "stingray injury",
+      "marine sting"
+    ]
+  },
+  {
+    "code": "ND54",
+    "name": "Exposure to extreme heat",
+    "keywords": [
+      "heat stroke",
+      "sun stroke",
+      "heat exhaustion",
+      "hyperthermia weather"
+    ]
+  },
+  {
+    "code": "ND55",
+    "name": "Exposure to extreme cold",
+    "keywords": [
+      "frostbite",
+      "trench foot",
+      "freezing temperature exposure",
+      "extreme cold"
+    ]
+  },
+  {
+    "code": "PB00",
+    "name": "Pedal cyclist injured in transport accident",
+    "keywords": [
+      "bicycle accident",
+      "cycle crash",
+      "bike accident injury",
+      "pedal cycle crash"
+    ]
+  },
+  {
+    "code": "PB10",
+    "name": "Motorcyclist injured in transport accident",
+    "keywords": [
+      "bike accident",
+      "motorcycle crash",
+      "two wheeler accident",
+      "scooter crash"
+    ]
+  },
+  {
+    "code": "ME05",
+    "name": "Ascites",
+    "keywords": [
+      "fluid in abdomen",
+      "swollen belly fluid",
+      "water in stomach liver",
+      "ascites"
+    ]
+  },
+  {
+    "code": "MG23",
+    "name": "Oedema",
+    "keywords": [
+      "swelling",
+      "water retention",
+      "pitting edema",
+      "swollen feet"
+    ]
+  },
+  {
+    "code": "FA05",
+    "name": "Osteoarthritis of spine",
+    "keywords": [
+      "spinal osteoarthritis",
+      "spondylosis",
+      "wear and tear spine",
+      "spinal arthritis"
+    ]
+  },
+  {
+    "code": "ND91",
+    "name": "Burn of trunk",
+    "keywords": [
+      "chest burn",
+      "abdomen burn",
+      "back burn",
+      "trunk burn"
+    ]
+  },
+  {
+    "code": "ND92",
+    "name": "Burn of upper limb",
+    "keywords": [
+      "arm burn",
+      "hand burn",
+      "finger burn",
+      "shoulder burn"
+    ]
+  },
+  {
+    "code": "ND93",
+    "name": "Burn of lower limb",
+    "keywords": [
+      "leg burn",
+      "foot burn",
+      "thigh burn",
+      "toe burn"
+    ]
+  },
+  {
+    "code": "NC10",
+    "name": "Fracture of skull or facial bones",
+    "keywords": [
+      "skull fracture",
+      "broken jaw",
+      "broken nose",
+      "fractured cheekbone"
+    ]
+  },
+  {
+    "code": "NC11",
+    "name": "Fracture of neck",
+    "keywords": [
+      "broken neck",
+      "cervical spine fracture",
+      "neck bone break",
+      "c spine fracture"
+    ]
+  },
+  {
+    "code": "NC12",
+    "name": "Fracture of rib, sternum or thoracic spine",
+    "keywords": [
+      "broken rib",
+      "cracked rib",
+      "chest bone fracture",
+      "thoracic fracture"
+    ]
+  },
+  {
+    "code": "NC31",
+    "name": "Fracture of shoulder or upper arm",
+    "keywords": [
+      "broken humerus",
+      "collarbone fracture",
+      "clavicle break",
+      "shoulder fracture"
+    ]
+  },
+  {
+    "code": "NC33",
+    "name": "Fracture at wrist or hand level",
+    "keywords": [
+      "broken wrist",
+      "colles fracture",
+      "broken finger",
+      "hand fracture"
+    ]
+  },
+  {
+    "code": "NC51",
+    "name": "Fracture of femur",
+    "keywords": [
+      "broken thigh bone",
+      "femur fracture",
+      "hip fracture",
+      "broken leg top"
+    ]
+  },
+  {
+    "code": "NC52",
+    "name": "Fracture of lower leg",
+    "keywords": [
+      "tibia fracture",
+      "fibula fracture",
+      "broken calf bone",
+      "broken leg bottom"
+    ]
+  },
+  {
+    "code": "NC53",
+    "name": "Fracture of foot or ankle",
+    "keywords": [
+      "broken ankle",
+      "broken toe",
+      "metatarsal fracture",
+      "foot fracture"
+    ]
+  },
+  {
+    "code": "MA30",
+    "name": "Enlarged lymph nodes",
+    "keywords": [
+      "swollen glands",
+      "lymph node swelling",
+      "lump in armpit",
+      "swollen neck glands"
+    ]
+  },
+  {
+    "code": "MG41",
+    "name": "Abnormal weight loss",
+    "keywords": [
+      "unexplained weight loss",
+      "losing weight fast",
+      "cachexia",
+      "getting weak and thin"
+    ]
+  },
+  {
+    "code": "BA02",
+    "name": "Elevated blood pressure reading, without diagnosis of hypertension",
+    "keywords": [
+      "high bp reading",
+      "borderline high blood pressure",
+      "high pressure once",
+      "elevated bp"
+    ]
+  },
+  {
+    "code": "GC08.1",
+    "name": "Asymptomatic bacteriuria",
+    "keywords": [
+      "bacteria in urine",
+      "urine infection no symptoms",
+      "pus cells in urine",
+      "smelly urine no pain"
+    ]
+  },
+  {
+    "code": "MG22.0",
+    "name": "Asthenia",
+    "keywords": [
+      "weakness",
+      "lack of energy",
+      "physical weakness",
+      "loss of strength"
+    ]
+  },
+  {
+    "code": "MG22.1",
+    "name": "Chronic fatigue",
+    "keywords": [
+      "always tired",
+      "chronic tiredness",
+      "exhausted",
+      "prolonged fatigue"
+    ]
+  },
+  {
+    "code": "MG31.1",
+    "name": "Chronic widespread pain",
+    "keywords": [
+      "pain all over",
+      "generalized pain",
+      "body ache everywhere",
+      "widespread ache"
+    ]
+  },
+  {
+    "code": "NC10.0",
+    "name": "Fracture of vault of skull",
+    "keywords": [
+      "skull fracture",
+      "head bone break",
+      "broken skull",
+      "cracked head"
+    ]
+  },
+  {
+    "code": "NC32.0",
+    "name": "Fracture of shaft of humerus",
+    "keywords": [
+      "broken upper arm",
+      "humerus break",
+      "arm bone fracture",
+      "arm break"
+    ]
+  },
+  {
+    "code": "NC51.0",
+    "name": "Fracture of neck of femur",
+    "keywords": [
+      "broken hip",
+      "hip bone fracture",
+      "femur neck break",
+      "thigh bone break top"
+    ]
+  },
+  {
+    "code": "ND54.0",
+    "name": "Heat exhaustion",
+    "keywords": [
+      "heat exhaustion",
+      "sun stroke weak",
+      "overheated",
+      "heat sickness"
+    ]
+  },
+  {
+    "code": "ND54.1",
+    "name": "Heat stroke",
+    "keywords": [
+      "sun stroke",
+      "heat stroke",
+      "severe heat illness",
+      "fainted from sun"
+    ]
+  },
+  {
+    "code": "ND73.0",
+    "name": "Injury by electric current",
+    "keywords": [
+      "electric shock",
+      "electrocuted",
+      "current shock",
+      "wire shock"
+    ]
+  },
+  {
+    "code": "QD70",
+    "name": "Homelessness",
+    "keywords": [
+      "no home",
+      "living on street",
+      "homeless",
+      "destitute"
+    ]
+  },
+  {
+    "code": "QD50",
+    "name": "Lack of adequate food",
+    "keywords": [
+      "starving",
+      "no food",
+      "hunger",
+      "food insecurity"
+    ]
+  },
+  {
+    "code": "QD51",
+    "name": "Lack of adequate safe drinking water",
+    "keywords": [
+      "no clean water",
+      "unsafe drinking water",
+      "lack of drinking water",
+      "dirty water"
+    ]
+  },
+  {
+    "code": "QE50",
+    "name": "Occupational exposure to dust",
+    "keywords": [
+      "dust at work",
+      "factory dust",
+      "bidi worker dust",
+      "construction dust"
+    ]
+  },
+  {
+    "code": "QE51",
+    "name": "Occupational exposure to toxic chemicals",
+    "keywords": [
+      "chemical exposure",
+      "factory chemicals",
+      "pesticide work",
+      "toxic fumes work"
+    ]
+  },
+  {
+    "code": "NA01.0",
+    "name": "Laceration of head",
+    "keywords": [
+      "cut on head",
+      "head wound",
+      "bleeding head cut",
+      "gash on head"
+    ]
+  },
+  {
+    "code": "NC30.0",
+    "name": "Laceration of wrist or hand",
+    "keywords": [
+      "cut on hand",
+      "palm cut",
+      "wrist wound",
+      "bleeding hand"
+    ]
+  },
+  {
+    "code": "NC50.0",
+    "name": "Laceration of lower leg",
+    "keywords": [
+      "cut on leg",
+      "shin wound",
+      "bleeding leg cut",
+      "leg gash"
+    ]
+  },
+  {
+    "code": "NC34.0",
+    "name": "Sprain of wrist",
+    "keywords": [
+      "twisted wrist",
+      "wrist sprain",
+      "wrist ligament",
+      "bent wrist pain"
+    ]
+  },
+  {
+    "code": "NC54.0",
+    "name": "Sprain of knee",
+    "keywords": [
+      "twisted knee",
+      "knee sprain",
+      "ligament tear knee",
+      "jerked knee"
+    ]
+  },
+  {
+    "code": "NC54.1",
+    "name": "Sprain of ankle",
+    "keywords": [
+      "rolled ankle",
+      "twisted ankle",
+      "ankle sprain",
+      "ligament tear ankle"
+    ]
+  },
+  {
+    "code": "ME05.0",
+    "name": "Chylous ascites",
+    "keywords": [
+      "milky fluid in belly",
+      "chyle leak",
+      "lymph in abdomen"
+    ]
+  },
+  {
+    "code": "MG23.0",
+    "name": "Peripheral oedema",
+    "keywords": [
+      "swollen feet",
+      "swollen ankles",
+      "pitting edema",
+      "water in legs"
+    ]
+  },
+  {
+    "code": "MG23.1",
+    "name": "Generalised oedema",
+    "keywords": [
+      "swelling everywhere",
+      "anasarca",
+      "full body swelling",
+      "bloated all over"
+    ]
+  },
+  {
+    "code": "MD01.0",
+    "name": "Oropharyngeal dysphagia",
+    "keywords": [
+      "difficulty starting swallow",
+      "choking on liquid",
+      "throat swallowing issue",
+      "cant swallow food"
+    ]
+  },
+  {
+    "code": "MD01.1",
+    "name": "Oesophageal dysphagia",
+    "keywords": [
+      "food sticking in chest",
+      "food won't go down",
+      "esophagus block",
+      "chest swallowing pain"
+    ]
+  },
+  {
+    "code": "PB11",
+    "name": "Motorcyclist injured in collision with car, pick-up truck or van",
+    "keywords": [
+      "bike hit by car",
+      "motorcycle accident with car",
+      "scooter crash vehicle"
+    ]
+  },
+  {
+    "code": "PB01",
+    "name": "Pedal cyclist injured in collision with car, pick-up truck or van",
+    "keywords": [
+      "bicycle hit by car",
+      "cycle accident with vehicle",
+      "cyclist struck"
+    ]
+  },
+  {
+    "code": "PD50",
+    "name": "Fall on same level",
+    "keywords": [
+      "slipped and fell",
+      "tripped over",
+      "fell on ground",
+      "falling down"
+    ]
+  },
+  {
+    "code": "PD51",
+    "name": "Fall involving bed",
+    "keywords": [
+      "fell out of bed",
+      "rolled off bed",
+      "bed fall injury"
+    ]
+  },
+  {
+    "code": "PD53",
+    "name": "Fall from stairs or steps",
+    "keywords": [
+      "fell down stairs",
+      "tumbled down steps",
+      "staircase fall",
+      "slipped on stairs"
+    ]
+  },
+  {
+    "code": "PD54",
+    "name": "Fall from ladder",
+    "keywords": [
+      "fell off ladder",
+      "ladder accident",
+      "stepladder fall"
+    ]
+  },
+  {
+    "code": "PE10",
+    "name": "Bitten or struck by dog",
+    "keywords": [
+      "dog bite",
+      "stray dog attack",
+      "canine bite",
+      "mauled by dog"
+    ]
+  },
+  {
+    "code": "PE13",
+    "name": "Bitten or struck by snake",
+    "keywords": [
+      "snake bite",
+      "cobra bite",
+      "viper strike",
+      "bitten by snake"
+    ]
+  },
+  {
+    "code": "PE50",
+    "name": "Struck by thrown, projected or falling object",
+    "keywords": [
+      "hit by falling object",
+      "brick fell on head",
+      "struck by item",
+      "object hit"
+    ]
+  },
+  {
+    "code": "PE51",
+    "name": "Striking against or struck by sports equipment",
+    "keywords": [
+      "cricket ball hit",
+      "sports injury",
+      "bat hit",
+      "hit while playing"
+    ]
+  },
+  {
+    "code": "PE60",
+    "name": "Contact with knife, sword or dagger",
+    "keywords": [
+      "knife cut",
+      "stab wound",
+      "accident with knife",
+      "chopper cut"
+    ]
+  },
+  {
+    "code": "PE61",
+    "name": "Contact with nonpowered hand tool",
+    "keywords": [
+      "hammer injury",
+      "axe cut",
+      "sickle cut",
+      "farming tool injury"
+    ]
+  },
+  {
+    "code": "QE70",
+    "name": "Extreme poverty",
+    "keywords": [
+      "very poor",
+      "no money",
+      "financial hardship",
+      "below poverty line"
+    ]
+  },
+  {
+    "code": "QE71",
+    "name": "Low income",
+    "keywords": [
+      "not enough money",
+      "financial stress",
+      "struggling to pay bills",
+      "low wage"
+    ]
+  },
+  {
+    "code": "QF00",
+    "name": "Lack of family support",
+    "keywords": [
+      "no family help",
+      "abandoned by family",
+      "living alone",
+      "no one to care"
+    ]
+  },
+  {
+    "code": "QF01",
+    "name": "Stressful life events",
+    "keywords": [
+      "recent trauma",
+      "loss of loved one",
+      "divorce stress",
+      "major life stress"
+    ]
+  },
+  {
+    "code": "QF20",
+    "name": "Problems related to living alone",
+    "keywords": [
+      "isolated",
+      "elderly living alone",
+      "loneliness",
+      "no company at home"
+    ]
+  },
+  {
+    "code": "QF21",
+    "name": "Problems related to living in residential institution",
+    "keywords": [
+      "nursing home issues",
+      "orphanage issues",
+      "institutional care problem"
+    ]
+  },
+  {
+    "code": "MC15",
+    "name": "Abnormal results of blood chemistry",
+    "keywords": [
+      "bad blood test",
+      "abnormal lab test",
+      "high uric acid test",
+      "liver enzymes high test"
+    ]
+  },
+  {
+    "code": "MC16",
+    "name": "Abnormal results of blood glucose",
+    "keywords": [
+      "high sugar on test",
+      "sugar test abnormal",
+      "elevated blood sugar reading"
+    ]
+  },
+  {
+    "code": "MC17",
+    "name": "Abnormal levels of blood enzymes",
+    "keywords": [
+      "sgpt high",
+      "sgot high",
+      "liver enzymes elevated",
+      "high blood enzymes"
+    ]
+  },
+  {
+    "code": "MA51",
+    "name": "Abnormal sputum",
+    "keywords": [
+      "blood in spit",
+      "yellow phlegm",
+      "green sputum",
+      "abnormal cough mucus"
+    ]
+  },
+  {
+    "code": "MF51",
+    "name": "Disturbances of smell or taste",
+    "keywords": [
+      "cant smell",
+      "loss of taste",
+      "anosmia",
+      "metallic taste"
+    ]
+  },
+  {
+    "code": "MH11",
+    "name": "Suicidal ideation",
+    "keywords": [
+      "want to die",
+      "suicide thoughts",
+      "feeling suicidal",
+      "end life thoughts"
+    ]
+  },
+  {
+    "code": "MD20",
+    "name": "Hiccup",
+    "keywords": [
+      "hiccups",
+      "continuous hiccups",
+      "hiccough",
+      "diaphragm spasm"
+    ]
+  },
+  {
+    "code": "MD30",
+    "name": "Eructation",
+    "keywords": [
+      "belching",
+      "burping",
+      "excess gas upper",
+      "burps"
+    ]
+  },
+  {
+    "code": "MD31",
+    "name": "Flatulence",
+    "keywords": [
+      "passing gas",
+      "farting",
+      "wind",
+      "bloated with gas"
+    ]
+  },
+  {
+    "code": "MB22",
+    "name": "Sputum",
+    "keywords": [
+      "excess phlegm",
+      "productive cough fluid",
+      "mucus from chest"
+    ]
+  },
+  {
+    "code": "MB23",
+    "name": "Sneezing",
+    "keywords": [
+      "frequent sneezing",
+      "sneeze attack",
+      "allergy sneeze"
+    ]
+  },
+  {
+    "code": "MB42",
+    "name": "Oliguria or anuria",
+    "keywords": [
+      "passed very little urine",
+      "stopped urinating",
+      "no urine output",
+      "scanty urine"
+    ]
+  },
+  {
+    "code": "MB45",
+    "name": "Polyuria",
+    "keywords": [
+      "peeing too much",
+      "frequent large urination",
+      "passing lots of urine",
+      "polyuria"
+    ]
+  },
+  {
+    "code": "MB46",
+    "name": "Nocturia",
+    "keywords": [
+      "waking up to pee",
+      "nighttime urination",
+      "peeing at night"
+    ]
+  },
+  {
+    "code": "MB47",
+    "name": "Urinary incontinence",
+    "keywords": [
+      "wetting pants",
+      "urine leak",
+      "loss of bladder control",
+      "incontinence"
+    ]
+  },
+  {
+    "code": "MC00",
+    "name": "Abnormal faeces",
+    "keywords": [
+      "weird stool",
+      "pale stool",
+      "clay colored stool",
+      "abnormal poop"
+    ]
+  },
+  {
+    "code": "MD91",
+    "name": "Tenesmus",
+    "keywords": [
+      "feeling to pass stool always",
+      "straining at stool",
+      "incomplete bowel movement feeling"
+    ]
+  },
+  {
+    "code": "MG24",
+    "name": "Excessive sweating",
+    "keywords": [
+      "hyperhidrosis",
+      "sweating too much",
+      "drenched in sweat easily"
+    ]
+  },
+  {
+    "code": "EB03",
+    "name": "Contact urticaria",
+    "keywords": [
+      "hives from touching",
+      "allergic reaction skin touch",
+      "contact hives"
+    ]
+  },
+  {
+    "code": "FA21",
+    "name": "Other specified rheumatoid arthritis",
+    "keywords": [
+      "rheumatoid variant",
+      "atypical rheumatoid",
+      "inflammatory joint disease"
+    ]
+  },
+  {
+    "code": "MA24",
+    "name": "Gangrene",
+    "keywords": [
+      "dead toe",
+      "black tissue",
+      "necrosis",
+      "diabetic foot gangrene"
+    ]
+  },
+  {
+    "code": "NA03",
+    "name": "Superficial injury of head",
+    "keywords": [
+      "bruise on head",
+      "scratch on head",
+      "head abrasion",
+      "bump on head"
+    ]
+  },
+  {
+    "code": "NB33",
+    "name": "Superficial injury of thorax",
+    "keywords": [
+      "bruise on chest",
+      "chest scratch",
+      "chest wall contusion"
+    ]
+  },
+  {
+    "code": "NB93",
+    "name": "Superficial injury of lower back or pelvis",
+    "keywords": [
+      "lower back bruise",
+      "buttock abrasion",
+      "sacral bruise"
+    ]
+  },
+  {
+    "code": "NC33.0",
+    "name": "Superficial injury of wrist",
+    "keywords": [
+      "wrist scratch",
+      "wrist bruise",
+      "abraded wrist"
+    ]
+  },
+  {
+    "code": "NC55",
+    "name": "Superficial injury of knee or lower leg",
+    "keywords": [
+      "scraped knee",
+      "bruised shin",
+      "leg abrasion"
+    ]
+  },
+  {
+    "code": "NC56",
+    "name": "Superficial injury of ankle or foot",
+    "keywords": [
+      "stubbed toe",
+      "bruised ankle",
+      "scraped foot"
+    ]
+  },
+  {
+    "code": "QC03",
+    "name": "Prophylactic surgery",
+    "keywords": [
+      "preventive surgery",
+      "surgery to prevent disease",
+      "prophylactic procedure"
+    ]
+  },
+  {
+    "code": "QC10",
+    "name": "Screening for infectious or parasitic diseases",
+    "keywords": [
+      "tb test check",
+      "hiv screening",
+      "malaria test checkup",
+      "infection screen"
+    ]
+  },
+  {
+    "code": "QC11",
+    "name": "Screening for neoplasms",
+    "keywords": [
+      "cancer screening",
+      "pap smear routine",
+      "mammogram screening"
+    ]
+  },
+  {
+    "code": "QC12",
+    "name": "Screening for disorders of the blood or blood-forming organs",
+    "keywords": [
+      "anemia screening camp",
+      "thalassemia test check",
+      "hemoglobin screening"
+    ]
+  },
+  {
+    "code": "QC13",
+    "name": "Screening for endocrine, nutritional or metabolic diseases",
+    "keywords": [
+      "diabetes screening camp",
+      "thyroid screen routine",
+      "sugar checkup camp"
+    ]
+  },
+  {
+    "code": "QC14",
+    "name": "Screening for cardiovascular diseases",
+    "keywords": [
+      "bp checkup camp",
+      "heart screening",
+      "ecg screening routine"
+    ]
+  },
+  {
+    "code": "QC41",
+    "name": "High-risk pregnancy care",
+    "keywords": [
+      "complicated pregnancy check",
+      "high risk anc",
+      "pregnancy risk visit"
+    ]
+  },
+  {
+    "code": "QC44",
+    "name": "Care of newborn baby",
+    "keywords": [
+      "newborn care",
+      "routine baby check",
+      "neonatal check"
+    ]
+  },
+  {
+    "code": "QC50",
+    "name": "Contraceptive management",
+    "keywords": [
+      "family planning follow up",
+      "pill refill visit",
+      "contraception care"
+    ]
+  },
+  {
+    "code": "QC7Z",
+    "name": "General counselling",
+    "keywords": [
+      "health advice",
+      "general medical counseling",
+      "lifestyle counseling"
+    ]
+  },
+  {
+    "code": "QC72",
+    "name": "Dietary counselling",
+    "keywords": [
+      "diet plan advice",
+      "nutritionist visit",
+      "food advice for diabetes"
+    ]
+  },
+  {
+    "code": "QC70",
+    "name": "Counselling for substance use",
+    "keywords": [
+      "deaddiction counseling",
+      "quit smoking advice",
+      "alcohol counseling"
+    ]
+  },
+  {
+    "code": "QE62",
+    "name": "Lack of adequate housing",
+    "keywords": [
+      "poor housing conditions",
+      "slum dwelling",
+      "unsafe house",
+      "crowded home"
+    ]
+  },
+  {
+    "code": "QE63",
+    "name": "Inadequate heating or cooling of housing",
+    "keywords": [
+      "too cold at home",
+      "house too hot",
+      "no fan in heatwave"
+    ]
+  },
+  {
+    "code": "QF04",
+    "name": "Problems related to primary support group",
+    "keywords": [
+      "family conflict",
+      "domestic argument",
+      "issues with parents",
+      "family tension"
+    ]
+  },
+  {
+    "code": "QF0Z",
+    "name": "Problems related to upbringing",
+    "keywords": [
+      "childhood issues",
+      "troubled upbringing",
+      "orphan issues"
+    ]
+  },
+  {
+    "code": "QF12",
+    "name": "Problems related to spouse or partner",
+    "keywords": [
+      "marital issues",
+      "husband wife problem",
+      "partner conflict"
+    ]
+  },
+  {
+    "code": "QE80",
+    "name": "Unemployment",
+    "keywords": [
+      "lost job",
+      "no work",
+      "unemployed",
+      "jobless"
+    ]
+  },
+  {
+    "code": "QE81",
+    "name": "Change of job",
+    "keywords": [
+      "new job stress",
+      "job transition",
+      "work change"
+    ]
+  },
+  {
+    "code": "QE82",
+    "name": "Threat of job loss",
+    "keywords": [
+      "fear of getting fired",
+      "layoff threat",
+      "job insecurity"
+    ]
+  },
+  {
+    "code": "QF30",
+    "name": "Social isolation",
+    "keywords": [
+      "no friends",
+      "lonely",
+      "isolated from society"
+    ]
+  },
+  {
+    "code": "QF31",
+    "name": "Cultural or social exclusion",
+    "keywords": [
+      "discrimination",
+      "outcast",
+      "socially excluded"
+    ]
+  },
+  {
+    "code": "QF40",
+    "name": "Refugee status",
+    "keywords": [
+      "refugee",
+      "fled country",
+      "asylum seeker"
+    ]
+  },
+  {
+    "code": "MD40",
+    "name": "Vomiting",
+    "keywords": [
+      "throwing up",
+      "puking",
+      "emesis",
+      "vomit"
+    ]
+  },
+  {
+    "code": "MD41",
+    "name": "Nausea",
+    "keywords": [
+      "feeling sick to stomach",
+      "queasy",
+      "nauseous",
+      "urge to vomit"
+    ]
+  },
+  {
+    "code": "01A",
+    "name": "Sepsis",
+    "keywords": [
+      "blood infection",
+      "septic",
+      "severe infection whole body"
+    ]
+  },
+  {
+    "code": "2A50",
+    "name": "Myelodysplastic syndromes",
+    "keywords": [
+      "bone marrow failure",
+      "mds",
+      "preleukemia"
+    ]
+  },
+  {
+    "code": "2C40",
+    "name": "Squamous cell carcinoma of skin",
+    "keywords": [
+      "skin cancer squamous",
+      "scc",
+      "sun cancer spot"
+    ]
+  },
+  {
+    "code": "2C41",
+    "name": "Basal cell carcinoma of skin",
+    "keywords": [
+      "bcc",
+      "rodent ulcer",
+      "skin cancer basal"
+    ]
+  },
+  {
+    "code": "2C42",
+    "name": "Melanoma of skin",
+    "keywords": [
+      "malignant melanoma",
+      "black mole cancer",
+      "skin cancer dark"
+    ]
+  }
+]

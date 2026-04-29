@@ -1,0 +1,522 @@
+[
+  {
+    "code": "MA30",
+    "name": "Enlarged lymph nodes",
+    "keywords": ["swollen glands", "lymph node swelling", "lump in armpit", "swollen neck glands"]
+  },
+  {
+    "code": "MG41",
+    "name": "Abnormal weight loss",
+    "keywords": ["unexplained weight loss", "losing weight fast", "cachexia", "getting weak and thin"]
+  },
+  {
+    "code": "BA02",
+    "name": "Elevated blood pressure reading, without diagnosis of hypertension",
+    "keywords": ["high bp reading", "borderline high blood pressure", "high pressure once", "elevated bp"]
+  },
+  {
+    "code": "GC08.1",
+    "name": "Asymptomatic bacteriuria",
+    "keywords": ["bacteria in urine", "urine infection no symptoms", "pus cells in urine", "smelly urine no pain"]
+  },
+  {
+    "code": "MG22.0",
+    "name": "Asthenia",
+    "keywords": ["weakness", "lack of energy", "physical weakness", "loss of strength"]
+  },
+  {
+    "code": "MG22.1",
+    "name": "Chronic fatigue",
+    "keywords": ["always tired", "chronic tiredness", "exhausted", "prolonged fatigue"]
+  },
+  {
+    "code": "MG31.1",
+    "name": "Chronic widespread pain",
+    "keywords": ["pain all over", "generalized pain", "body ache everywhere", "widespread ache"]
+  },
+  {
+    "code": "NC10.0",
+    "name": "Fracture of vault of skull",
+    "keywords": ["skull fracture", "head bone break", "broken skull", "cracked head"]
+  },
+  {
+    "code": "NC32.0",
+    "name": "Fracture of shaft of humerus",
+    "keywords": ["broken upper arm", "humerus break", "arm bone fracture", "arm break"]
+  },
+  {
+    "code": "NC51.0",
+    "name": "Fracture of neck of femur",
+    "keywords": ["broken hip", "hip bone fracture", "femur neck break", "thigh bone break top"]
+  },
+  {
+    "code": "ND54.0",
+    "name": "Heat exhaustion",
+    "keywords": ["heat exhaustion", "sun stroke weak", "overheated", "heat sickness"]
+  },
+  {
+    "code": "ND54.1",
+    "name": "Heat stroke",
+    "keywords": ["sun stroke", "heat stroke", "severe heat illness", "fainted from sun"]
+  },
+  {
+    "code": "ND73.0",
+    "name": "Injury by electric current",
+    "keywords": ["electric shock", "electrocuted", "current shock", "wire shock"]
+  },
+  {
+    "code": "QD70",
+    "name": "Homelessness",
+    "keywords": ["no home", "living on street", "homeless", "destitute"]
+  },
+  {
+    "code": "QD50",
+    "name": "Lack of adequate food",
+    "keywords": ["starving", "no food", "hunger", "food insecurity"]
+  },
+  {
+    "code": "QD51",
+    "name": "Lack of adequate safe drinking water",
+    "keywords": ["no clean water", "unsafe drinking water", "lack of drinking water", "dirty water"]
+  },
+  {
+    "code": "QE50",
+    "name": "Occupational exposure to dust",
+    "keywords": ["dust at work", "factory dust", "bidi worker dust", "construction dust"]
+  },
+  {
+    "code": "QE51",
+    "name": "Occupational exposure to toxic chemicals",
+    "keywords": ["chemical exposure", "factory chemicals", "pesticide work", "toxic fumes work"]
+  },
+  {
+    "code": "NA01.0",
+    "name": "Laceration of head",
+    "keywords": ["cut on head", "head wound", "bleeding head cut", "gash on head"]
+  },
+  {
+    "code": "NC30.0",
+    "name": "Laceration of wrist or hand",
+    "keywords": ["cut on hand", "palm cut", "wrist wound", "bleeding hand"]
+  },
+  {
+    "code": "NC50.0",
+    "name": "Laceration of lower leg",
+    "keywords": ["cut on leg", "shin wound", "bleeding leg cut", "leg gash"]
+  },
+  {
+    "code": "NC34.0",
+    "name": "Sprain of wrist",
+    "keywords": ["twisted wrist", "wrist sprain", "wrist ligament", "bent wrist pain"]
+  },
+  {
+    "code": "NC54.0",
+    "name": "Sprain of knee",
+    "keywords": ["twisted knee", "knee sprain", "ligament tear knee", "jerked knee"]
+  },
+  {
+    "code": "NC54.1",
+    "name": "Sprain of ankle",
+    "keywords": ["rolled ankle", "twisted ankle", "ankle sprain", "ligament tear ankle"]
+  },
+  {
+    "code": "ME05.0",
+    "name": "Chylous ascites",
+    "keywords": ["milky fluid in belly", "chyle leak", "lymph in abdomen"]
+  },
+  {
+    "code": "MG23.0",
+    "name": "Peripheral oedema",
+    "keywords": ["swollen feet", "swollen ankles", "pitting edema", "water in legs"]
+  },
+  {
+    "code": "MG23.1",
+    "name": "Generalised oedema",
+    "keywords": ["swelling everywhere", "anasarca", "full body swelling", "bloated all over"]
+  },
+  {
+    "code": "MD01.0",
+    "name": "Oropharyngeal dysphagia",
+    "keywords": ["difficulty starting swallow", "choking on liquid", "throat swallowing issue", "cant swallow food"]
+  },
+  {
+    "code": "MD01.1",
+    "name": "Oesophageal dysphagia",
+    "keywords": ["food sticking in chest", "food won't go down", "esophagus block", "chest swallowing pain"]
+  },
+  {
+    "code": "PB11",
+    "name": "Motorcyclist injured in collision with car, pick-up truck or van",
+    "keywords": ["bike hit by car", "motorcycle accident with car", "scooter crash vehicle"]
+  },
+  {
+    "code": "PB01",
+    "name": "Pedal cyclist injured in collision with car, pick-up truck or van",
+    "keywords": ["bicycle hit by car", "cycle accident with vehicle", "cyclist struck"]
+  },
+  {
+    "code": "PD50",
+    "name": "Fall on same level",
+    "keywords": ["slipped and fell", "tripped over", "fell on ground", "falling down"]
+  },
+  {
+    "code": "PD51",
+    "name": "Fall involving bed",
+    "keywords": ["fell out of bed", "rolled off bed", "bed fall injury"]
+  },
+  {
+    "code": "PD53",
+    "name": "Fall from stairs or steps",
+    "keywords": ["fell down stairs", "tumbled down steps", "staircase fall", "slipped on stairs"]
+  },
+  {
+    "code": "PD54",
+    "name": "Fall from ladder",
+    "keywords": ["fell off ladder", "ladder accident", "stepladder fall"]
+  },
+  {
+    "code": "PE10",
+    "name": "Bitten or struck by dog",
+    "keywords": ["dog bite", "stray dog attack", "canine bite", "mauled by dog"]
+  },
+  {
+    "code": "PE13",
+    "name": "Bitten or struck by snake",
+    "keywords": ["snake bite", "cobra bite", "viper strike", "bitten by snake"]
+  },
+  {
+    "code": "PE50",
+    "name": "Struck by thrown, projected or falling object",
+    "keywords": ["hit by falling object", "brick fell on head", "struck by item", "object hit"]
+  },
+  {
+    "code": "PE51",
+    "name": "Striking against or struck by sports equipment",
+    "keywords": ["cricket ball hit", "sports injury", "bat hit", "hit while playing"]
+  },
+  {
+    "code": "PE60",
+    "name": "Contact with knife, sword or dagger",
+    "keywords": ["knife cut", "stab wound", "accident with knife", "chopper cut"]
+  },
+  {
+    "code": "PE61",
+    "name": "Contact with nonpowered hand tool",
+    "keywords": ["hammer injury", "axe cut", "sickle cut", "farming tool injury"]
+  },
+  {
+    "code": "QE70",
+    "name": "Extreme poverty",
+    "keywords": ["very poor", "no money", "financial hardship", "below poverty line"]
+  },
+  {
+    "code": "QE71",
+    "name": "Low income",
+    "keywords": ["not enough money", "financial stress", "struggling to pay bills", "low wage"]
+  },
+  {
+    "code": "QF00",
+    "name": "Lack of family support",
+    "keywords": ["no family help", "abandoned by family", "living alone", "no one to care"]
+  },
+  {
+    "code": "QF01",
+    "name": "Stressful life events",
+    "keywords": ["recent trauma", "loss of loved one", "divorce stress", "major life stress"]
+  },
+  {
+    "code": "QF20",
+    "name": "Problems related to living alone",
+    "keywords": ["isolated", "elderly living alone", "loneliness", "no company at home"]
+  },
+  {
+    "code": "QF21",
+    "name": "Problems related to living in residential institution",
+    "keywords": ["nursing home issues", "orphanage issues", "institutional care problem"]
+  },
+  {
+    "code": "MC15",
+    "name": "Abnormal results of blood chemistry",
+    "keywords": ["bad blood test", "abnormal lab test", "high uric acid test", "liver enzymes high test"]
+  },
+  {
+    "code": "MC16",
+    "name": "Abnormal results of blood glucose",
+    "keywords": ["high sugar on test", "sugar test abnormal", "elevated blood sugar reading"]
+  },
+  {
+    "code": "MC17",
+    "name": "Abnormal levels of blood enzymes",
+    "keywords": ["sgpt high", "sgot high", "liver enzymes elevated", "high blood enzymes"]
+  },
+  {
+    "code": "MA51",
+    "name": "Abnormal sputum",
+    "keywords": ["blood in spit", "yellow phlegm", "green sputum", "abnormal cough mucus"]
+  },
+  {
+    "code": "MF51",
+    "name": "Disturbances of smell or taste",
+    "keywords": ["cant smell", "loss of taste", "anosmia", "metallic taste"]
+  },
+  {
+    "code": "MH11",
+    "name": "Suicidal ideation",
+    "keywords": ["want to die", "suicide thoughts", "feeling suicidal", "end life thoughts"]
+  },
+  {
+    "code": "MD20",
+    "name": "Hiccup",
+    "keywords": ["hiccups", "continuous hiccups", "hiccough", "diaphragm spasm"]
+  },
+  {
+    "code": "MD30",
+    "name": "Eructation",
+    "keywords": ["belching", "burping", "excess gas upper", "burps"]
+  },
+  {
+    "code": "MD31",
+    "name": "Flatulence",
+    "keywords": ["passing gas", "farting", "wind", "bloated with gas"]
+  },
+  {
+    "code": "MB22",
+    "name": "Sputum",
+    "keywords": ["excess phlegm", "productive cough fluid", "mucus from chest"]
+  },
+  {
+    "code": "MB23",
+    "name": "Sneezing",
+    "keywords": ["frequent sneezing", "sneeze attack", "allergy sneeze"]
+  },
+  {
+    "code": "MB42",
+    "name": "Oliguria or anuria",
+    "keywords": ["passed very little urine", "stopped urinating", "no urine output", "scanty urine"]
+  },
+  {
+    "code": "MB45",
+    "name": "Polyuria",
+    "keywords": ["peeing too much", "frequent large urination", "passing lots of urine", "polyuria"]
+  },
+  {
+    "code": "MB46",
+    "name": "Nocturia",
+    "keywords": ["waking up to pee", "nighttime urination", "peeing at night"]
+  },
+  {
+    "code": "MB47",
+    "name": "Urinary incontinence",
+    "keywords": ["wetting pants", "urine leak", "loss of bladder control", "incontinence"]
+  },
+  {
+    "code": "MC00",
+    "name": "Abnormal faeces",
+    "keywords": ["weird stool", "pale stool", "clay colored stool", "abnormal poop"]
+  },
+  {
+    "code": "MD91",
+    "name": "Tenesmus",
+    "keywords": ["feeling to pass stool always", "straining at stool", "incomplete bowel movement feeling"]
+  },
+  {
+    "code": "MG24",
+    "name": "Excessive sweating",
+    "keywords": ["hyperhidrosis", "sweating too much", "drenched in sweat easily"]
+  },
+  {
+    "code": "EB03",
+    "name": "Contact urticaria",
+    "keywords": ["hives from touching", "allergic reaction skin touch", "contact hives"]
+  },
+  {
+    "code": "FA21",
+    "name": "Other specified rheumatoid arthritis",
+    "keywords": ["rheumatoid variant", "atypical rheumatoid", "inflammatory joint disease"]
+  },
+  {
+    "code": "MA24",
+    "name": "Gangrene",
+    "keywords": ["dead toe", "black tissue", "necrosis", "diabetic foot gangrene"]
+  },
+  {
+    "code": "NA03",
+    "name": "Superficial injury of head",
+    "keywords": ["bruise on head", "scratch on head", "head abrasion", "bump on head"]
+  },
+  {
+    "code": "NB33",
+    "name": "Superficial injury of thorax",
+    "keywords": ["bruise on chest", "chest scratch", "chest wall contusion"]
+  },
+  {
+    "code": "NB93",
+    "name": "Superficial injury of lower back or pelvis",
+    "keywords": ["lower back bruise", "buttock abrasion", "sacral bruise"]
+  },
+  {
+    "code": "NC33.0",
+    "name": "Superficial injury of wrist",
+    "keywords": ["wrist scratch", "wrist bruise", "abraded wrist"]
+  },
+  {
+    "code": "NC55",
+    "name": "Superficial injury of knee or lower leg",
+    "keywords": ["scraped knee", "bruised shin", "leg abrasion"]
+  },
+  {
+    "code": "NC56",
+    "name": "Superficial injury of ankle or foot",
+    "keywords": ["stubbed toe", "bruised ankle", "scraped foot"]
+  },
+  {
+    "code": "QC03",
+    "name": "Prophylactic surgery",
+    "keywords": ["preventive surgery", "surgery to prevent disease", "prophylactic procedure"]
+  },
+  {
+    "code": "QC10",
+    "name": "Screening for infectious or parasitic diseases",
+    "keywords": ["tb test check", "hiv screening", "malaria test checkup", "infection screen"]
+  },
+  {
+    "code": "QC11",
+    "name": "Screening for neoplasms",
+    "keywords": ["cancer screening", "pap smear routine", "mammogram screening"]
+  },
+  {
+    "code": "QC12",
+    "name": "Screening for disorders of the blood or blood-forming organs",
+    "keywords": ["anemia screening camp", "thalassemia test check", "hemoglobin screening"]
+  },
+  {
+    "code": "QC13",
+    "name": "Screening for endocrine, nutritional or metabolic diseases",
+    "keywords": ["diabetes screening camp", "thyroid screen routine", "sugar checkup camp"]
+  },
+  {
+    "code": "QC14",
+    "name": "Screening for cardiovascular diseases",
+    "keywords": ["bp checkup camp", "heart screening", "ecg screening routine"]
+  },
+  {
+    "code": "QC41",
+    "name": "High-risk pregnancy care",
+    "keywords": ["complicated pregnancy check", "high risk anc", "pregnancy risk visit"]
+  },
+  {
+    "code": "QC44",
+    "name": "Care of newborn baby",
+    "keywords": ["newborn care", "routine baby check", "neonatal check"]
+  },
+  {
+    "code": "QC50",
+    "name": "Contraceptive management",
+    "keywords": ["family planning follow up", "pill refill visit", "contraception care"]
+  },
+  {
+    "code": "QC7Z",
+    "name": "General counselling",
+    "keywords": ["health advice", "general medical counseling", "lifestyle counseling"]
+  },
+  {
+    "code": "QC72",
+    "name": "Dietary counselling",
+    "keywords": ["diet plan advice", "nutritionist visit", "food advice for diabetes"]
+  },
+  {
+    "code": "QC70",
+    "name": "Counselling for substance use",
+    "keywords": ["deaddiction counseling", "quit smoking advice", "alcohol counseling"]
+  },
+  {
+    "code": "QE62",
+    "name": "Lack of adequate housing",
+    "keywords": ["poor housing conditions", "slum dwelling", "unsafe house", "crowded home"]
+  },
+  {
+    "code": "QE63",
+    "name": "Inadequate heating or cooling of housing",
+    "keywords": ["too cold at home", "house too hot", "no fan in heatwave"]
+  },
+  {
+    "code": "QF04",
+    "name": "Problems related to primary support group",
+    "keywords": ["family conflict", "domestic argument", "issues with parents", "family tension"]
+  },
+  {
+    "code": "QF0Z",
+    "name": "Problems related to upbringing",
+    "keywords": ["childhood issues", "troubled upbringing", "orphan issues"]
+  },
+  {
+    "code": "QF12",
+    "name": "Problems related to spouse or partner",
+    "keywords": ["marital issues", "husband wife problem", "partner conflict"]
+  },
+  {
+    "code": "QE80",
+    "name": "Unemployment",
+    "keywords": ["lost job", "no work", "unemployed", "jobless"]
+  },
+  {
+    "code": "QE81",
+    "name": "Change of job",
+    "keywords": ["new job stress", "job transition", "work change"]
+  },
+  {
+    "code": "QE82",
+    "name": "Threat of job loss",
+    "keywords": ["fear of getting fired", "layoff threat", "job insecurity"]
+  },
+  {
+    "code": "QF30",
+    "name": "Social isolation",
+    "keywords": ["no friends", "lonely", "isolated from society"]
+  },
+  {
+    "code": "QF31",
+    "name": "Cultural or social exclusion",
+    "keywords": ["discrimination", "outcast", "socially excluded"]
+  },
+  {
+    "code": "QF40",
+    "name": "Refugee status",
+    "keywords": ["refugee", "fled country", "asylum seeker"]
+  },
+  {
+    "code": "MD40",
+    "name": "Vomiting",
+    "keywords": ["throwing up", "puking", "emesis", "vomit"]
+  },
+  {
+    "code": "MD41",
+    "name": "Nausea",
+    "keywords": ["feeling sick to stomach", "queasy", "nauseous", "urge to vomit"]
+  },
+  {
+    "code": "01A",
+    "name": "Sepsis",
+    "keywords": ["blood infection", "septic", "severe infection whole body"]
+  },
+  {
+    "code": "2A50",
+    "name": "Myelodysplastic syndromes",
+    "keywords": ["bone marrow failure", "mds", "preleukemia"]
+  },
+  {
+    "code": "2C40",
+    "name": "Squamous cell carcinoma of skin",
+    "keywords": ["skin cancer squamous", "scc", "sun cancer spot"]
+  },
+  {
+    "code": "2C41",
+    "name": "Basal cell carcinoma of skin",
+    "keywords": ["bcc", "rodent ulcer", "skin cancer basal"]
+  },
+  {
+    "code": "2C42",
+    "name": "Melanoma of skin",
+    "keywords": ["malignant melanoma", "black mole cancer", "skin cancer dark"]
+  }
+]

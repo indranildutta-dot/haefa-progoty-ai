@@ -1,11 +1,23 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Box, Typography, Button, Paper, Container, Stack, IconButton } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useNavigate } from 'react-router-dom';
 import TopNavigation from '../components/TopNavigation';
+import { seedICD11ToFirestore } from '../utils/seedICD11';
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  const handleSeed = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsSeeding(true);
+    try {
+      await seedICD11ToFirestore();
+    } finally {
+      setIsSeeding(false);
+    }
+  };
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f8fafc' }}>
@@ -58,6 +70,21 @@ const AdminDashboard: React.FC = () => {
             </Typography>
             <Button variant="contained" sx={{ bgcolor: '#8b5cf6', '&:hover': { bgcolor: '#7c3aed' } }} onClick={(e) => { e.stopPropagation(); navigate('/analytics'); }}>
               Launch Analytics Portal
+            </Button>
+          </Paper>
+
+          <Paper 
+            elevation={0} 
+            sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0' }} 
+          >
+            <Typography variant="h6" fontWeight="bold" sx={{ mb: 1, color: '#ef4444' }}>
+              Database Ops
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+              Seed ICD-11 Cache to Firestore.
+            </Typography>
+            <Button variant="contained" color="warning" onClick={handleSeed} disabled={isSeeding}>
+              {isSeeding ? 'Seeding...' : 'Seed ICD-11 Data'}
             </Button>
           </Paper>
         </Stack>
