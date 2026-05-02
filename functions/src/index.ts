@@ -490,6 +490,7 @@ export const dispenseMedication = onCall(async (request) => {
     clinicId?: string;
     medications?: Array<{
       medication_name: string;
+      medication_dosage?: string;
       mode: string;
       qty: number | string;
       prescribed_qty?: number | string;
@@ -562,14 +563,35 @@ export const dispenseMedication = onCall(async (request) => {
         presDocSnap = await transaction.get(presRef);
       }
 
-      // SECOND: For each unique inventoryId, perform transaction.get(inventoryRef)
-      const inventoryDocs = new Map<string, any>();
+      // SECOND: For each unique inventoryId, we need to find ANY other batches of the same medication
+      // to implement FEFO (First Expired First Out) as requested.
+      const inventoryDocs = new Map<string, any[]>(); // Map med_id -> array of batches
       
-      const inventoryRefs = invIds.map(id => db.collection('clinics').doc(cId).collection('inventory').doc(id));
-      let inventorySnaps: any[] = [];
-      if (inventoryRefs.length > 0) {
-        logStep("READ", `getAll inventoryRefs count=${inventoryRefs.length}`);
-        inventorySnaps = await transaction.getAll(...inventoryRefs);
+      const initialInventorySnaps = invIds.length > 0 ? await transaction.getAll(...invIds.map(id => db.collection('clinics').doc(cId).collection('inventory').doc(id))) : [];
+      
+      // For each medication we are dispensing, we want to find ALL batches in the clinic's inventory
+      // so we can deduct from the one expiring soonest.
+      for (const snap of initialInventorySnaps) {
+        if (!snap.exists) continue;
+        const data = snap.data();
+        const medId = data.medication_id || data.name;
+        const dosage = data.dosage;
+        
+        // Query for ALL batches of this med+dosage in this clinic
+        const allBatchesSnap = await db.collection('clinics').doc(cId).collection('inventory')
+          .where('medication_id', '==', medId)
+          .where('dosage', '==', dosage)
+          .get();
+        
+        const batches = allBatchesSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        // Sort batches by expiry_date ASC (earliest first)
+        batches.sort((a: any, b: any) => {
+          const dateA = a.expiry_date ? (a.expiry_date.toDate ? a.expiry_date.toDate().getTime() : new Date(a.expiry_date).getTime()) : Infinity;
+          const dateB = b.expiry_date ? (b.expiry_date.toDate ? b.expiry_date.toDate().getTime() : new Date(b.expiry_date).getTime()) : Infinity;
+          return dateA - dateB;
+        });
+        
+        inventoryDocs.set(`${medId}|${dosage}`, batches);
       }
 
       // Gather Queue doc if available
@@ -579,67 +601,95 @@ export const dispenseMedication = onCall(async (request) => {
         queueDocSnap = await transaction.get(qRef);
       }
       
-      inventorySnaps.forEach((snap, idx) => {
-        inventoryDocs.set(invIds[idx], snap.exists ? snap.data() : null);
-      });
-
       // Step 3: LOCAL CALCULATIONS
-      const currentStockLevels = new Map<string, number>();
-      inventoryDocs.forEach((data, id) => {
-        if (data) currentStockLevels.set(id, Number(data.quantity) || 0);
-      });
-
       const results: any[] = [];
       const requisitionWrites: Array<any> = [];
       let anyShortfallRemaining = false;
+      const batchesToUpdate = new Map<string, number>(); // inventoryId -> newQty
 
       for (const medication of meds) {
-        const { medication_name, mode, qty, prescribed_qty, substitution, return_on, inventoryId } = medication;
-        const targetMedName = (mode === 'SUBSTITUTE' && substitution) ? substitution : medication_name;
+        const { medication_name, medication_dosage, mode, qty, prescribed_qty, substitution, return_on, inventoryId } = medication;
         
         let actualDeducted = 0;
         let shortfall = Number(prescribed_qty) || Number(qty) || 0;
+        const requestedQty = Number(qty) || 0;
 
         if (mode !== 'OUT_OF_STOCK') {
           if (!inventoryId) {
             throw new HttpsError("invalid-argument", `Medication ${medication_name} is missing inventoryId.`);
           }
 
-          const available = currentStockLevels.get(inventoryId);
-          if (available === undefined) {
-             throw new HttpsError("not-found", `Inventory record ${inventoryId} not found.`);
+          // Find the medication info from the initially selected batch to find other batches
+          const initialSnap = initialInventorySnaps.find((s: any) => s.id === inventoryId);
+          if (!initialSnap || !initialSnap.exists) {
+             throw new HttpsError("not-found", `Initial inventory record ${inventoryId} not found.`);
           }
+          const initialData = initialSnap.data();
+          const medKey = `${initialData.medication_id || initialData.name}|${initialData.dosage}`;
+          const batches = inventoryDocs.get(medKey) || [];
 
-          const toTake = Math.min(available, Number(qty));
-          const newQty = available - toTake;
+          let remainingToDeduct = requestedQty;
           
-          currentStockLevels.set(inventoryId, newQty);
-          actualDeducted = toTake;
-          shortfall = Math.max(0, shortfall - actualDeducted);
+          for (const batch of batches) {
+            if (remainingToDeduct <= 0) break;
+            
+            const currentQty = batchesToUpdate.has(batch.id) ? batchesToUpdate.get(batch.id)! : Number(batch.quantity) || 0;
+            if (currentQty <= 0) continue;
 
-          if (newQty < REQUISITION_THRESHOLD) {
-            requisitionWrites.push({
-              clinic_id: cId, medication_name: targetMedName,
-              current_stock: newQty, type: 'LOW_STOCK_ALERT', status: 'PENDING',
-              created_at: admin.firestore.Timestamp.now()
-            });
+            const toTake = Math.min(currentQty, remainingToDeduct);
+            const newQty = currentQty - toTake;
+            
+            batchesToUpdate.set(batch.id, newQty);
+            actualDeducted += toTake;
+            remainingToDeduct -= toTake;
+
+            const ninetyDaysFromNow = new Date();
+            ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
+            
+            const batchExpDate = batch.expiry_date ? (batch.expiry_date.toDate ? batch.expiry_date.toDate() : new Date(batch.expiry_date)) : null;
+            const isExpiringSoon = batchExpDate && batchExpDate < ninetyDaysFromNow;
+
+            if (newQty < REQUISITION_THRESHOLD || isExpiringSoon) {
+              requisitionWrites.push({
+                clinic_id: cId, 
+                medication_name: batch.medication_id || batch.name,
+                medication_dosage: batch.dosage || '',
+                current_stock: newQty, 
+                expiry_date: batch.expiry_date || null,
+                type: isExpiringSoon ? 'EXPIRY_ALERT' : 'LOW_STOCK_ALERT', 
+                status: 'PENDING',
+                created_at: admin.firestore.Timestamp.now()
+              });
+            }
           }
+          
+          shortfall = Math.max(0, shortfall - actualDeducted);
         }
 
         if (mode === 'PARTIAL' || mode === 'OUT_OF_STOCK') {
           anyShortfallRemaining = true;
-          requisitionWrites.push({
-            clinic_id: cId, patient_id: pId, medication_name: medication_name,
-            type: 'PATIENT_IOU_SHORTFALL', status: 'WAITING_FOR_STOCK',
-            required_quantity: shortfall,
-            return_date: return_on || null, encounter_id: vId,
-            created_at: admin.firestore.Timestamp.now()
-          });
           
+          // Calculate total remaining stock across all batches for this med
+          const initialSnap = initialInventorySnaps.find((s: any) => s.id === inventoryId);
+          let totalStockLeft = 0;
+          if (initialSnap?.exists) {
+            const data = initialSnap.data();
+            const medKey = `${data.medication_id || data.name}|${data.dosage}`;
+            const batches = inventoryDocs.get(medKey) || [];
+            totalStockLeft = batches.reduce((sum, b) => sum + (batchesToUpdate.has(b.id) ? batchesToUpdate.get(b.id)! : Number(b.quantity) || 0), 0);
+          }
+
+          // Create a single consolidated record for the shortfall
           requisitionWrites.push({
-            clinic_id: cId, patient_id: pId, medication_name: medication_name,
-            type: 'PROCUREMENT_NEEDED', status: 'PENDING', encounter_id: vId,
+            clinic_id: cId, 
+            patient_id: pId, 
+            medication_name: medication_name,
+            medication_dosage: medication_dosage || '',
+            type: 'IOU_SHORTFALL', 
+            status: totalStockLeft < shortfall ? 'AWAITING_STOCK' : 'IOU_PENDING',
             required_quantity: shortfall,
+            return_date: return_on || null, 
+            encounter_id: vId,
             created_at: admin.firestore.Timestamp.now()
           });
         }
@@ -656,7 +706,7 @@ export const dispenseMedication = onCall(async (request) => {
 
       // Step 4: ATOMIC WRITES (The 'Execute' Phase)
       // FIRST: Perform all transaction.update() calls for the inventory items
-      for (const [id, newQty] of currentStockLevels.entries()) {
+      for (const [id, newQty] of batchesToUpdate.entries()) {
         const invRef = db.collection('clinics').doc(cId).collection('inventory').doc(id);
         const cleanInvData = sanitizeData({ quantity: newQty });
         phase = "WRITE";

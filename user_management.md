@@ -11,7 +11,7 @@ Every user has a profile in the `users` collection in Firestore.
   - `role`: One of `global_admin`, `country_admin`, `doctor`, `nurse`, `pharmacy`, `registration`.
   - `isApproved`: Boolean. Must be `true` for any clinical station access (except for Global Admins).
   - `assignedCountries`: Array of country IDs (for `country_admin`).
-  - `assignedClinics`: Array of clinic IDs (for all clinical roles).
+  - `assignedClinics`: Array of clinic IDs (Source of truth for clinical station access).
   - `professional_reg_no`: Professional license number (BMDC/BNMC/PCB).
   - `professional_body`: The licensing body (e.g., BMDC).
   - `designation`: Official job title (e.g., Senior Nurse Practitioner).

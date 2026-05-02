@@ -445,11 +445,11 @@ const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTe
               <Table size="small">
                 <TableHead sx={{ bgcolor: '#f0f9ff' }}>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 900 }}>Medication</TableCell>
-                    <TableCell sx={{ fontWeight: 900 }}>Dosage</TableCell>
-                    <TableCell sx={{ fontWeight: 900 }}>Mode</TableCell>
-                    <TableCell sx={{ fontWeight: 900 }}>Dispensed Qty</TableCell>
-                    <TableCell sx={{ fontWeight: 900 }}>Substitution / Notes</TableCell>
+                    <TableCell sx={{ fontWeight: 900, fontSize: '0.75rem' }}>Medication</TableCell>
+                    <TableCell sx={{ fontWeight: 900, fontSize: '0.75rem' }}>Dosage</TableCell>
+                    <TableCell sx={{ fontWeight: 900, fontSize: '0.75rem' }}>Mode</TableCell>
+                    <TableCell sx={{ fontWeight: 900, fontSize: '0.75rem' }}>Dispensed Qty</TableCell>
+                    <TableCell sx={{ fontWeight: 900, fontSize: '0.75rem' }}>Substitution / Notes</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -458,16 +458,16 @@ const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTe
                     const dosageStr = originalPres ? (originalPres.dosage || `${originalPres.dosageValue || ''}${originalPres.dosageUnit || ''}`) : '';
                     return (
                     <TableRow key={idx}>
-                      <TableCell sx={{ fontWeight: 700 }}>{item.medication}</TableCell>
-                      <TableCell>{dosageStr}</TableCell>
-                      <TableCell>
-                        <Chip label={item.mode} size="small" color={item.mode === 'FULL' ? 'success' : 'warning'} sx={{ fontWeight: 800, height: 20 }} />
+                      <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>{item.medication}</TableCell>
+                      <TableCell sx={{ fontSize: '0.75rem' }}>{dosageStr}</TableCell>
+                      <TableCell sx={{ fontSize: '0.75rem' }}>
+                        <Chip label={item.mode} size="small" color={item.mode === 'FULL' ? 'success' : (item.mode === 'OUT_OF_STOCK' ? 'error' : 'warning')} sx={{ fontWeight: 800, height: 20, fontSize: '0.65rem' }} />
                       </TableCell>
-                      <TableCell>{item.dispensed}</TableCell>
-                      <TableCell>
+                      <TableCell sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}>{item.dispensed}</TableCell>
+                      <TableCell sx={{ fontSize: '0.75rem' }}>
                         {item.substitution && <Typography variant="caption" display="block"><b>Sub:</b> {item.substitution}</Typography>}
                         {item.substitution_reason && <Typography variant="caption" display="block"><b>Reason:</b> {item.substitution_reason}</Typography>}
-                        {item.return_on && <Typography variant="caption" color="error" fontWeight="900">Return on: {new Date(item.return_on).toLocaleDateString()}</Typography>}
+                        {item.return_on && <Typography variant="caption" color="error" fontWeight="900">Return on: {dayjs(item.return_on).format('DD/MM/YYYY')}</Typography>}
                       </TableCell>
                     </TableRow>
                   )})}

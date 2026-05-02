@@ -72,7 +72,7 @@ To ensure that existing features, thresholds, and clinical logic are never lost 
 - **CRA Calculation Integrity**: Calculations for both Lab and Non-Lab must ONLY proceed if all required fields are valid. Never default missing values to zero. Display `--%` if inputs are incomplete.
 - **BP Medication Warning**: Always display a prominent Amber Clinical Warning if `onBPMedication` is "Yes", as risk may be underestimated.
 - **CRA Locking & Overrides**: All pre-populated CRA fields (Age, Sex, BMI, SBP, Smoker, Diabetes) MUST be locked by default. Manual overrides must be recorded in the `overrides` array of the clinical assessment record.
-- **Pharmacy**: Inventory-coupled dispensing, Substitution/Return-Later logic, Professional ID stamps on labels.
+- **Pharmacy**: Inventory-coupled dispensing, Substitution/Return-Later logic, Professional ID stamps on labels. Smart Procurement Report with 90-day expiry triggers, dynamic reconciliation based on live stock levels, and staff-specific dispensing history summaries.
 - **Operations & Advanced Analytics**: Real-time KPI aggregation, Bottleneck analysis, Triage distribution charts. AI-driven Gemini insights and over a dozen advanced reporting modules (e.g., Risk Stratification, TBSurveillance, MaternalHealthTracker, CVRiskAnalysis) with `ReportSectionWrapper`.
 - **Offline & Connectivity Resilience (PWA)**: Global draft auto-save via `localforage` for clinical stations. A Service Worker (vite-plugin-pwa) for offline access. The `backgroundRetryQueue` which intercepts Firestore mutations (`updateDoc`, `setDoc`, `addDoc`) and safely buffers them for retry when connection restores, along with a top-level `NetworkStatusIndicator`.
 

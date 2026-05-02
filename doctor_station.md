@@ -107,6 +107,7 @@ Displays a read-only snapshot of all data collected in previous stations.
 ### Historical Visits (Right Panel)
 *   **Independent Scrolling**: Allows reviewing previous visit notes and trends independently.
 *   **Timeline**: Provides a timeline of the **last two visits**. Doctors can toggle between "Last Visit" and "2nd Last Visit" to view detailed vitals and clinical notes from those encounters.
+*   **Dispensing Visibility**: If a visit was completed, the **Pharmacist Dispensing Summary** (actual amounts given, substitutions, and return dates) is visible in the historical summary to assist the doctor in continuity of care.
 
 ---
 

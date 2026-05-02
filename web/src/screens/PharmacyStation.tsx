@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Typography, Box, Paper, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Button, Chip, Stack, Card, CardContent, Container, Alert, Divider, Grid,
@@ -78,6 +78,8 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const [historyToDate, setHistoryToDate] = useState<Dayjs | null>(dayjs());
   const [historyRecords, setHistoryRecords] = useState<any[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [staffMembers, setStaffMembers] = useState<{ id: string; name: string; role: string }[]>([]);
+  const [selectedStaff, setSelectedStaff] = useState<{ id: string; name: string; role: string } | null>(null);
   
   // Dispensing State
   const [dispensingModes, setDispensingModes] = useState<Record<string, string>>({});
@@ -95,9 +97,76 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   // Procurement State
   const [procurementRecords, setProcurementRecords] = useState<any[]>([]);
   const [isProcurementLoading, setIsProcurementLoading] = useState(false);
+  const [catalog, setCatalog] = useState<any[]>([]);
 
   // Checkout State
   const [checkoutList, setCheckoutList] = useState<string[]>([]);
+
+  const reconciledProcurement = useMemo(() => {
+    const ninetyDaysAfter = dayjs().add(90, 'days');
+    
+    return procurementRecords.filter(record => {
+      const name = (record.medication_name || '').toLowerCase().trim();
+      const dosage = (record.medication_dosage || record.dosage || '').toLowerCase().trim();
+      
+      const matchingInventory = inventory.filter(i => 
+        (i.medication_id || '').toLowerCase().trim() === name && 
+        (i.dosage || '').toLowerCase().trim() === dosage
+      );
+      
+      const totalStock = matchingInventory.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+      
+      // TRIGGER: Stock < 200 OR Expiry < 90 days
+      const hasExpiringBatch = matchingInventory.some(i => {
+        const expDate = toDateSafely(i.expiry_date);
+        return expDate && dayjs(expDate).isBefore(ninetyDaysAfter);
+      });
+
+      // SELF-CLEANING: If stock >= 200 AND no batches are expiring, hide from report
+      return totalStock < 200 || hasExpiringBatch;
+    });
+  }, [procurementRecords, inventory]);
+
+  const handleMarkAsOrdered = async (medName: string, medDosage: string) => {
+    if (!selectedClinic) return;
+    try {
+      const relatedRecords = reconciledProcurement.filter(r => 
+        (r.medication_name || '').toLowerCase().trim() === medName.toLowerCase().trim() &&
+        (r.medication_dosage || r.dosage || '').toLowerCase().trim() === medDosage.toLowerCase().trim()
+      );
+
+      const promises = relatedRecords.map(r => 
+        updateDoc(doc(db, "requisitions", r.id), {
+          status: 'ORDERED',
+          ordered_at: serverTimestamp(),
+          ordered_by: userProfile?.name || 'Pharmacist'
+        })
+      );
+
+      await Promise.all(promises);
+      notify(`Marked ${medName} ${medDosage} as Ordered`, "success");
+      fetchProcurementReport();
+    } catch (e) {
+      notify("Failed to update requisition status", "error");
+    }
+  };
+
+  const staffMedSummary = useMemo(() => {
+    if (!selectedStaff || !historyRecords.length) return [];
+    
+    const summaryMap = new Map<string, { total: number, medication: string }>();
+    
+    historyRecords.forEach(record => {
+      const key = record.medication || 'Unknown Medicine';
+      const existing = summaryMap.get(key) || { total: 0, medication: key };
+      summaryMap.set(key, {
+        medication: key,
+        total: existing.total + (Number(record.dispensed) || 0)
+      });
+    });
+    
+    return Array.from(summaryMap.values()).sort((a, b) => b.total - a.total);
+  }, [historyRecords, selectedStaff]);
 
   useEffect(() => {
     setSelectedPatient(null);
@@ -109,6 +178,35 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   useEffect(() => {
     if (!selectedClinic) return;
     
+    const fetchStaff = async () => {
+      try {
+        const [clinicDocs, adminDocs] = await Promise.all([
+          getDocs(query(collection(db, "users"), where("assignedClinics", "array-contains", selectedClinic.id))),
+          getDocs(query(collection(db, "users"), where("role", "==", "global_admin")))
+        ]);
+        
+        const allDocs = [...clinicDocs.docs, ...adminDocs.docs];
+        const uniqueMembers = new Map<string, any>();
+        
+        allDocs.forEach(d => {
+            const data = d.data() as any;
+            if (!uniqueMembers.has(d.id)) {
+                uniqueMembers.set(d.id, { id: d.id, ...data });
+            }
+        });
+
+        const members = Array.from(uniqueMembers.values())
+          .filter(u => u.role === 'doctor' || u.role === 'pharmacist' || u.role === 'nurse' || u.role === 'global_admin')
+          .map(u => ({ id: u.id, name: u.name, role: u.role }));
+          
+        setStaffMembers(members);
+      } catch (e) {
+        console.error("Error fetching staff:", e);
+      }
+    };
+    
+    fetchStaff();
+
     setIsInventoryLoading(true);
     
     // First attempt to load fast local cache
@@ -174,6 +272,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
             acc[curr.medication].dispensed += Number(curr.dispensed) || 0;
             acc[curr.medication].modes.push(curr.mode);
             acc[curr.medication].details.push(curr);
+            acc[curr.medication].details.sort((a: any, b: any) => toMillisSafely(b.created_at) - toMillisSafely(a.created_at));
             if (curr.return_on) acc[curr.medication].lastReturnOn = curr.return_on;
           });
         }
@@ -305,7 +404,11 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       const initialSubQty: Record<string, number | ''> = {};
       
       allMeds.forEach(m => {
-        initialModes[m.id] = 'FULL';
+        const inInventory = inventory.some(i => i.medication_id.toLowerCase().replace(/\s+/g, '') === m.medicationName.toLowerCase().replace(/\s+/g, ''));
+        const isAlreadyDispensed = m.isAlreadyFullyDispensed;
+        const isNewMed = m.isRequisition || (!inInventory && !isAlreadyDispensed);
+
+        initialModes[m.id] = isNewMed ? 'OUT_OF_STOCK' : 'FULL';
         initialDates[m.id] = null;
         initialPartialQty[m.id] = '';
         initialSubMeds[m.id] = null;
@@ -405,6 +508,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
 
         return {
           medication_name: med.medicationName,
+          medication_dosage: `${med.dosageValue || ''}${med.dosageUnit || ''}`,
           mode,
           qty: mode === 'SUBSTITUTE' && substitutionQty[med.id] ? Number(substitutionQty[med.id]) : (mode === 'PARTIAL' && partialQty[med.id] ? Number(partialQty[med.id]) : (med.remainingQuantity !== undefined ? med.remainingQuantity : med.quantity)),
           prescribed_qty: med.remainingQuantity !== undefined ? med.remainingQuantity : (Number(med.quantity) || 0),
@@ -465,8 +569,13 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       const start = historyFromDate.startOf('day').toDate();
       const end = historyToDate.endOf('day').toDate();
       
-      // Query prescriptions that have been updated within the date range
-      const q = query(
+      let q;
+      if (selectedStaff) {
+        // If searching by staff, we filter in memory after fetching records for the date range
+        // or we could potentially query by dispenser_name or prescriber_name if we knew they matched
+      }
+
+      q = query(
         collection(db, "prescriptions"),
         where("updated_at", ">=", start),
         where("updated_at", "<=", end)
@@ -475,26 +584,48 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       const snapshot = await getDocs(q);
       const records: any[] = [];
       
+      // Harvesting unique staff from results to ensure filter is never empty
+      const harvestedStaff: Record<string, { id: string, name: string, role: string }> = {};
+      
+      const patientCache: Record<string, string> = {};
+
       for (const d of snapshot.docs) {
-        const data = d.data();
+        const data = d.data() as any;
         
-        // Include both full and partial dispensations
+        // Skip if not dispensed
         if (data.status !== 'DISPENSED' && data.status !== 'PARTIAL_DISPENSED') continue;
         
-        // Since we need to show patient name, we need to fetch the patient or use existing data if available
-        let patientName = "Unknown";
-        try {
-            const pData = await getPatientById(data.patient_id);
-            if (pData) {
-                patientName = `${pData.given_name} ${pData.family_name}`;
+        // Collect staff names for the filter if they don't exist yet
+        if (data.dispenser_name && !staffMembers.some(s => s.name === data.dispenser_name)) {
+            harvestedStaff[data.dispenser_name] = { id: data.dispenser_name, name: data.dispenser_name, role: 'pharmacist' };
+        }
+        if (data.prescriber_name && !staffMembers.some(s => s.name === data.prescriber_name)) {
+            harvestedStaff[data.prescriber_name] = { id: data.prescriber_name, name: data.prescriber_name, role: 'doctor' };
+        }
+
+        // Filter by Staff if selected
+        if (selectedStaff) {
+            const isDoctorMatch = (data.prescriber_name || '').toLowerCase() === selectedStaff.name.toLowerCase();
+            const isPharmacistMatch = (data.dispenser_name || '').toLowerCase() === selectedStaff.name.toLowerCase();
+            
+            if (!isDoctorMatch && !isPharmacistMatch) continue;
+        }
+
+        let patientName = patientCache[data.patient_id];
+        if (!patientName) {
+            try {
+                const pData = await getPatientById(data.patient_id);
+                if (pData) {
+                    patientName = `${pData.given_name} ${pData.family_name}`;
+                    patientCache[data.patient_id] = patientName;
+                }
+            } catch(e) {
+                patientName = "Unknown";
             }
-        } catch(e) {
-            console.error("Could not fetch patient name for history", e);
         }
 
         if (data.dispensation_details && Array.isArray(data.dispensation_details)) {
           data.dispensation_details.forEach((detail: any, index: number) => {
-             // Only include dispensation details that happened in the selected date range
              const detailDate = toDateSafely(detail.created_at) || toDateSafely(data.updated_at);
              if (!detailDate || detailDate < start || detailDate > end) return;
              
@@ -504,15 +635,27 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                date: detailDate,
                patientName,
                pharmacist: data.dispenser_name,
+               prescriber: data.prescriber_name || data.doctor_name || 'N/A',
                encounterId: data.encounter_id
              });
           });
         }
       }
       
-      // Sort in memory by date descending
+      // Merge harvested staff into the main list if not already present
+      if (Object.keys(harvestedStaff).length > 0) {
+          setStaffMembers(prev => {
+              const newMembers = [...prev];
+              Object.values(harvestedStaff).forEach(h => {
+                  if (!newMembers.some(m => m.name === h.name)) {
+                      newMembers.push(h);
+                  }
+              });
+              return newMembers;
+          });
+      }
+
       records.sort((a, b) => b.date.getTime() - a.date.getTime());
-      
       setHistoryRecords(records);
     } catch (err) {
       console.error("Error fetching dispensing history", err);
@@ -555,10 +698,16 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     if (!selectedClinic) return;
     setIsProcurementLoading(true);
     try {
-      const qRef = query(collection(db, "requisitions"), where("clinic_id", "==", selectedClinic.id));
-      const snapshot = await getDocs(qRef);
+      const [reqSnapshot, catalogSnapshot] = await Promise.all([
+        getDocs(query(collection(db, "requisitions"), where("clinic_id", "==", selectedClinic.id))),
+        getDocs(collection(db, "medications_catalog"))
+      ]);
+      
+      const catalogData = catalogSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setCatalog(catalogData);
+
       // Filter out FULFILLED records to keep the report clean, or show everything
-      const records = snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.status !== 'FULFILLED');
+      const records = reqSnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.status !== 'FULFILLED');
       records.sort((a: any, b: any) => toMillisSafely(b.created_at) - toMillisSafely(a.created_at));
       setProcurementRecords(records);
     } catch (e) {
@@ -576,11 +725,12 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   }, [activeTab, selectedClinic]);
 
   const handleDownloadExcel = () => {
-    if (!procurementRecords.length) return;
+    if (!reconciledProcurement.length) return;
     
-    const formattedData = procurementRecords.map(r => ({
+    const formattedData = reconciledProcurement.map(r => ({
       'Date': r.created_at ? dayjs(toDateSafely(r.created_at)).format('DD/MM/YYYY HH:mm') : 'N/A',
-      'Medication Name': r.medication_name || 'Unknown',
+      'Medication Name': `${r.medication_name || 'Unknown'} ${r.medication_dosage || r.dosage || ''}`,
+      'Dosage': r.medication_dosage || r.dosage || 'N/A',
       'Requirement Type': r.type === 'LOW_STOCK_ALERT' ? 'Low Stock Warning' : 
                           r.type === 'PATIENT_IOU_SHORTFALL' ? 'Patient Dispense Shortfall (IOU)' : 
                           'Procurement Needed / New Med',
@@ -825,32 +975,58 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                               borderRadius: 2, 
                               display: 'flex',
                               alignItems: 'center',
+                              justifyContent: 'space-between',
+                              width: '100%',
                               gap: 2,
-                              border: isNewMed ? '1px solid #cbd5e1' : 'none'
+                              border: isNewMed ? '1px solid #cbd5e1' : 'none',
+                              mb: 1
                             }}>
                               <Typography variant="h6" color={isAlreadyDispensed ? "text.secondary" : (isNewMed ? "#1e293b" : "primary")} fontWeight="900">
                                 {med.medicationName || "Unspecified"}
                               </Typography>
-                              {!isAlreadyDispensed && med.remainingQuantity !== undefined && med.remainingQuantity < med.quantity && (
-                                <Chip label="IOU - PARTIAL" size="small" color="warning" sx={{ fontWeight: 'bold' }} />
+                              {isAlreadyDispensed ? (
+                                <Chip label="FULLY DISPENSED" color="success" sx={{ fontWeight: 900, px: 2, height: 32, fontSize: '0.85rem' }} />
+                              ) : (
+                                med.remainingQuantity !== undefined && med.remainingQuantity < med.quantity && (
+                                  <Chip label="IOU - PARTIAL PENDING" color="warning" sx={{ fontWeight: 900, height: 24, fontSize: '0.7rem' }} />
+                                )
                               )}
                             </Box>
                             
-                            <Typography variant="body1" fontWeight="700" sx={{ color: isAlreadyDispensed ? 'text.secondary' : 'inherit', mt: 0.5 }}>
-                              {med.dosageValue}{med.dosageUnit} x {med.remainingQuantity !== undefined && med.remainingQuantity < med.quantity ? `${med.remainingQuantity} Remaining (from ${med.quantity} Total)` : `${med.quantity} Total`}
+                            <Typography variant="body1" fontWeight="700" sx={{ color: isAlreadyDispensed ? 'text.secondary' : 'primary.main', mt: 0.5, fontSize: '1.1rem' }}>
+                              {med.dosageValue}{med.dosageUnit} 
+                              <Box component="span" sx={{ mx: 1, color: 'text.secondary', fontWeight: 'normal' }}>|</Box>
+                              {med.remainingQuantity !== undefined && med.remainingQuantity < med.quantity 
+                                ? <Box component="span" sx={{ color: '#b45309' }}>{med.remainingQuantity} STILL PENDING</Box> 
+                                : `${med.quantity} Total`}
                             </Typography>
                             
                             {med.dispensedInfo && Array.isArray(med.dispensedInfo) && med.dispensedInfo.length > 0 && (
-                              <Box sx={{ mt: 1, mb: 1, p: 1.5, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #cbd5e1' }}>
-                                <Typography variant="caption" fontWeight="900" color="text.secondary" sx={{ textTransform: 'uppercase', mb: 1, display: 'block' }}>
-                                  Dispensing History:
+                              <Box sx={{ mt: 1.5, mb: 1, p: 2, bgcolor: '#f1f5f9', borderRadius: 3, border: '1px solid #cbd5e1' }}>
+                                <Typography variant="caption" fontWeight="900" color="text.secondary" sx={{ textTransform: 'uppercase', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <HistoryIcon sx={{ fontSize: 16 }} /> Dispensing History & Details:
                                 </Typography>
-                                <Stack spacing={0.5}>
+                                <Stack spacing={1}>
                                   {med.dispensedInfo.map((disp: any, i: number) => (
-                                    <Typography key={i} variant="caption" sx={{ display: 'flex', justifyContent: 'space-between', color: '#334155' }}>
-                                      <span>Mode: <strong>{disp.mode}</strong> (Qty: {disp.dispensed || 0})</span>
-                                      <span>{disp.created_at ? dayjs(toDateSafely(disp.created_at)).format('DD/MM/YYYY HH:mm') : ''}</span>
-                                    </Typography>
+                                    <Box key={i} sx={{ p: 1, bgcolor: 'white', borderRadius: 1.5, border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <Box>
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                          <Chip 
+                                            label={disp.mode} 
+                                            size="small" 
+                                            variant="outlined"
+                                            color={disp.mode === 'FULL' ? 'success' : (disp.mode === 'OUT_OF_STOCK' ? 'error' : 'warning')} 
+                                            sx={{ fontWeight: 900, height: 18, fontSize: '0.6rem' }} 
+                                          />
+                                          <Typography variant="caption" fontWeight="bold">Qty: {disp.dispensed || 0}</Typography>
+                                        </Stack>
+                                        {disp.substitution && <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}><b>Sub:</b> {disp.substitution}</Typography>}
+                                        {disp.return_on && <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block', fontWeight: 'bold' }}>Return expected: {dayjs(disp.return_on).format('DD/MM/YYYY')}</Typography>}
+                                      </Box>
+                                      <Typography variant="caption" color="text.secondary">
+                                        {disp.created_at ? dayjs(toDateSafely(disp.created_at)).format('DD MMM YYYY, HH:mm') : ''}
+                                      </Typography>
+                                    </Box>
                                   ))}
                                 </Stack>
                               </Box>
@@ -993,6 +1169,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                                 variant={isInCheckout ? "outlined" : "contained"}
                                 color={isInCheckout ? "error" : "primary"}
                                 startIcon={isInCheckout ? <CancelIcon /> : <ShoppingCartIcon />}
+                                disabled={!isInCheckout && isNewMed && (currentMode === 'FULL' || currentMode === 'PARTIAL')}
                                 onClick={() => {
                                   if (isInCheckout) {
                                     setCheckoutList(prev => prev.filter(id => id !== med.id));
@@ -1189,7 +1366,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     <Box>
       <Paper sx={{ p: 3, mb: 4, borderRadius: 4 }}>
         <Grid container spacing={3} alignItems="center">
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <DatePicker
                 label="From Date"
@@ -1200,7 +1377,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
               />
             </LocalizationProvider>
           </Grid>
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <DatePicker
                 label="To Date"
@@ -1212,7 +1389,20 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
               />
             </LocalizationProvider>
           </Grid>
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <Autocomplete
+                options={staffMembers}
+                getOptionLabel={(option) => {
+                  const roleStr = option.role ? ` (${option.role.toUpperCase()})` : '';
+                  return `${option.name || 'Unknown'}${roleStr}`;
+                }}
+                value={selectedStaff}
+                onChange={(_, newValue) => setSelectedStaff(newValue)}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                renderInput={(params) => <TextField {...params} label="Filter by Doctor/Pharmacist" fullWidth />}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 3 }}>
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Button 
                 variant="contained" 
@@ -1224,7 +1414,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
               >
                 Search History
               </Button>
-              <Tooltip title="If records from before to this update are missing, click this to repair their invisible timestamps.">
+              <Tooltip title="Repair timestamps">
                 <Button 
                   variant="outlined" 
                   color="warning"
@@ -1239,6 +1429,32 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
         </Grid>
       </Paper>
 
+      {/* Staff Activity Summary */}
+      {selectedStaff && staffMedSummary.length > 0 && (
+          <Paper sx={{ p: 3, mb: 4, borderRadius: 4, bgcolor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+            <Typography variant="subtitle2" fontWeight="900" color="success.main" sx={{ mb: 2, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CheckCircleIcon sx={{ fontSize: 18 }} /> {selectedStaff.role === 'doctor' ? 'Prescription' : 'Dispensing'} Summary for {selectedStaff.name}
+            </Typography>
+            <Grid container spacing={2}>
+                {staffMedSummary.map((item, idx) => (
+                    <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={idx}>
+                        <Card variant="outlined" sx={{ borderRadius: 3, bgcolor: 'white', border: '1px solid #bbf7d0' }}>
+                            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                                <Typography variant="caption" color="text.secondary" fontWeight="bold">Medication</Typography>
+                                <Typography variant="body1" fontWeight="900" noWrap sx={{ mb: 1, fontSize: '0.85rem' }}>{item.medication}</Typography>
+                                <Divider sx={{ mb: 1, opacity: 0.5 }} />
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                    <Typography variant="caption" color="text.secondary">Total {selectedStaff.role === 'doctor' ? 'Prescribed' : 'Dispensed'}:</Typography>
+                                    <Typography variant="h6" color="success.main" fontWeight="900">{item.total}</Typography>
+                                </Box>
+                            </CardContent>
+                        </Card>
+                    </Grid>
+                ))}
+            </Grid>
+          </Paper>
+      )}
+
       <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 4, border: '1px solid #e2e8f0' }}>
         <Table>
           <TableHead sx={{ bgcolor: '#f8fafc' }}>
@@ -1248,13 +1464,14 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
               <TableCell sx={{ fontWeight: 'bold' }}>Medication</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Dispensing Mode</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Qty Dispensed</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Prescriber</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Pharmacist</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {isHistoryLoading ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
                   <CircularProgress />
                 </TableCell>
               </TableRow>
@@ -1278,12 +1495,15 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                     />
                   </TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>{item.dispensed || 0}</TableCell>
+                  <TableCell>
+                    <Typography variant="body2">{item.prescriber || 'Unknown'}</Typography>
+                  </TableCell>
                   <TableCell>{item.pharmacist || 'Unknown'}</TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
                   <Typography color="text.secondary">
                     {historyRecords.length === 0 && !isHistoryLoading 
                       ? "Search a date range to view dispensing history." 
@@ -1298,14 +1518,52 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     </Box>
   );
 
-  const renderProcurementReport = () => (
+  const renderProcurementReport = () => {
+    // 2. Calculate Procurement Summary (The Buy List) using ONLY reconciled records
+    const summaryMap = new Map<string, { totalRequested: number, name: string, dosage: string, allOrdered: boolean, currentStock: number }>();
+    
+    reconciledProcurement.forEach(r => {
+      const medName = r.medication_name || 'Unknown';
+      const medDosage = r.medication_dosage || r.dosage || '';
+      const key = medDosage ? `${medName} ${medDosage}` : medName;
+      
+      const qty = Number(r.required_quantity) || 0;
+      
+      const matchingInventory = inventory.filter(i => 
+        (i.medication_id || '').toLowerCase().trim() === medName.toLowerCase().trim() && 
+        (i.dosage || '').toLowerCase().trim() === medDosage.toLowerCase().trim()
+      );
+      const totalStock = matchingInventory.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+
+      const existing = summaryMap.get(key) || { totalRequested: 0, name: medName, dosage: medDosage, allOrdered: true, currentStock: totalStock };
+      
+      summaryMap.set(key, {
+        name: medName,
+        dosage: medDosage,
+        totalRequested: existing.totalRequested + qty,
+        allOrdered: existing.allOrdered && r.status === 'ORDERED',
+        currentStock: totalStock
+      });
+    });
+    
+    const summaryList = Array.from(summaryMap.values())
+      .map(item => ({
+        ...item,
+        // Calculate dynamic shortfall: Sum of requisitions minus current on-hand inventory
+        total: Math.max(0, item.totalRequested - item.currentStock)
+      }))
+      // Keep items that are actually needed OR already ordered
+      .filter(item => item.total > 0 || item.allOrdered)
+      .sort((a,b) => b.total - a.total);
+
+    return (
     <Box>
       <Paper sx={{ p: 4, mb: 4, borderRadius: 5 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
           <Box>
              <Typography variant="h6" fontWeight="bold">Procurement & Over-prescribed Report</Typography>
              <Typography variant="body2" color="text.secondary" mt={0.5}>
-               Tracks medicines that are low on stock, missing, or newly prescribed by doctors outside the existing inventory catalog.
+                Tracks medicines that are low on stock, missing, or newly prescribed by doctors outside the existing inventory catalog.
              </Typography>
           </Box>
           <Stack direction="row" spacing={2}>
@@ -1321,7 +1579,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
               color="success"
               startIcon={<DownloadIcon />}
               onClick={handleDownloadExcel}
-              disabled={procurementRecords.length === 0 || isProcurementLoading}
+              disabled={reconciledProcurement.length === 0 || isProcurementLoading}
             >
               Download .xlsx
             </Button>
@@ -1329,16 +1587,73 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
         </Stack>
       </Paper>
 
+      {/* PROCUREMENT SUMMARY (THE BUY LIST) */}
+      {summaryList.length > 0 && (
+        <Paper sx={{ p: 3, mb: 4, borderRadius: 4, bgcolor: '#f0f9ff', border: '1px solid #bae6fd' }}>
+          <Typography variant="subtitle2" fontWeight="900" color="primary" sx={{ mb: 2, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ShoppingCartIcon sx={{ fontSize: 18 }} /> Procurement Summary (The Buy List)
+          </Typography>
+          <Grid container spacing={2}>
+            {summaryList.map((item, idx) => {
+              const displayName = item.dosage ? `${item.name} ${item.dosage}` : item.name;
+              return (
+              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={idx}>
+                <Card 
+                  variant="outlined" 
+                  sx={{ 
+                    borderRadius: 3, 
+                    height: '100%', 
+                    border: '1px solid #bae6fd',
+                    opacity: item.allOrdered ? 0.6 : 1,
+                    filter: item.allOrdered ? 'grayscale(0.5)' : 'none',
+                    transition: 'all 0.3s ease',
+                    bgcolor: item.allOrdered ? '#f8fafc' : 'white'
+                  }}
+                >
+                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                      <Box>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 'bold' }}>Medication</Typography>
+                        <Typography variant="body1" fontWeight="900" sx={{ mb: 1, fontSize: '0.9rem', color: item.allOrdered ? 'text.secondary' : '#0c4a6e' }}>{displayName}</Typography>
+                      </Box>
+                      {item.allOrdered && (
+                        <Chip label="ORDERED" size="small" color="primary" sx={{ height: 20, fontSize: '0.6rem', fontWeight: 900 }} />
+                      )}
+                    </Stack>
+                    <Divider sx={{ mb: 1.5, opacity: 0.5 }} />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                      <Typography variant="caption" color="text.secondary">Total Needed:</Typography>
+                      <Typography variant="h5" color={item.allOrdered ? 'text.secondary' : 'error'} fontWeight="900">{item.total}</Typography>
+                    </Box>
+                    <Button 
+                      fullWidth 
+                      size="small" 
+                      variant={item.allOrdered ? "text" : "contained"}
+                      color="primary"
+                      sx={{ mt: 2, fontWeight: 'bold', borderRadius: 2 }}
+                      disabled={item.allOrdered}
+                      onClick={() => handleMarkAsOrdered(item.name, item.dosage)}
+                    >
+                      {item.allOrdered ? "Pending Delivery" : "Mark as Ordered"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )})}
+          </Grid>
+        </Paper>
+      )}
+
       <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 4, border: '1px solid #e2e8f0' }}>
         <Table>
           <TableHead sx={{ bgcolor: '#f8fafc' }}>
             <TableRow>
               <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Medication</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Dosage</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }} align="center">Deficit Qty</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Linked Patient</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }} align="center">Qty Needed</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }} align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -1348,39 +1663,99 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                   <CircularProgress />
                 </TableCell>
               </TableRow>
-            ) : procurementRecords.length > 0 ? (
-              procurementRecords.map((item) => (
+            ) : reconciledProcurement.length > 0 ? (
+              reconciledProcurement.map((item) => {
+                // Determine Type Badge - Re-evaluate based on strict Matching
+                let badgeLabel = "Patient Shortfall";
+                let badgeColor = '#ef4444'; // Red
+                
+                const itemName = (item.medication_name || '').toLowerCase().trim();
+                const itemDosage = (item.medication_dosage || item.dosage || '').toLowerCase().trim();
+
+                const matchingBatches = inventory.filter(i => 
+                  (i.medication_id || '').toLowerCase().trim() === itemName && 
+                  (i.dosage || '').toLowerCase().trim() === itemDosage
+                );
+                
+                const totalCurrentStock = matchingBatches.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
+                
+                const ninetyDaysAfter = dayjs().add(90, 'days');
+                const hasExpiringBatch = matchingBatches.some(i => {
+                  const expDate = toDateSafely(i.expiry_date);
+                  return expDate && dayjs(expDate).isBefore(ninetyDaysAfter);
+                });
+
+                const isInCatalog = catalog.some(c => 
+                  (c.name || '').toLowerCase().trim() === itemName && 
+                  (c.strength || '').toLowerCase().trim() === itemDosage
+                );
+
+                if (item.status === 'ORDERED') {
+                  badgeLabel = "Ordered / In-Transit";
+                  badgeColor = '#3b82f6'; // Blue
+                } else if (!isInCatalog && item.patient_id) {
+                  badgeLabel = "New Medicine";
+                  badgeColor = '#9333ea'; // Purple
+                } else if (hasExpiringBatch) {
+                  badgeLabel = "Expiring Soon";
+                  badgeColor = '#dc2626'; // Bright Red/Alert
+                } else if (totalCurrentStock === 0) {
+                  badgeLabel = "Out of Stock";
+                  badgeColor = '#ef4444'; // Red
+                } else if (totalCurrentStock < 200) {
+                  badgeLabel = "Low in Stock";
+                  badgeColor = '#f59e0b'; // Orange
+                }
+
+                return (
                 <TableRow key={item.id} hover>
                   <TableCell>
                     {item.created_at ? dayjs(toDateSafely(item.created_at)).format('DD/MM/YY HH:mm') : 'N/A'}
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>{item.medication_name || 'Unknown'}</TableCell>
+                  <TableCell>
+                    <Typography variant="body2" fontWeight="bold">
+                      {item.medication_name || 'Unknown'} {item.medication_dosage || item.dosage || ''}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="text.secondary">
+                      {item.medication_dosage || item.dosage || '-'}
+                    </Typography>
+                  </TableCell>
                   <TableCell>
                      <Chip 
                         size="small"
-                        label={
-                          item.type === 'LOW_STOCK_ALERT' ? 'Low Stock' : 
-                          item.type === 'PATIENT_IOU_SHORTFALL' ? 'Patient Shortfall' : 
-                          'Procurement Needed'
-                        }
-                        color={
-                          item.type === 'LOW_STOCK_ALERT' ? 'warning' : 
-                          item.type === 'PATIENT_IOU_SHORTFALL' ? 'error' : 
-                          'info'
-                        }
+                        label={badgeLabel}
+                        sx={{ 
+                          fontWeight: 900, 
+                          fontSize: '0.65rem',
+                          bgcolor: badgeColor,
+                          color: 'white'
+                        }}
                      />
                   </TableCell>
                   <TableCell align="center">
                     <Typography fontWeight="bold" color="error">{item.required_quantity || '-'}</Typography>
                   </TableCell>
-                  <TableCell>{item.status}</TableCell>
-                  <TableCell>
-                    {item.patient_id ? (
-                      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{item.patient_id.substring(0,8)}...</Typography>
-                    ) : '-'}
+                  <TableCell align="right">
+                    {item.encounter_id && (
+                      <Button 
+                        size="small" 
+                        variant="outlined" 
+                        color="primary"
+                        startIcon={<HistoryIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => {
+                          setLastEncounterId(item.encounter_id);
+                          setShowPrintDialog(true);
+                        }}
+                        sx={{ fontWeight: 'bold', borderRadius: 2 }}
+                      >
+                        View RX
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
-              ))
+              )})
             ) : (
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
@@ -1392,7 +1767,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
         </Table>
       </TableContainer>
     </Box>
-  );
+  );};
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>

@@ -22,7 +22,7 @@ export const SUPER_ADMIN_EMAILS = [
   'ruhul_abid@haefa.org'
 ];
 
-export const REQUISITION_THRESHOLD = 500;
+export const REQUISITION_THRESHOLD = 200;
 
 /**
  * Helper to verify if the caller is a Global Admin
