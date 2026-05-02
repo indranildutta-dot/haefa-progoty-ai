@@ -39,7 +39,10 @@ import {
   Select,
   InputLabel,
   Autocomplete,
-  Alert
+  Alert,
+  ToggleButton,
+  ToggleButtonGroup,
+  InputAdornment
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
@@ -182,6 +185,7 @@ export interface ClinicalAssessmentData {
     onBPMedication: string | null;
     diabetes: string | null;
     totalCholesterol: string | null;
+    totalCholesterolUnit?: 'mg/dL' | 'mmol/L';
     hdlCholesterol: string | null;
     riskScore: number | null;
     overrides: string[];
@@ -266,6 +270,7 @@ export const initialClinicalAssessment: ClinicalAssessmentData = {
     onBPMedication: null,
     diabetes: null,
     totalCholesterol: null,
+    totalCholesterolUnit: 'mg/dL',
     hdlCholesterol: null,
     riskScore: null,
     overrides: []
@@ -544,11 +549,11 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
       isSmoker: data.cvRisk.isSmoker === 'Yes',
       bmi: isNaN(nonLabBMI) ? 0 : nonLabBMI,
       sbp: isNaN(nonLabSBP) ? 0 : nonLabSBP,
-      hasDiabetes: data.cvRisk.diabetes === 'Yes',
+      hasDiabetes: false,
     };
 
     // Only calculate if essential fields are present
-    const canCalculateNonLab = !isNaN(inputs.age) && inputs.sbp > 0 && inputs.bmi > 0 && data.cvRisk.sex !== '' && data.cvRisk.isSmoker !== '' && data.cvRisk.diabetes !== '';
+    const canCalculateNonLab = !isNaN(inputs.age) && inputs.sbp > 0 && inputs.bmi > 0 && data.cvRisk.sex !== '' && data.cvRisk.isSmoker !== '';
     const score = canCalculateNonLab ? calculateCVRisk(inputs) : null;
     
     if (score !== data.cvRisk.riskScore) {
@@ -560,19 +565,22 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
 
     // 2. Lab-Based
     const labSBP = parseFloat(data.cvRiskLab.sbp) || (typeof selectedPatient?.currentVitals?.systolic === 'number' ? selectedPatient.currentVitals.systolic : parseFloat(selectedPatient?.currentVitals?.systolic || ''));
-    const labChol = parseFloat(data.cvRiskLab.totalCholesterol);
+    const labCholInput = parseFloat(data.cvRiskLab.totalCholesterol);
+    const labChol = (data.cvRiskLab.totalCholesterolUnit === 'mmol/L' && !isNaN(labCholInput)) 
+      ? labCholInput * 38.67 
+      : labCholInput;
 
     const labInputs: CVRiskLabInputs = {
       age: parseInt(data.cvRiskLab.age) || patientAge,
       gender: (data.cvRiskLab.sex === 'Men' || data.cvRiskLab.sex === 'Women') ? (data.cvRiskLab.sex as Gender) : (selectedPatient?.gender === 'male' ? 'Men' : 'Women') as Gender,
       isSmoker: data.cvRiskLab.isSmoker === 'Yes',
       sbp: isNaN(labSBP) ? 0 : labSBP,
-      hasDiabetes: data.cvRiskLab.diabetes === 'Yes',
+      hasDiabetes: false,
       totalCholesterol: isNaN(labChol) ? 0 : labChol,
     };
 
     // Requirement: All lab fields MUST be present including Cholesterol
-    const canCalculateLab = !isNaN(labInputs.age) && labInputs.sbp > 0 && labInputs.totalCholesterol > 0 && data.cvRiskLab.sex !== '' && data.cvRiskLab.isSmoker !== '' && data.cvRiskLab.diabetes !== '';
+    const canCalculateLab = !isNaN(labInputs.age) && labInputs.sbp > 0 && labInputs.totalCholesterol > 0 && data.cvRiskLab.sex !== '' && data.cvRiskLab.isSmoker !== '';
     const labScore = canCalculateLab ? calculateCVRiskLab(labInputs) : null;
 
     if (labScore !== data.cvRiskLab.riskScore) {
@@ -1170,15 +1178,6 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
                     options: [{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]
                   })}
 
-                  {renderCRAField({
-                    label: "Diabetes",
-                    field: "diabetes",
-                    section: "cvRisk",
-                    value: data.cvRisk.diabetes,
-                    type: "select",
-                    options: [{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]
-                  })}
-
                   {data.cvRisk.riskScore !== null && (
                     <Grid size={12}>
                       <Box sx={{ 
@@ -1252,14 +1251,6 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
                   })}
 
                   {renderCRAField({
-                    label: "BMI",
-                    field: "bmi",
-                    section: "cvRiskLab",
-                    value: data.cvRiskLab.bmi,
-                    placeholder: "-- Enter BMI --"
-                  })}
-
-                  {renderCRAField({
                     label: "Cigarette Smoker",
                     field: "isSmoker",
                     section: "cvRiskLab",
@@ -1285,30 +1276,76 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
                     options: [{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]
                   })}
 
-                  {renderCRAField({
-                    label: "Diabetes",
-                    field: "diabetes",
-                    section: "cvRiskLab",
-                    value: data.cvRiskLab.diabetes,
-                    type: "select",
-                    options: [{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]
-                  })}
+                  <Grid size={12}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Total Cholesterol</Typography>
+                    </Stack>
+                    <TextField 
+                      fullWidth 
+                      size="small" 
+                      placeholder="EX: 180"
+                      value={data.cvRiskLab.totalCholesterol || ''}
+                      onChange={(e) => {
+                        handleStartSection('cvRiskLab');
+                        onChange({
+                          ...data,
+                          cvRiskLab: {
+                            ...data.cvRiskLab,
+                            totalCholesterol: e.target.value
+                          },
+                          sectionStatuses: {
+                            ...data.sectionStatuses,
+                            cvRiskLab: 'Complete'
+                          }
+                        });
+                      }}
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5, bgcolor: '#fdfdfd' } }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <ToggleButtonGroup
+                              size="small"
+                              exclusive
+                              value={data.cvRiskLab.totalCholesterolUnit || 'mg/dL'}
+                              onChange={(e, newUnit) => {
+                                if (!newUnit) return;
+                                
+                                let currentVal = parseFloat(data.cvRiskLab.totalCholesterol || '0');
+                                let newVal = '';
+                                if (!isNaN(currentVal) && currentVal > 0) {
+                                  if (newUnit === 'mmol/L' && data.cvRiskLab.totalCholesterolUnit === 'mg/dL') {
+                                    newVal = (currentVal / 38.67).toFixed(2);
+                                  } else if (newUnit === 'mg/dL' && data.cvRiskLab.totalCholesterolUnit === 'mmol/L') {
+                                    newVal = (currentVal * 38.67).toFixed(0);
+                                  } else {
+                                    newVal = currentVal.toString();
+                                  }
+                                }
 
-                  {renderCRAField({
-                    label: "Total Cholesterol In Mg/Dl",
-                    field: "totalCholesterol",
-                    section: "cvRiskLab",
-                    value: data.cvRiskLab.totalCholesterol,
-                    placeholder: "EX: 180"
-                  })}
-
-                  {renderCRAField({
-                    label: "HDL Cholesterol In Mg/Dl",
-                    field: "hdlCholesterol",
-                    section: "cvRiskLab",
-                    value: data.cvRiskLab.hdlCholesterol,
-                    placeholder: "EX: 50"
-                  })}
+                                handleStartSection('cvRiskLab');
+                                onChange({
+                                  ...data,
+                                  cvRiskLab: {
+                                    ...data.cvRiskLab,
+                                    totalCholesterolUnit: newUnit,
+                                    totalCholesterol: newVal || data.cvRiskLab.totalCholesterol
+                                  },
+                                  sectionStatuses: {
+                                    ...data.sectionStatuses,
+                                    cvRiskLab: 'Complete'
+                                  }
+                                });
+                              }}
+                              sx={{ height: 28 }}
+                            >
+                              <ToggleButton value="mg/dL" sx={{ px: 1, py: 0, textTransform: 'none', fontSize: '0.75rem' }}>mg/dL</ToggleButton>
+                              <ToggleButton value="mmol/L" sx={{ px: 1, py: 0, textTransform: 'none', fontSize: '0.75rem' }}>mmol/L</ToggleButton>
+                            </ToggleButtonGroup>
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
 
                   <Grid size={12}>
                     <Box sx={{ mt: 4, textAlign: 'center' }}>
@@ -1513,6 +1550,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
           isSmoker: vitals?.social_history?.smoking === true ? 'Yes' : (vitals?.social_history?.smoking === false ? 'No' : ''),
           diabetes: (vitals?.rbg >= 200 || vitals?.fbg >= 126) ? 'Yes' : (vitals?.rbg || vitals?.fbg ? 'No' : ''),
           totalCholesterol: vitals?.total_cholesterol?.toString() || '',
+          totalCholesterolUnit: 'mg/dL',
           hdlCholesterol: vitals?.hdl_cholesterol?.toString() || '',
           overrides: [],
         }

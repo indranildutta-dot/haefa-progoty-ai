@@ -97,7 +97,10 @@ const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals }) => {
         { label: 'Fasting', value: vitals.is_fasting ? 'Yes' : 'No' },
         { label: 'Symptomatic', value: vitals.has_symptoms ? 'Yes' : 'No' },
         { label: 'Pregnant', value: vitals.is_pregnant ? `Yes (${vitals.pregnancy_months}m)` : 'No' },
-        { label: 'Allergies', value: vitals.allergies?.length ? vitals.allergies.join(', ') : 'None', color: 'error.main' },
+        { label: 'Allergies', 
+          value: Array.isArray(vitals.allergies) ? (vitals.allergies.length ? vitals.allergies.join(', ') : 'None') : (vitals.allergies || 'None'), 
+          color: (Array.isArray(vitals.allergies) ? vitals.allergies.some(a => String(a).trim().toLowerCase() !== 'none') : (String(vitals.allergies || '').trim().toLowerCase() !== 'none' && String(vitals.allergies || '').trim() !== '')) ? 'error.main' : undefined 
+        },
       ])}
     </Paper>
   );

@@ -256,7 +256,9 @@ const PatientContextBar: React.FC = () => {
           (() => {
              const sourceAllergies = selectedPatient?.allergies || vitals?.allergies;
              const isArr = Array.isArray(sourceAllergies);
-             const hasAllergies = isArr ? sourceAllergies.length > 0 : String(sourceAllergies).length > 0;
+             const hasAllergies = isArr 
+               ? sourceAllergies.length > 0 && sourceAllergies.some(a => String(a).trim().toLowerCase() !== 'none')
+               : String(sourceAllergies).trim().length > 0 && String(sourceAllergies).trim().toLowerCase() !== 'none';
              if (hasAllergies) {
                return (
                   <Tooltip title={`Allergies: ${isArr ? sourceAllergies.join(', ') : sourceAllergies}`}>

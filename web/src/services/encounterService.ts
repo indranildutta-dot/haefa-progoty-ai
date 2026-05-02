@@ -155,6 +155,30 @@ export const saveConsultation = async (
       isFinalize
     });
 
+    // WORKAROUND: The currently deployed cloud function drops 'provisionalDiagnosisMajor' and 'provisionalDiagnosisMinor'
+    // We patch both the diagnosis record and encounter record directly here to preserve data integrity.
+    try {
+      const qDiag = query(
+        collection(db, DIAGNOSES_COLLECTION),
+        where("encounter_id", "==", diagnosisData.encounter_id),
+        limit(1)
+      );
+      const qSnapDiag = await getDocs(qDiag);
+      if (!qSnapDiag.empty) {
+        await firestoreUpdateDoc(qSnapDiag.docs[0].ref, {
+          provisionalDiagnosisMajor: diagnosisData.provisionalDiagnosisMajor || [],
+          provisionalDiagnosisMinor: diagnosisData.provisionalDiagnosisMinor || [],
+        });
+      }
+
+      await firestoreUpdateDoc(doc(db, ENCOUNTERS_COLLECTION, diagnosisData.encounter_id), {
+        provisionalDiagnosisMajor: diagnosisData.provisionalDiagnosisMajor || [],
+        provisionalDiagnosisMinor: diagnosisData.provisionalDiagnosisMinor || [],
+      });
+    } catch (patchErr) {
+      console.warn("Failed to apply provisional diagnosis patch", patchErr);
+    }
+
     if (isFinalize) {
       // Logging the successful hand-off for audit purposes
       await logAction({

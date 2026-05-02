@@ -163,15 +163,32 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       setPatientVitals(vitalsResult);
 
       const allMeds: any[] = [];
+      
+      const globalDispensedDetails = pastMedsSnapshot.docs.reduce((acc: any, doc) => {
+        const presData = doc.data() as any;
+        if (Array.isArray(presData.dispensation_details)) {
+          presData.dispensation_details.forEach((curr: any) => {
+            if (!acc[curr.medication]) {
+                acc[curr.medication] = { dispensed: 0, modes: [], details: [], lastReturnOn: null };
+            }
+            acc[curr.medication].dispensed += Number(curr.dispensed) || 0;
+            acc[curr.medication].modes.push(curr.mode);
+            acc[curr.medication].details.push(curr);
+            if (curr.return_on) acc[curr.medication].lastReturnOn = curr.return_on;
+          });
+        }
+        return acc;
+      }, {});
+
       medsSnapshot.forEach(presDoc => {
         const presData = presDoc.data() as any;
         if (Array.isArray(presData.prescriptions)) {
           presData.prescriptions.forEach((med: any, index: number) => {
-            // Check if this specific medication in the current encounter was already dispensed
-            // (e.g. if the pharmacist is re-opening a completed patient)
-            const dispensation = Array.isArray(presData.dispensation_details) 
-              ? presData.dispensation_details.find((d: any) => d.medication === med.medicationName)
-              : null;
+            const group = globalDispensedDetails[med.medicationName];
+            const qtyTotal = Number(med.quantity) || 0;
+            const dispensedSoFar = group ? group.dispensed : 0;
+            const qtyRemaining = Math.max(0, qtyTotal - dispensedSoFar);
+            const isAlreadyFullyDispensed = group ? (group.modes.includes('FULL') || group.modes.includes('SUBSTITUTE') || dispensedSoFar >= qtyTotal) : false;
 
             allMeds.push({
               ...med,
@@ -180,10 +197,12 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
               originalIndex: index,
               isOwed: false,
               visitDate: toDateSafely(presData.created_at) || new Date(),
-              dispensedInfo: dispensation,
+              dispensedInfo: group ? group.details : null,
               pharmacistName: presData.dispenser_name,
               pharmacistRegNo: presData.dispenser_reg_no,
-              isAlreadyFullyDispensed: dispensation?.mode === 'FULL' || dispensation?.mode === 'SUBSTITUTE' || presData.status === 'DISPENSED' && !dispensation
+              isAlreadyFullyDispensed: isAlreadyFullyDispensed || (presData.status === 'DISPENSED' && !group),
+              remainingQuantity: qtyRemaining,
+              dispensedSoFar: dispensedSoFar
             });
           });
         }
@@ -199,68 +218,72 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
         
       for (const pastDoc of pastPres) {
         const visitDate = toDateSafely(pastDoc.created_at) || new Date();
-        
-        if (Array.isArray(pastDoc.dispensation_details)) {
-          // If there's dispensation info, we look at what happened
-          for (const detail of pastDoc.dispensation_details) {
-            const originalPres = (pastDoc.prescriptions || []).find((p: any) => p.medicationName === detail.medication);
-            const originalQty = originalPres ? Number(originalPres.quantity) : 0;
-            const dispensedSoFar = Number(detail.dispensed) || 0;
+
+        if (Array.isArray(pastDoc.prescriptions)) {
+          for (const originalPres of pastDoc.prescriptions) {
+            const group = globalDispensedDetails[originalPres.medicationName];
+            const originalQty = Number(originalPres.quantity) || 0;
+            const dispensedSoFar = group ? group.dispensed : 0;
             const owedQty = Math.max(0, originalQty - dispensedSoFar);
+            
+            const isFullyDispensed = group ? (group.modes.includes('FULL') || group.modes.includes('SUBSTITUTE') || dispensedSoFar >= originalQty) : false;
 
-            const isFullyDispensed = detail.mode === 'FULL' || detail.mode === 'SUBSTITUTE';
-
-            if (isFullyDispensed) {
-              // Add for information only
-              allMeds.push({
-                  medicationName: detail.medication,
-                  dosageValue: originalPres?.dosageValue || '',
-                  dosageUnit: originalPres?.dosageUnit || '',
-                  instructions: `Fully dispensed on ${visitDate.toLocaleDateString()}`,
+            if (group) {
+              if (isFullyDispensed) {
+                // Add for information only
+                allMeds.push({
+                    medicationName: originalPres.medicationName,
+                    dosageValue: originalPres.dosageValue || '',
+                    dosageUnit: originalPres.dosageUnit || '',
+                    instructions: `Fully dispensed on ${visitDate.toLocaleDateString()}`,
+                    quantity: originalQty,
+                    isOwed: true,
+                    id: `past-full-${pastDoc.id}-${originalPres.medicationName.replace(/\s+/g,'-')}`,
+                    presDocId: pastDoc.id,
+                    originalIndex: -1,
+                    visitDate: visitDate,
+                    isAlreadyFullyDispensed: true,
+                    pharmacistName: pastDoc.dispenser_name,
+                    pharmacistRegNo: pastDoc.dispenser_reg_no,
+                    dispensedInfo: group.details,
+                    remainingQuantity: 0,
+                    dispensedSoFar: dispensedSoFar
+                  });
+              } else if (owedQty > 0) {
+                allMeds.push({
+                  medicationName: originalPres.medicationName,
+                  dosageValue: originalPres.dosageValue || '',
+                  dosageUnit: originalPres.dosageUnit || '',
+                  instructions: `[PREVIOUSLY OWED from ${visitDate.toLocaleDateString()}] Ordered: ${originalQty}, Dispensed: ${dispensedSoFar}`,
                   quantity: originalQty,
+                  promisedDate: group.lastReturnOn, // Capture when they were advised to come back
                   isOwed: true,
-                  id: `past-full-${pastDoc.id}-${detail.medication.replace(/\s+/g,'-')}`,
+                  id: `owed-${pastDoc.id}-${originalPres.medicationName.replace(/\s+/g,'-')}`,
                   presDocId: pastDoc.id,
                   originalIndex: -1,
                   visitDate: visitDate,
-                  isAlreadyFullyDispensed: true,
-                  pharmacistName: pastDoc.dispenser_name,
-                  pharmacistRegNo: pastDoc.dispenser_reg_no,
-                  dispensedInfo: detail
+                  isAlreadyFullyDispensed: false,
+                  dispensedInfo: group.details,
+                  remainingQuantity: owedQty,
+                  dispensedSoFar: dispensedSoFar
                 });
-            } else if (owedQty > 0) {
+              }
+            } else if (pastDoc.status !== 'DISPENSED') {
+              // No dispensation info yet for this past encounter record? This shouldn't happen usually for DISPENSED status
+              // but let's handle it by showing them as needing dispensing if status is not DISPENSED
               allMeds.push({
-                medicationName: detail.medication,
-                dosageValue: originalPres?.dosageValue || '',
-                dosageUnit: originalPres?.dosageUnit || '',
-                instructions: `[PREVIOUSLY OWED from ${visitDate.toLocaleDateString()}] Originally ordered: ${originalQty}, Dispensed earlier: ${dispensedSoFar}`,
-                quantity: owedQty,
-                promisedDate: detail.return_on, // Capture when they were advised to come back
-                isOwed: true,
-                id: `owed-${pastDoc.id}-${detail.medication.replace(/\s+/g,'-')}`,
+                ...originalPres,
+                id: `past-pending-${pastDoc.id}-${originalPres.medicationName.replace(/\s+/g,'-')}`,
                 presDocId: pastDoc.id,
-                originalIndex: -1,
+                originalIndex: -1, // Cannot easily get index from this iteration, but it's okay
+                isOwed: true,
                 visitDate: visitDate,
                 isAlreadyFullyDispensed: false,
-                dispensedInfo: detail
+                remainingQuantity: originalQty,
+                dispensedSoFar: 0,
+                dispensedInfo: null
               });
             }
-          }
-        } else if (Array.isArray(pastDoc.prescriptions)) {
-          // No dispensation info yet for this past encounter record? This shouldn't happen usually for DISPENSED status
-          // but let's handle it by showing them as needing dispensing if status is not DISPENSED
-          if (pastDoc.status !== 'DISPENSED') {
-             pastDoc.prescriptions.forEach((med: any, index: number) => {
-                allMeds.push({
-                  ...med,
-                  id: `past-pending-${pastDoc.id}-${index}`,
-                  presDocId: pastDoc.id,
-                  originalIndex: index,
-                  isOwed: true,
-                  visitDate: visitDate,
-                  isAlreadyFullyDispensed: false
-                });
-             });
           }
         }
       }
@@ -291,15 +314,8 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
         initialSubQty[m.id] = '';
       });
       
-      // Pre-populate if progress was previously saved
-      allMeds.forEach(m => {
-        if (m.dispensedInfo) {
-          const detail = m.dispensedInfo;
-          initialModes[m.id] = detail.mode || 'FULL';
-          if (detail.return_on) initialDates[m.id] = dayjs(toDateSafely(detail.return_on));
-          if (detail.dispensed !== undefined) initialPartialQty[m.id] = detail.dispensed;
-        }
-      });
+      // Modes are initialized to 'FULL' by default in the loop above.
+      // If remainingQuantity < quantity, 'FULL' now means 'Full remaining quantity'.
       
       setDispensingModes(initialModes);
       setReturnDates(initialDates);
@@ -321,10 +337,11 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       
       const dispensationDetails = medsInCheckout.map(med => {
         const mode = dispensingModes[med.id];
+        const remaining = med.remainingQuantity !== undefined ? med.remainingQuantity : med.quantity;
         return {
           medication: med.medicationName,
           mode,
-          dispensed: mode === 'PARTIAL' ? Number(partialQty[med.id]) : (mode === 'SUBSTITUTE' ? Number(substitutionQty[med.id]) : Number(med.quantity)),
+          dispensed: mode === 'PARTIAL' ? Number(partialQty[med.id]) : (mode === 'SUBSTITUTE' ? Number(substitutionQty[med.id]) : Number(remaining)),
           return_on: (mode === 'PARTIAL' || mode === 'OUT_OF_STOCK') ? returnDates[med.id]?.toISOString() : null,
           created_at: new Date()
         };
@@ -389,9 +406,10 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
         return {
           medication_name: med.medicationName,
           mode,
-          qty: mode === 'SUBSTITUTE' && substitutionQty[med.id] ? Number(substitutionQty[med.id]) : (mode === 'PARTIAL' && partialQty[med.id] ? Number(partialQty[med.id]) : med.quantity),
-          prescribed_qty: Number(med.quantity) || 0,
+          qty: mode === 'SUBSTITUTE' && substitutionQty[med.id] ? Number(substitutionQty[med.id]) : (mode === 'PARTIAL' && partialQty[med.id] ? Number(partialQty[med.id]) : (med.remainingQuantity !== undefined ? med.remainingQuantity : med.quantity)),
+          prescribed_qty: med.remainingQuantity !== undefined ? med.remainingQuantity : (Number(med.quantity) || 0),
           inventoryId,
+          presDocId: med.presDocId,
           substitution: mode === 'SUBSTITUTE' ? inventory.find(i => i.id === substitutionMeds[med.id])?.medication_id : null,
           substitution_reason: mode === 'SUBSTITUTE' ? substitutionReasons[med.id] : null,
           return_on: (mode === 'PARTIAL' || mode === 'OUT_OF_STOCK') 
@@ -447,10 +465,9 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       const start = historyFromDate.startOf('day').toDate();
       const end = historyToDate.endOf('day').toDate();
       
-      // Query prescriptions that have been dispensed within the date range
+      // Query prescriptions that have been updated within the date range
       const q = query(
         collection(db, "prescriptions"),
-        where("status", "==", "DISPENSED"),
         where("updated_at", ">=", start),
         where("updated_at", "<=", end)
       );
@@ -461,23 +478,30 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       for (const d of snapshot.docs) {
         const data = d.data();
         
+        // Include both full and partial dispensations
+        if (data.status !== 'DISPENSED' && data.status !== 'PARTIAL_DISPENSED') continue;
+        
         // Since we need to show patient name, we need to fetch the patient or use existing data if available
-        // To be safe we fetch the patient name if it's not readily available.
-        // It's better to fetch it to have accurate names for history
         let patientName = "Unknown";
         try {
             const pData = await getPatientById(data.patient_id);
-            patientName = `${pData.given_name} ${pData.family_name}`;
+            if (pData) {
+                patientName = `${pData.given_name} ${pData.family_name}`;
+            }
         } catch(e) {
             console.error("Could not fetch patient name for history", e);
         }
 
         if (data.dispensation_details && Array.isArray(data.dispensation_details)) {
-          data.dispensation_details.forEach((detail: any) => {
+          data.dispensation_details.forEach((detail: any, index: number) => {
+             // Only include dispensation details that happened in the selected date range
+             const detailDate = toDateSafely(detail.created_at) || toDateSafely(data.updated_at);
+             if (!detailDate || detailDate < start || detailDate > end) return;
+             
              records.push({
                ...detail,
-               id: `${d.id}-${records.length}`,
-               date: toDateSafely(data.updated_at),
+               id: `${d.id}-${index}`,
+               date: detailDate,
                patientName,
                pharmacist: data.dispenser_name,
                encounterId: data.encounter_id
@@ -598,31 +622,34 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
 
   const handleReprintFromSearch = async (patientId: string) => {
     try {
+      // Find the most recent prescription for this patient that has actual prescriptions or dispensations
       const q = query(
-        collection(db, "encounters"),
+        collection(db, "prescriptions"),
         where("patient_id", "==", patientId),
         orderBy("created_at", "desc"),
-        limit(1)
+        limit(10) // fetch a few to ensure we find one with data
       );
       const snapshot = await getDocs(q);
-      if (!snapshot.empty) {
-        setLastEncounterId(snapshot.docs[0].id);
+      
+      let targetEncounterId = null;
+      for (const d of snapshot.docs) {
+        const data = d.data();
+        if ((data.prescriptions && data.prescriptions.length > 0) || (data.dispensation_details && data.dispensation_details.length > 0)) {
+            targetEncounterId = data.encounter_id;
+            break;
+        }
+      }
+      
+      // Fallback to the absolute latest prescription even if empty
+      if (!targetEncounterId && !snapshot.empty) {
+        targetEncounterId = snapshot.docs[0].data().encounter_id;
+      }
+      
+      if (targetEncounterId) {
+        setLastEncounterId(targetEncounterId);
         setShowPrintDialog(true);
       } else {
-        // Try archived encounters if not in active
-        const aq = query(
-          collection(db, "encounters_archive"),
-          where("patient_id", "==", patientId),
-          orderBy("created_at", "desc"),
-          limit(1)
-        );
-        const aSnapshot = await getDocs(aq);
-        if(!aSnapshot.empty) {
-          setLastEncounterId(aSnapshot.docs[0].id);
-          setShowPrintDialog(true);
-        } else {
-          notify("No encounters found for this patient", "warning");
-        }
+        notify("No prescriptions found for this patient", "warning");
       }
     } catch (err) {
       console.error("Reprint error:", err);
@@ -731,11 +758,21 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
         <Box sx={{ mt: 2 }}>
           <Container maxWidth="lg">
             <Stack spacing={2} sx={{ mb: 4 }}>
-                {patientVitals?.allergies && patientVitals.allergies.length > 0 && (
-                  <Alert severity="error" variant="filled" icon={<WarningIcon />}>
-                    <strong>CRITICAL ALLERGY ALERT:</strong> {Array.isArray(patientVitals.allergies) ? patientVitals.allergies.join(', ') : patientVitals.allergies}
-                  </Alert>
-                )}
+                {(() => {
+                  const hasAllergies = patientVitals?.allergies && (
+                    Array.isArray(patientVitals.allergies) 
+                      ? patientVitals.allergies.some(a => String(a).trim().toLowerCase() !== 'none')
+                      : String(patientVitals.allergies).trim().toLowerCase() !== 'none' && String(patientVitals.allergies).trim() !== ''
+                  );
+                  if (hasAllergies) {
+                    return (
+                      <Alert severity="error" variant="filled" icon={<WarningIcon />}>
+                        <strong>CRITICAL ALLERGY ALERT:</strong> {Array.isArray(patientVitals.allergies) ? patientVitals.allergies.join(', ') : patientVitals.allergies}
+                      </Alert>
+                    );
+                  }
+                  return null;
+                })()}
                 {patientVitals?.is_pregnant && (
                   <Alert severity="warning" variant="filled" icon={<ErrorIcon />}>
                     <strong>PREGNANCY ALERT:</strong> Patient is {patientVitals.pregnancy_months} months pregnant. Check drug safety.
@@ -786,18 +823,39 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                               px: isNewMed ? 1.5 : 0, 
                               py: isNewMed ? 0.75 : 0, 
                               borderRadius: 2, 
-                              display: 'inline-block',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 2,
                               border: isNewMed ? '1px solid #cbd5e1' : 'none'
                             }}>
                               <Typography variant="h6" color={isAlreadyDispensed ? "text.secondary" : (isNewMed ? "#1e293b" : "primary")} fontWeight="900">
                                 {med.medicationName || "Unspecified"}
                               </Typography>
+                              {!isAlreadyDispensed && med.remainingQuantity !== undefined && med.remainingQuantity < med.quantity && (
+                                <Chip label="IOU - PARTIAL" size="small" color="warning" sx={{ fontWeight: 'bold' }} />
+                              )}
                             </Box>
                             
                             <Typography variant="body1" fontWeight="700" sx={{ color: isAlreadyDispensed ? 'text.secondary' : 'inherit', mt: 0.5 }}>
-                              {med.dosageValue}{med.dosageUnit} x {med.quantity} Total
+                              {med.dosageValue}{med.dosageUnit} x {med.remainingQuantity !== undefined && med.remainingQuantity < med.quantity ? `${med.remainingQuantity} Remaining (from ${med.quantity} Total)` : `${med.quantity} Total`}
                             </Typography>
                             
+                            {med.dispensedInfo && Array.isArray(med.dispensedInfo) && med.dispensedInfo.length > 0 && (
+                              <Box sx={{ mt: 1, mb: 1, p: 1.5, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #cbd5e1' }}>
+                                <Typography variant="caption" fontWeight="900" color="text.secondary" sx={{ textTransform: 'uppercase', mb: 1, display: 'block' }}>
+                                  Dispensing History:
+                                </Typography>
+                                <Stack spacing={0.5}>
+                                  {med.dispensedInfo.map((disp: any, i: number) => (
+                                    <Typography key={i} variant="caption" sx={{ display: 'flex', justifyContent: 'space-between', color: '#334155' }}>
+                                      <span>Mode: <strong>{disp.mode}</strong> (Qty: {disp.dispensed || 0})</span>
+                                      <span>{disp.created_at ? dayjs(toDateSafely(disp.created_at)).format('DD/MM/YYYY HH:mm') : ''}</span>
+                                    </Typography>
+                                  ))}
+                                </Stack>
+                              </Box>
+                            )}
+
                             {med.promisedDate && (
                               <Box sx={{ mt: 1, p: 1, bgcolor: '#fff7ed', borderRadius: 1.5, border: '1px solid #ffedd5' }}>
                                 <Typography variant="caption" color="#9a3412" fontWeight="bold">
@@ -826,7 +884,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                             {isAlreadyDispensed && (
                               <Box sx={{ mt: 2, p: 1.5, bgcolor: '#f1f5f9', borderRadius: 2, border: '1px solid #cbd5e1' }}>
                                 <Typography variant="body2" sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>
-                                  Dispensed By: <strong>{med.pharmacistName}</strong> ({med.pharmacistRegNo}) on {toDateSafely(med.dispensedInfo?.created_at) ? dayjs(toDateSafely(med.dispensedInfo.created_at)).format('DD/MM/YYYY') : 'N/A'}
+                                  Processed By: <strong>{med.pharmacistName}</strong> ({med.pharmacistRegNo})
                                 </Typography>
                               </Box>
                             )}
@@ -850,8 +908,8 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
 
                           {isAlreadyDispensed ? (
                              <Box sx={{ mt: 2, p: 2, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                               <Typography variant="subtitle2" fontWeight="bold" color="text.secondary">Item already processed in history</Typography>
-                               <Typography variant="caption" color="text.secondary">Select an active prescription to modify dispensing.</Typography>
+                               <Typography variant="subtitle2" fontWeight="bold" color="text.secondary">Item is fully dispensed</Typography>
+                               <Typography variant="caption" color="text.secondary">No further dispensing is required for this medication.</Typography>
                              </Box>
                           ) : (
                            <>
@@ -986,7 +1044,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                               const mode = dispensingModes[med.id];
                               const qty = mode === 'PARTIAL' ? partialQty[med.id] : 
                                           mode === 'SUBSTITUTE' ? substitutionQty[med.id] : 
-                                          med.quantity;
+                                          (med.remainingQuantity !== undefined ? med.remainingQuantity : med.quantity);
                               return (
                                 <TableRow key={med.id}>
                                   <TableCell>{med.medicationName}</TableCell>
@@ -994,7 +1052,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                                   <TableCell>
                                     <Chip label={mode} size="small" color={mode === 'FULL' ? 'success' : 'warning'} variant="outlined" sx={{ fontWeight: 'bold', fontSize: '0.65rem' }} />
                                   </TableCell>
-                                  <TableCell sx={{ fontWeight: 'bold' }}>{qty || med.quantity}</TableCell>
+                                  <TableCell sx={{ fontWeight: 'bold' }}>{qty}</TableCell>
                                   <TableCell align="right">
                                     <IconButton size="small" color="error" onClick={() => setCheckoutList(prev => prev.filter(id => id !== med.id))}>
                                       <CancelIcon fontSize="small" />

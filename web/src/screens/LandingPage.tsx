@@ -20,6 +20,18 @@ const LandingPage: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const { setSelectedCountry } = useAppStore();
+  const [isOnline, setIsOnline] = React.useState(navigator.onLine);
+
+  React.useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const handleSelect = (country: CountryConfig) => {
     // Logic: Initialize session state and move to login
@@ -267,13 +279,13 @@ const LandingPage: React.FC = () => {
               <Box sx={{ 
                 width: 8, 
                 height: 8, 
-                bgcolor: '#10b981', 
+                bgcolor: isOnline ? '#10b981' : '#f59e0b', 
                 borderRadius: '50%',
-                boxShadow: '0 0 0 rgba(16, 185, 129, 0.4)',
-                animation: 'pulse 2s infinite'
+                boxShadow: isOnline ? '0 0 0 rgba(16, 185, 129, 0.4)' : 'none',
+                animation: isOnline ? 'pulse 2s infinite' : 'none'
               }} />
               <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 700, textTransform: 'uppercase' }}>
-                System Live
+                {isOnline ? 'System Live' : 'Offline Mode'}
               </Typography>
             </Box>
           </Box>

@@ -111,6 +111,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
   const { clearSavedData } = useFormAutoSave(`vitalsDraft_${selectedQueueItem?.encounter_id || 'new'}`, vitals, setVitals, !!selectedQueueItem);
   const [glucoseUnit, setGlucoseUnit] = useState<'mg/dL' | 'mmol/L'>('mg/dL');
   const [hbUnit, setHbUnit] = useState<'g/dL' | 'g/L'>('g/dL');
+  const [isEditingAllergies, setIsEditingAllergies] = useState(false);
 
   useEffect(() => {
     setSelectedPatient(null);
@@ -259,7 +260,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
   const isPediatric = getAgeYears(selectedPatient) < 18;
   const isUnderFive = getAgeYears(selectedPatient) < 5;
 
-  const getVitalStatus = (type: 'bp' | 'hr' | 'o2' | 'rr' | 'fbg' | 'rbg', val1: number, val2?: number) => {
+  const getVitalStatus = (type: 'bp' | 'hr' | 'o2' | 'rr' | 'fbg' | 'rbg' | 'temp', val1: number, val2?: number) => {
     if (isNaN(val1)) return { color: '#e2e8f0', label: 'PENDING' };
     
     if (type === 'bp') {
@@ -326,6 +327,11 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
     if (type === 'rbg') {
       if (val1 >= 200) return { color: '#ef4444', label: 'CRITICAL ALERT' };
       if (val1 >= 140) return { color: '#f59e0b', label: 'ELEVATED' };
+      return { color: '#10b981', label: 'NORMAL' };
+    }
+    if (type === 'temp') {
+      if (val1 >= 39 || (val1 > 0 && val1 < 35)) return { color: '#ef4444', label: 'EMERGENCY' };
+      if ((val1 >= 38 && val1 < 39) || (val1 >= 35 && val1 < 36)) return { color: '#f59e0b', label: 'WARNING' };
       return { color: '#10b981', label: 'NORMAL' };
     }
     return { color: '#e2e8f0', label: '' };
@@ -856,9 +862,9 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                     </Box>
                   </Grid>
                   <Grid size={{ xs: 12, md: 6 }}>
-                    <Box sx={{ p: 3, borderRadius: 4, border: '4px solid #e2e8f0', bgcolor: 'white' }}>
-                      <Typography variant="subtitle1" fontWeight="900" color="text.secondary" sx={{ mb: 1 }}>
-                        TEMPERATURE
+                    <Box sx={{ p: 3, borderRadius: 4, border: `4px solid ${getVitalStatus('temp', vitals.temperature).color}`, bgcolor: 'white' }}>
+                      <Typography variant="subtitle1" fontWeight="900" color={getVitalStatus('temp', vitals.temperature).label === 'PENDING' ? 'text.secondary' : getVitalStatus('temp', vitals.temperature).color} sx={{ mb: 1 }}>
+                        {getVitalStatus('temp', vitals.temperature).label}
                       </Typography>
                       <TextField 
                         fullWidth 
@@ -1159,12 +1165,42 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                   </Grid>
                 </Box>
 
+                <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+                  <Typography variant="h6" fontWeight="900" color="text.secondary">Allergies</Typography>
+                  <Stack direction="row" spacing={2}>
+                    <Button 
+                      variant={String(vitals.allergies || '').trim().toLowerCase() === 'none' ? 'contained' : 'outlined'}
+                      color={String(vitals.allergies || '').trim().toLowerCase() === 'none' ? 'success' : 'inherit'}
+                      onClick={() => {
+                        setVitals({...vitals, allergies: 'None'});
+                        setIsEditingAllergies(false);
+                      }}
+                      sx={{ fontWeight: 'bold' }}
+                    >
+                      No Known Allergies
+                    </Button>
+                    <Button
+                      variant={isEditingAllergies ? 'contained' : 'outlined'}
+                      color="primary"
+                      onClick={() => {
+                        if (String(vitals.allergies || '').trim().toLowerCase() === 'none') {
+                          setVitals({...vitals, allergies: ''});
+                        }
+                        setIsEditingAllergies(!isEditingAllergies);
+                      }}
+                      sx={{ fontWeight: 'bold' }}
+                    >
+                      {isEditingAllergies ? 'Done Editing' : 'Edit Allergies'}
+                    </Button>
+                  </Stack>
+                </Box>
                 <TextField 
                   fullWidth 
                   multiline 
                   rows={3} 
-                  label="Allergies" 
+                  label="Allergies (if any)" 
                   value={vitals.allergies} 
+                  disabled={!isEditingAllergies}
                   onChange={(e) => setVitals({...vitals, allergies: e.target.value})} 
                   InputProps={{ sx: { fontSize: '1.25rem', fontWeight: 500 }}}
                 />

@@ -81,6 +81,7 @@ const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTe
           
           // Otherwise, find the LATEST instructions for this drug in history
           for (const record of allHistRecords) {
+            if (!Array.isArray(record.prescriptions)) continue;
             const match = record.prescriptions.find(p => p.medicationName === name);
             if (match) {
               historicalRequired.push(match);
@@ -435,8 +436,8 @@ const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTe
         </Grid>
       </Grid>
 
-      {/* Dispensing Summary (Only if dispensed or partial) */}
-      {(prescription?.status === 'DISPENSED' || prescription?.status === 'PARTIAL_DISPENSED') && (
+      {/* Dispensing Summary */}
+      {(prescription?.dispensation_details && prescription.dispensation_details.length > 0) && (
         <Box sx={{ mt: 4, pt: 4, borderTop: '2px dashed #cbd5e1' }}>
           <Typography variant="subtitle2" fontWeight="900" color="secondary" sx={{ mb: 2, textTransform: 'uppercase' }}>Dispensing Summary (Pharmacy)</Typography>
           <Card variant="outlined" sx={{ borderRadius: 3, border: '1px solid #e2e8f0' }}>
@@ -445,15 +446,20 @@ const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTe
                 <TableHead sx={{ bgcolor: '#f0f9ff' }}>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 900 }}>Medication</TableCell>
+                    <TableCell sx={{ fontWeight: 900 }}>Dosage</TableCell>
                     <TableCell sx={{ fontWeight: 900 }}>Mode</TableCell>
                     <TableCell sx={{ fontWeight: 900 }}>Dispensed Qty</TableCell>
                     <TableCell sx={{ fontWeight: 900 }}>Substitution / Notes</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {prescription.dispensation_details?.map((item, idx) => (
+                  {prescription.dispensation_details?.map((item, idx) => {
+                    const originalPres = mergedPrescriptions.find(p => p.medicationName === item.medication);
+                    const dosageStr = originalPres ? (originalPres.dosage || `${originalPres.dosageValue || ''}${originalPres.dosageUnit || ''}`) : '';
+                    return (
                     <TableRow key={idx}>
                       <TableCell sx={{ fontWeight: 700 }}>{item.medication}</TableCell>
+                      <TableCell>{dosageStr}</TableCell>
                       <TableCell>
                         <Chip label={item.mode} size="small" color={item.mode === 'FULL' ? 'success' : 'warning'} sx={{ fontWeight: 800, height: 20 }} />
                       </TableCell>
@@ -464,7 +470,7 @@ const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTe
                         {item.return_on && <Typography variant="caption" color="error" fontWeight="900">Return on: {new Date(item.return_on).toLocaleDateString()}</Typography>}
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )})}
                 </TableBody>
               </Table>
               
