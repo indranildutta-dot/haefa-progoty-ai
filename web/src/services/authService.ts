@@ -1,7 +1,6 @@
 import { 
   onAuthStateChanged, 
-  signInWithPopup,
-  GoogleAuthProvider,
+  signInWithEmailAndPassword,
   signOut,
   User
 } from "firebase/auth";
@@ -9,22 +8,19 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { UserProfile } from "../types";
 
-const provider = new GoogleAuthProvider();
-provider.setCustomParameters({
-  hd: 'haefa.org'
-});
-
-const SUPER_ADMIN_EMAILS = [
+export const MASTER_ADMINS = [
   'indranil_dutta@haefa.org',
   'ruhul_abid@haefa.org'
 ];
+
+export const SUPER_ADMIN_EMAILS = MASTER_ADMINS;
 
 export const subscribeToAuthChanges = (callback: (user: User | null) => void) => {
   return onAuthStateChanged(auth, callback);
 };
 
-export const loginWithGoogle = async () => {
-  return signInWithPopup(auth, provider);
+export const loginWithEmailAndPassword = async (email: string, password: string) => {
+  return signInWithEmailAndPassword(auth, email, password);
 };
 
 export const logout = async () => {
@@ -48,8 +44,8 @@ export const getUserProfile = async (uid: string, email?: string | null): Promis
       profile = { uid, ...docSnap.data() } as UserProfile;
     }
 
-    // SUPER ADMIN BYPASS: If email is hardcoded, ensure they have global_admin role
-    if (normalizedEmail && SUPER_ADMIN_EMAILS.includes(normalizedEmail)) {
+    // MASTER ADMIN OVERRIDE: If authenticated user's email is in MASTER_ADMINS, immediately override any database role restrictions and grant full global_admin status.
+    if (normalizedEmail && MASTER_ADMINS.includes(normalizedEmail)) {
       return {
         uid,
         email: normalizedEmail,
@@ -57,7 +53,8 @@ export const getUserProfile = async (uid: string, email?: string | null): Promis
         isApproved: true,
         assignedClinics: profile?.assignedClinics || [],
         assignedCountries: profile?.assignedCountries || ['BD'],
-        ...profile // Merge existing profile data if any
+        ...profile, // Merge existing profile data if any
+        role_override: true // flag to indicate override
       } as UserProfile;
     }
 

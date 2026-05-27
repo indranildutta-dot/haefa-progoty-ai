@@ -104,7 +104,18 @@ export const syncUserPermissions = onCall(async (request) => {
   if (!request.auth || !checkIsGlobalAdmin(request.auth)) {
     throw new HttpsError("permission-denied", "Unauthorized: Global Admin required.");
   }
-  const { email, role, country_id, assignedCountries, assignedClinics, isApproved } = request.data;
+  const { 
+    email, 
+    role, 
+    country_id, 
+    countryCode,
+    assignedCountries, 
+    assignedClinics, 
+    isApproved,
+    professional_reg_no,
+    professional_body,
+    designation
+  } = request.data;
   if (!email || !role) {
     throw new HttpsError("invalid-argument", "Missing email or role.");
   }
@@ -123,11 +134,19 @@ export const syncUserPermissions = onCall(async (request) => {
     }
     const uid = userRecord.uid;
     await admin.auth().setCustomUserClaims(uid, { role });
+    
+    const finalCountryId = country_id || countryCode || null;
     await db.collection("users").doc(uid).set({
-      email, role, country_id: country_id || null,
+      email, 
+      role, 
+      countryCode: finalCountryId,
+      country_id: finalCountryId,
       assignedCountries: assignedCountries || [],
       assignedClinics: assignedClinics || [],
       isApproved: isApproved ?? false,
+      professional_reg_no: professional_reg_no || null,
+      professional_body: professional_body || null,
+      designation: designation || null,
       lastUpdated: admin.firestore.Timestamp.now()
     }, { merge: true });
     return { success: true };
@@ -148,7 +167,19 @@ export const deleteUser = onCall(async (request) => {
   try {
     const admin = await getAdmin();
     const db = await getDb();
-    await admin.auth().deleteUser(uid);
+    try {
+      await admin.auth().deleteUser(uid);
+    } catch (authError: any) {
+      const isUserNotFound = 
+        authError.code === 'auth/user-not-found' || 
+        (authError.message && authError.message.includes('user-not-found')) ||
+        (authError.message && authError.message.includes('no user record corresponding'));
+      
+      if (!isUserNotFound) {
+        throw authError;
+      }
+      console.log(`User ${uid} not found in Auth, carrying on with db deletion.`, authError);
+    }
     await db.collection("users").doc(uid).delete();
     return { success: true };
   } catch (error: any) {

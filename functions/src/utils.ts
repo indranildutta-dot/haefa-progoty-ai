@@ -17,21 +17,24 @@ export const getCrypto = async () => {
 // ==========================================
 // CONFIGURATION & GLOBAL SETTINGS
 // ==========================================
-export const SUPER_ADMIN_EMAILS = [
+export const MASTER_ADMINS = [
   'indranil_dutta@haefa.org', 
   'ruhul_abid@haefa.org'
 ];
+
+export const SUPER_ADMIN_EMAILS = MASTER_ADMINS;
 
 export const REQUISITION_THRESHOLD = 200;
 
 /**
  * Helper to verify if the caller is a Global Admin
+ * Overrides any datastore checks for MASTER_ADMINS fallback
  */
 export const checkIsGlobalAdmin = (auth: any) => {
   if (!auth) return false;
   const email = auth.token.email?.toLowerCase();
   const role = auth.token.role;
-  return SUPER_ADMIN_EMAILS.includes(email) || role === 'global_admin';
+  return MASTER_ADMINS.includes(email) || role === 'global_admin';
 };
 
 // ==========================================

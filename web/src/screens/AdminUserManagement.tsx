@@ -80,11 +80,19 @@ const AdminUserManagement = () => {
   };
 
   const handleSync = async () => {
+    if (!email || !email.trim()) {
+      alert('Please enter a valid email address.');
+      return;
+    }
+    if (!role) {
+      alert('Please select a role.');
+      return;
+    }
     const functions = getFunctions();
     const syncUserPermissions = httpsCallable(functions, 'syncUserPermissions');
     try {
       await syncUserPermissions({ 
-        email, 
+        email: email.trim(), 
         role, 
         assignedClinics: selectedClinicIds, 
         countryCode: selectedCountryId,
