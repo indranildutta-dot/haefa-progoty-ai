@@ -143,14 +143,22 @@ const ClinicalSidebar: React.FC = () => {
             <Box>
               <Typography variant="overline" fontWeight="900" color="text.disabled">Vital Signs</Typography>
               <Divider sx={{ mb: 2 }} />
-              <DataRow 
-                icon={<HeartIcon />} 
-                label="Blood Pressure" 
-                value={(!isNaN(v.systolic) && !isNaN(v.diastolic)) ? `${v.systolic}/${v.diastolic}` : '--'} 
-                unit="mmHg" 
-                isEmergency={v.systolic >= 180 || v.diastolic >= 120}
-                isWarning={(v.systolic >= 130 && v.systolic < 180) || (v.diastolic >= 80 && v.diastolic < 120)}
-              />
+              {(() => {
+                const hasSecondBP = v.systolic_2 !== undefined && v.systolic_2 !== null && !isNaN(v.systolic_2) && v.systolic_2 > 0 &&
+                                    v.diastolic_2 !== undefined && v.diastolic_2 !== null && !isNaN(v.diastolic_2) && v.diastolic_2 > 0;
+                const displaySys = hasSecondBP ? v.systolic_2 : v.systolic;
+                const displayDia = hasSecondBP ? v.diastolic_2 : v.diastolic;
+                return (
+                  <DataRow 
+                    icon={<HeartIcon />} 
+                    label="Blood Pressure" 
+                    value={(!isNaN(displaySys) && !isNaN(displayDia)) ? `${displaySys}/${displayDia}` : '--'} 
+                    unit="mmHg" 
+                    isEmergency={(!isNaN(displaySys) && displaySys > 0 && (displaySys > 130 || displaySys < 70)) || (!isNaN(displayDia) && displayDia > 0 && (displayDia > 90 || displayDia < 50))}
+                    isWarning={(!isNaN(displaySys) && displaySys > 0 && ((displaySys >= 120 && displaySys <= 130) || (displaySys >= 70 && displaySys < 80))) || (!isNaN(displayDia) && displayDia > 0 && ((displayDia >= 80 && displayDia <= 90) || (displayDia >= 50 && displayDia < 60)))}
+                  />
+                );
+              })()}
               <DataRow 
                 icon={<HeartIcon />} 
                 label="Heart Rate" 
@@ -172,8 +180,8 @@ const ClinicalSidebar: React.FC = () => {
                 label="Temperature" 
                 value={v.temperature} 
                 unit="°C" 
-                isEmergency={v.temperature >= 39 || (v.temperature > 0 && v.temperature < 35)}
-                isWarning={(v.temperature >= 38 && v.temperature < 39) || (v.temperature >= 35 && v.temperature < 36)}
+                isEmergency={v.temperature > 40 || (v.temperature > 0 && v.temperature < 35)}
+                isWarning={(v.temperature >= 38.5 && v.temperature <= 40) || (v.temperature >= 35 && v.temperature < 36)}
               />
             </Box>
 
@@ -207,8 +215,6 @@ const ClinicalSidebar: React.FC = () => {
                   isWarning={v.hemoglobin < 11} // Simplified warning for sidebar
                 />
               )}
-              {v.is_fasting && <Chip label="FASTING" size="small" sx={{ mr: 1, mb: 1, fontWeight: 900, fontSize: '0.65rem' }} />}
-              {v.has_symptoms && <Chip label="SYMPTOMATIC" size="small" color="error" sx={{ mb: 1, fontWeight: 900, fontSize: '0.65rem' }} />}
             </Box>
           </>
         )}
@@ -247,7 +253,13 @@ const ClinicalSidebar: React.FC = () => {
                   <Typography variant="caption" fontWeight="900">VITAL SIGNS</Typography>
                 </AccordionSummary>
                 <AccordionDetails sx={{ pt: 0 }}>
-                  <DataRow label="BP" value={`${lastVitals.systolic}/${lastVitals.diastolic}`} unit="mmHg" />
+                  {(() => {
+                    const lastHasSecondBP = lastVitals.systolic_2 !== undefined && lastVitals.systolic_2 !== null && !isNaN(lastVitals.systolic_2) && lastVitals.systolic_2 > 0 &&
+                                           lastVitals.diastolic_2 !== undefined && lastVitals.diastolic_2 !== null && !isNaN(lastVitals.diastolic_2) && lastVitals.diastolic_2 > 0;
+                    const lastSys = lastHasSecondBP ? lastVitals.systolic_2 : lastVitals.systolic;
+                    const lastDia = lastHasSecondBP ? lastVitals.diastolic_2 : lastVitals.diastolic;
+                    return <DataRow label="BP" value={`${lastSys}/${lastDia}`} unit="mmHg" />;
+                  })()}
                   <DataRow label="HR" value={lastVitals.heartRate} unit="bpm" />
                   <DataRow label="SpO2" value={lastVitals.oxygenSaturation} unit="%" />
                 </AccordionDetails>

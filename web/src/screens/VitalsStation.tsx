@@ -160,7 +160,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
   // SAFETY SENTINEL SYNC: Ensures top bar updates as nurse types all fields
   useEffect(() => {
     if (selectedPatient) {
-      const triage = evaluateTriage(vitals, selectedPatient?.age_years, selectedPatient?.age_months);
+      const triage = evaluateTriage(vitals, getAgeYears(selectedPatient), selectedPatient?.age_months, selectedPatient?.gender);
       
       // CRITICAL: Force is_pregnant to false for non-females to prevent data leakage
       const isFemale = selectedPatient.gender?.toLowerCase() === 'female';
@@ -181,6 +181,8 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
   }, [
     vitals.systolic, 
     vitals.diastolic, 
+    vitals.systolic_2,
+    vitals.diastolic_2,
     vitals.heartRate, 
     vitals.respiratoryRate,
     vitals.oxygenSaturation, 
@@ -233,9 +235,9 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
     return `${hours} hr ${mins} min`;
   };
 
-  const systemTriage = evaluateTriage(vitals, selectedPatient?.age_years, selectedPatient?.age_months);
+  const systemTriage = evaluateTriage(vitals, getAgeYears(selectedPatient), selectedPatient?.age_months, selectedPatient?.gender);
 
-  const getAgeYears = (p: any): number => {
+  function getAgeYears(p: any): number {
     if (!p) return 0;
     let years: number | undefined;
     if (p.age_years !== null && p.age_years !== undefined) {
@@ -255,7 +257,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
       years = new Date().getFullYear() - p.estimated_birth_year;
     }
     return years ?? 0;
-  };
+  }
 
   const isPediatric = getAgeYears(selectedPatient) < 18;
   const isUnderFive = getAgeYears(selectedPatient) < 5;
@@ -265,8 +267,17 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
     
     if (type === 'bp') {
       if (isNaN(val1) || (val2 !== undefined && isNaN(val2))) return { color: '#e2e8f0', label: 'PENDING' };
-      if (val1 >= 180 || (val2 && val2 >= 120)) return { color: '#ef4444', label: 'CRITICAL' };
-      if (val1 >= 130 || (val2 && val2 >= 80)) return { color: '#f59e0b', label: 'WARNING' };
+      const sys = val1;
+      const dia = val2;
+
+      const isSysEmergency = !isNaN(sys) && sys > 0 && (sys > 130 || sys < 70);
+      const isDiaEmergency = dia !== undefined && !isNaN(dia) && dia > 0 && (dia > 90 || dia < 50);
+
+      const isSysWarning = !isNaN(sys) && sys > 0 && ((sys > 120 && sys <= 130) || (sys >= 70 && sys < 80));
+      const isDiaWarning = dia !== undefined && !isNaN(dia) && dia > 0 && ((dia > 80 && dia <= 90) || (dia >= 50 && dia < 60));
+
+      if (isSysEmergency || isDiaEmergency) return { color: '#ef4444', label: 'CRITICAL' };
+      if (isSysWarning || isDiaWarning) return { color: '#f59e0b', label: 'WARNING' };
       return { color: '#10b981', label: 'NORMAL' };
     }
     if (type === 'hr') {
@@ -322,16 +333,20 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
     if (type === 'fbg') {
       if (val1 >= 126) return { color: '#ef4444', label: 'DIABETES RANGE' };
       if (val1 >= 100) return { color: '#f59e0b', label: 'PREDIABETES' };
+      if (val1 < 55) return { color: '#ef4444', label: 'SEVERE HYPOGLYCEMIA' };
+      if (val1 < 70) return { color: '#f59e0b', label: 'HYPOGLYCEMIA' };
       return { color: '#10b981', label: 'NORMAL' };
     }
     if (type === 'rbg') {
       if (val1 >= 200) return { color: '#ef4444', label: 'CRITICAL ALERT' };
       if (val1 >= 140) return { color: '#f59e0b', label: 'ELEVATED' };
+      if (val1 < 55) return { color: '#ef4444', label: 'SEVERE HYPOGLYCEMIA' };
+      if (val1 < 70) return { color: '#f59e0b', label: 'HYPOGLYCEMIA' };
       return { color: '#10b981', label: 'NORMAL' };
     }
     if (type === 'temp') {
-      if (val1 >= 39 || (val1 > 0 && val1 < 35)) return { color: '#ef4444', label: 'EMERGENCY' };
-      if ((val1 >= 38 && val1 < 39) || (val1 >= 35 && val1 < 36)) return { color: '#f59e0b', label: 'WARNING' };
+      if (val1 > 40 || (val1 > 0 && val1 < 35)) return { color: '#ef4444', label: 'EMERGENCY' };
+      if ((val1 >= 38.5 && val1 <= 40) || (val1 >= 35 && val1 < 36)) return { color: '#f59e0b', label: 'URGENT' };
       return { color: '#10b981', label: 'NORMAL' };
     }
     return { color: '#e2e8f0', label: '' };
@@ -344,23 +359,36 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
     const age_months = selectedPatient?.age_months ?? 0;
     const isMale = selectedPatient?.gender?.toLowerCase() === 'male';
     const isPregnant = !!vitals.is_pregnant;
-    
-    let threshold = 12.0;
-    
-    if (age_years === 0 && age_months >= 1) threshold = 10.5;
-    else if (age_years >= 1 && age_years <= 5) threshold = 11.0;
-    else if (age_years >= 6 && age_years <= 11) threshold = 11.5;
-    else if (age_years >= 12 && age_years <= 14) threshold = 12.0;
-    else if (age_years >= 15) {
-      if (isPregnant) threshold = 11.0;
-      else if (isMale) threshold = 13.0;
-      else threshold = 12.0;
+
+    // Children specific checks
+    if (age_years < 15) {
+      let threshold = 12.0;
+      if (age_years === 0 && age_months >= 1) threshold = 10.5;
+      else if (age_years >= 1 && age_years <= 5) threshold = 11.0;
+      else if (age_years >= 6 && age_years <= 11) threshold = 11.5;
+      else if (age_years >= 12 && age_years <= 14) threshold = 12.0;
+      
+      if (hb >= threshold) return { color: '#10b981', label: 'NORMAL' };
+      if (hb >= 10) return { color: '#f59e0b', label: 'MILD ANEMIA' };
+      if (hb >= 7) return { color: '#f97316', label: 'MODERATE ANEMIA' };
+      return { color: '#ef4444', label: 'SEVERE ANEMIA' };
     }
-    
-    if (hb >= threshold) return { color: '#10b981', label: 'NORMAL' };
-    if (hb >= 10) return { color: '#f59e0b', label: 'MILD ANEMIA' };
-    if (hb >= 7) return { color: '#f97316', label: 'MODERATE ANEMIA' };
-    return { color: '#ef4444', label: 'SEVERE ANEMIA' };
+
+    // Adults (age >= 15)
+    if (isMale) {
+      if (hb > 17.5) return { color: '#f59e0b', label: 'URGENT (HIGH HB)' };
+      if (hb >= 13.0) return { color: '#10b981', label: 'NORMAL' };
+      if (hb >= 10.0) return { color: '#f59e0b', label: 'MILD ANEMIA' };
+      if (hb >= 7.0) return { color: '#f97316', label: 'MODERATE ANEMIA' };
+      return { color: '#ef4444', label: 'SEVERE ANEMIA' };
+    } else {
+      const lowerLimitNormal = isPregnant ? 11.0 : 12.0;
+      if (hb > 15.5) return { color: '#f59e0b', label: 'URGENT (HIGH HB)' };
+      if (hb >= lowerLimitNormal) return { color: '#10b981', label: 'NORMAL' };
+      if (hb >= 10.0) return { color: '#f59e0b', label: 'MILD ANEMIA' };
+      if (hb >= 7.0) return { color: '#f97316', label: 'MODERATE ANEMIA' };
+      return { color: '#ef4444', label: 'SEVERE ANEMIA' };
+    }
   };
 
   const handleCancelQueueItem = async (reason: string) => {
@@ -433,7 +461,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
   };
 
   const isBPAbnormal = (s: number, d: number) => {
-    return s >= 130 || d >= 80;
+    return s < 80 || s > 120 || d < 60 || d > 80;
   };
 
   const handleSaveVitals = async (nextStatus: EncounterStatus, isSaveProgress: boolean = false) => {
@@ -838,7 +866,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                       </Typography>
                       <TextField 
                         fullWidth 
-                        label="Resp. Rate (bpm)" 
+                        label="Resp. Rate (rpm)" 
                         type="number"
                         value={isNaN(vitals.respiratoryRate) ? '' : vitals.respiratoryRate} 
                         onChange={(e) => setVitals({...vitals, respiratoryRate: parseInt(e.target.value)})} 
@@ -1147,23 +1175,8 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
                   </Box>
                 </Stack>
 
-                <Box sx={{ p: 4, bgcolor: '#f8fafc', borderRadius: 4, border: '1px solid #e2e8f0' }}>
-                  <Typography variant="h6" fontWeight="900" color="text.secondary" gutterBottom>Clinical Context Flags</Typography>
-                  <Grid container spacing={2}>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <FormControlLabel
-                        control={<Switch checked={vitals.is_fasting} onChange={(e) => setVitals({...vitals, is_fasting: e.target.checked})} />}
-                        label="Patient is Fasting"
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <FormControlLabel
-                        control={<Switch checked={vitals.has_symptoms} onChange={(e) => setVitals({...vitals, has_symptoms: e.target.checked})} />}
-                        label="Symptomatic (for RBG)"
-                      />
-                    </Grid>
-                  </Grid>
-                </Box>
+
+
 
                 <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
                   <Typography variant="h6" fontWeight="900" color="text.secondary">Allergies</Typography>

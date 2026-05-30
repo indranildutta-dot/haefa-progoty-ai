@@ -5,9 +5,10 @@ import { VitalsRecord, Patient } from '../types';
 
 interface VitalsSnapshotProps {
   vitals: VitalsRecord | null;
+  gender?: string;
 }
 
-const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals }) => {
+const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals, gender }) => {
   if (!vitals) {
     return (
       <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 3, bgcolor: 'grey.50' }}>
@@ -43,28 +44,49 @@ const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals }) => {
     </Box>
   );
 
-  const isAbnormalTemp = vitals.temperature && (vitals.temperature > 37.5 || vitals.temperature < 35.0);
+  const hasSecondBP = vitals.systolic_2 !== undefined && vitals.systolic_2 !== null && !isNaN(vitals.systolic_2) && vitals.systolic_2 > 0 &&
+                      vitals.diastolic_2 !== undefined && vitals.diastolic_2 !== null && !isNaN(vitals.diastolic_2) && vitals.diastolic_2 > 0;
+  const sysVal = hasSecondBP ? vitals.systolic_2 : vitals.systolic;
+  const diaVal = hasSecondBP ? vitals.diastolic_2 : vitals.diastolic;
+
+  const isAbnormalTemp = vitals.temperature && (vitals.temperature >= 38.5 || vitals.temperature < 35.0);
   const isAbnormalHR = vitals.heartRate && (vitals.heartRate > 100 || vitals.heartRate < 60);
-  const isAbnormalBP = vitals.systolic && vitals.diastolic && (vitals.systolic > 140 || vitals.diastolic > 90 || vitals.systolic < 90 || vitals.diastolic < 60);
-  const isAbnormalO2 = vitals.oxygenSaturation && vitals.oxygenSaturation < 95;
+  const isAbnormalBP = sysVal && diaVal && (sysVal > 120 || sysVal < 80 || diaVal > 80 || diaVal < 60);
+  const isAbnormalO2 = vitals.oxygenSaturation && !isNaN(vitals.oxygenSaturation) && vitals.oxygenSaturation > 0 && vitals.oxygenSaturation < 93;
 
   const getGlucoseStatus = (type: 'fbg' | 'rbg', val: number) => {
     if (type === 'fbg') {
       if (val >= 126) return { label: 'DIABETES RANGE', color: 'error.main' };
       if (val >= 100) return { label: 'PREDIABETES', color: 'warning.main' };
+      if (val < 55) return { label: 'SEVERE HYPOGLYCEMIA', color: 'error.main' };
+      if (val < 70) return { label: 'HYPOGLYCEMIA', color: 'warning.main' };
       return { label: 'NORMAL', color: 'success.main' };
     } else {
       if (val >= 200) return { label: 'CRITICAL ALERT', color: 'error.main' };
       if (val >= 140) return { label: 'ELEVATED', color: 'warning.main' };
+      if (val < 55) return { label: 'SEVERE HYPOGLYCEMIA', color: 'error.main' };
+      if (val < 70) return { label: 'HYPOGLYCEMIA', color: 'warning.main' };
       return { label: 'NORMAL', color: 'success.main' };
     }
   };
 
   const getHbStatus = (val: number) => {
-    if (val < 7) return { label: 'SEVERE ANEMIA', color: 'error.main' };
-    if (val < 11) return { label: 'MODERATE ANEMIA', color: 'warning.main' };
-    if (val < 12) return { label: 'MILD ANEMIA', color: 'warning.main' };
-    return { label: 'NORMAL', color: 'success.main' };
+    const isMale = gender?.toLowerCase() === 'male';
+    const isPregnant = !!vitals?.is_pregnant;
+    if (isMale) {
+      if (val > 17.5) return { label: 'URGENT (HIGH HB)', color: 'warning.main' };
+      if (val < 7.0) return { label: 'SEVERE ANEMIA', color: 'error.main' };
+      if (val < 10.0) return { label: 'MODERATE ANEMIA', color: 'warning.main' };
+      if (val < 13.0) return { label: 'MILD ANEMIA', color: 'warning.main' };
+      return { label: 'NORMAL', color: 'success.main' };
+    } else {
+      const lowerLimitNormal = isPregnant ? 11.0 : 12.0;
+      if (val > 15.5) return { label: 'URGENT (HIGH HB)', color: 'warning.main' };
+      if (val < 7.0) return { label: 'SEVERE ANEMIA', color: 'error.main' };
+      if (val < 10.0) return { label: 'MODERATE ANEMIA', color: 'warning.main' };
+      if (val < lowerLimitNormal) return { label: 'MILD ANEMIA', color: 'warning.main' };
+      return { label: 'NORMAL', color: 'success.main' };
+    }
   };
 
   return (
@@ -94,8 +116,6 @@ const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals }) => {
         { label: 'FBG', value: vitals.fbg ? `${vitals.fbg} mg/dL (${getGlucoseStatus('fbg', vitals.fbg).label})` : null, color: vitals.fbg ? getGlucoseStatus('fbg', vitals.fbg).color : undefined },
         { label: 'RBG', value: vitals.rbg ? `${vitals.rbg} mg/dL (${getGlucoseStatus('rbg', vitals.rbg).label})` : null, color: vitals.rbg ? getGlucoseStatus('rbg', vitals.rbg).color : undefined },
         { label: 'Hemoglobin', value: vitals.hemoglobin ? `${vitals.hemoglobin} g/dL (${getHbStatus(vitals.hemoglobin).label})` : null, color: vitals.hemoglobin ? getHbStatus(vitals.hemoglobin).color : undefined },
-        { label: 'Fasting', value: vitals.is_fasting ? 'Yes' : 'No' },
-        { label: 'Symptomatic', value: vitals.has_symptoms ? 'Yes' : 'No' },
         { label: 'Pregnant', value: vitals.is_pregnant ? `Yes (${vitals.pregnancy_months}m)` : 'No' },
         { label: 'Allergies', 
           value: Array.isArray(vitals.allergies) ? (vitals.allergies.length ? vitals.allergies.join(', ') : 'None') : (vitals.allergies || 'None'), 

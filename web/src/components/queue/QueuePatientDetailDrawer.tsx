@@ -125,7 +125,13 @@ const QueuePatientDetailDrawer: React.FC<QueuePatientDetailDrawerProps> = ({ pat
               </Typography>
               {vitals ? (
                 <Box sx={{ bgcolor: 'white', p: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-                  <Typography variant="body2"><strong>BP:</strong> {vitals.systolic}/{vitals.diastolic} mmHg</Typography>
+                  {(() => {
+                    const drawerHasSecondBP = vitals.systolic_2 !== undefined && vitals.systolic_2 !== null && !isNaN(vitals.systolic_2) && vitals.systolic_2 > 0 &&
+                                            vitals.diastolic_2 !== undefined && vitals.diastolic_2 !== null && !isNaN(vitals.diastolic_2) && vitals.diastolic_2 > 0;
+                    const drawerSys = drawerHasSecondBP ? vitals.systolic_2 : vitals.systolic;
+                    const drawerDia = drawerHasSecondBP ? vitals.diastolic_2 : vitals.diastolic;
+                    return <Typography variant="body2"><strong>BP:</strong> {drawerSys || '--'}/{drawerDia || '--'} mmHg</Typography>;
+                  })()}
                   <Typography variant="body2"><strong>HR:</strong> {vitals.heartRate} bpm</Typography>
                   <Typography variant="body2"><strong>Temp:</strong> {vitals.temperature} °C</Typography>
                   <Typography variant="body2"><strong>Weight:</strong> {vitals.weight} kg</Typography>

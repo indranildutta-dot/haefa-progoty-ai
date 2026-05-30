@@ -39,9 +39,9 @@ The registration process is divided into three steps.
 - **Age Determination**:
   - **Date of Birth**: Format `DD/MM/YYYY`.
   - **Estimated Birth Year**: Used if DOB is unknown.
+- **Parent/Guardian / Family Fields**: Father's Given/Family Name and Mother's Given/Family Name appear in Step 0. At a minimum, either Father's info (First & Last Name) or Mother's info (First & Last Name) must be provided and is required for all patient registrations.
 - **Minor Detection (Automatic)**:
   - If calculated age is **< 18 years**, the system automatically flags the patient as a minor.
-  - **Parent/Guardian Fields**: Father's Given/Family Name and Mother's Given/Family Name appear automatically in Step 0 when a minor is detected.
 
 ### Step 1: Identity & Credentials
 - **Primary Contact**: Phone number.
@@ -74,10 +74,12 @@ Strict validation is enforced on blur and during form submission.
 | Field | Regex / Rule | Error Message |
 | :--- | :--- | :--- |
 | **Date of Birth** | `^(\d{2})/(\d{2})/(\d{4})$` | "Invalid format. Use DD/MM/YYYY." |
+| **Father/Mother Name** | At least one complete parent entry (first & last name) must be filled | "Father's Name or Mother's Name information is required." |
 | **National ID (BD)** | `^(\d{10}\|\d{13}\|\d{17})$` | "Invalid NID (10, 13, or 17 digits)." |
 | **FDMN Number (BD)** | Alphanumeric with hyphen (8-15 chars) OR 17-digit starting with 1 | "Invalid MoHA format." |
 | **Nepal ID** | `^\d{10}$` | "Invalid Citizen ID (10 digits)." |
 | **Bhutanese Refugee ID** | `^\d{5,8}$` OR `^\d{10,12}$` | "Invalid Refugee ID." |
+| **Email Address** | `^[^\s@]+@[^\s@]+\.[^\s@]+$` | "Invalid email format. Use address like email@domain.com." |
 
 ---
 

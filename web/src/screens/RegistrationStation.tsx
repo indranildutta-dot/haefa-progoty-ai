@@ -38,6 +38,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import FingerprintIcon from '@mui/icons-material/Fingerprint';
 import ContactPhoneIcon from '@mui/icons-material/ContactPhone';
+import EmailIcon from '@mui/icons-material/Email';
 import HomeIcon from '@mui/icons-material/Home';
 import BadgeIcon from '@mui/icons-material/Badge';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
@@ -369,6 +370,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
     parent_name: '',
     parent_id: '',
     phone: '',
+    email: '',
     marital_status: '' as any,
     national_id: '',
     rohingya_number: '',
@@ -410,7 +412,8 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
     rohingya_number: '',
     nepal_id: '',
     bhutanese_refugee_number: '',
-    date_of_birth: ''
+    date_of_birth: '',
+    email: ''
   });
 
   const validateDOB = useCallback((value: string) => {
@@ -453,6 +456,14 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
     const trimmed = value.trim();
     if (!trimmed) return '';
     return (/^\d{5,8}$/.test(trimmed) || /^\d{10,12}$/.test(trimmed)) ? '' : "Invalid Refugee ID.";
+  }, []);
+
+  const validateEmail = useCallback((value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    // Checks for xxx@xxx.xxx email address type format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(trimmed) ? '' : "Invalid email format. Use address like email@domain.com.";
   }, []);
 
   const calculateIsMinor = (dob: string, birthYear: string | number) => {
@@ -504,6 +515,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
     });
 
     if (field === 'date_of_birth') setValidationErrors(prev => ({ ...prev, date_of_birth: validateDOB(value) }));
+    if (field === 'email') setValidationErrors(prev => ({ ...prev, email: validateEmail(value) }));
     if (selectedCountry?.id === 'BD') {
       if (field === 'national_id') setValidationErrors(prev => ({ ...prev, national_id: validateNID(value) }));
       else if (field === 'fcn_number' || field === 'rohingya_number') setValidationErrors(prev => ({ ...prev, rohingya_number: validateRohingyaNumber(value) }));
@@ -516,6 +528,7 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
   const handleFieldBlur = (field: string) => {
     const value = (newPatient as any)[field] || '';
     if (field === 'date_of_birth') setValidationErrors(prev => ({ ...prev, date_of_birth: validateDOB(value) }));
+    if (field === 'email') setValidationErrors(prev => ({ ...prev, email: validateEmail(value) }));
     if (selectedCountry?.id === 'BD') {
       if (field === 'national_id') setValidationErrors(prev => ({ ...prev, national_id: validateNID(value) }));
       else if (field === 'fcn_number' || field === 'rohingya_number') setValidationErrors(prev => ({ ...prev, rohingya_number: validateRohingyaNumber(value) }));
@@ -641,6 +654,21 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
       if (!patientPhotoUrl) {
         notify("Patient photo required.", "error");
         return;
+      }
+      
+      if (newPatient.is_minor) {
+        const fatherGiven = (newPatient.father_given_name || '').trim();
+        const fatherFamily = (newPatient.father_family_name || '').trim();
+        const motherGiven = (newPatient.mother_given_name || '').trim();
+        const motherFamily = (newPatient.mother_family_name || '').trim();
+
+        const hasFather = fatherGiven !== '' && fatherFamily !== '';
+        const hasMother = motherGiven !== '' && motherFamily !== '';
+
+        if (!hasFather && !hasMother) {
+          notify("At a minimum, either Father's or Mother's information (both first and last name) is required and must be provided.", "error");
+          return;
+        }
       }
     }
     if (activeStep === 1 && !newPatient.marital_status) {
@@ -902,6 +930,23 @@ const RegistrationStation: React.FC<RegistrationStationProps> = ({
                 <MenuItem value="divorced">Divorced</MenuItem>
                 <MenuItem value="widowed">Widowed</MenuItem>
               </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField 
+                fullWidth 
+                label="Email Address" 
+                value={newPatient.email || ''} 
+                error={!!validationErrors.email} 
+                helperText={validationErrors.email} 
+                onChange={(e) => handleFieldChange('email', e.target.value)} 
+                onBlur={() => handleFieldBlur('email')} 
+                InputProps={{ 
+                  sx: { height: 80, fontSize: '1.5rem', fontWeight: 700 }, 
+                  startAdornment: (<InputAdornment position="start"><EmailIcon color="primary" /></InputAdornment>) 
+                }} 
+                InputLabelProps={{ sx: { fontSize: '1.1rem', fontWeight: 600 }}} 
+                sx={{ bgcolor: 'white' }} 
+              />
             </Grid>
             {selectedCountry?.id === 'NP' && (
               <>

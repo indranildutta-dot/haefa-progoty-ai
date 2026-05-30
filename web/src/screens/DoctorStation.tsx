@@ -539,8 +539,12 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
   useEffect(() => {
     if (!isCRAEligible) return;
 
+    const vitalsObj = selectedPatient?.currentVitals;
+    const has2BP = vitalsObj && typeof vitalsObj.systolic_2 === 'number' && !isNaN(vitalsObj.systolic_2) && vitalsObj.systolic_2 > 0 && typeof vitalsObj.diastolic_2 === 'number' && !isNaN(vitalsObj.diastolic_2) && vitalsObj.diastolic_2 > 0;
+    const preferredSBP = has2BP ? vitalsObj?.systolic_2 : vitalsObj?.systolic;
+
     // 1. Non-Lab
-    const nonLabSBP = parseFloat(data.cvRisk.sbp) || (typeof selectedPatient?.currentVitals?.systolic === 'number' ? selectedPatient.currentVitals.systolic : parseFloat(selectedPatient?.currentVitals?.systolic || ''));
+    const nonLabSBP = parseFloat(data.cvRisk.sbp) || (typeof preferredSBP === 'number' ? preferredSBP : parseFloat((preferredSBP as any) || ''));
     const nonLabBMI = parseFloat(data.cvRisk.bmi) || (typeof selectedPatient?.currentVitals?.bmi === 'number' ? selectedPatient.currentVitals.bmi : parseFloat(selectedPatient?.currentVitals?.bmi || ''));
 
     const inputs: CVRiskInputs = {
@@ -564,7 +568,7 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
     }
 
     // 2. Lab-Based
-    const labSBP = parseFloat(data.cvRiskLab.sbp) || (typeof selectedPatient?.currentVitals?.systolic === 'number' ? selectedPatient.currentVitals.systolic : parseFloat(selectedPatient?.currentVitals?.systolic || ''));
+    const labSBP = parseFloat(data.cvRiskLab.sbp) || (typeof preferredSBP === 'number' ? preferredSBP : parseFloat((preferredSBP as any) || ''));
     const labCholInput = parseFloat(data.cvRiskLab.totalCholesterol);
     const labChol = (data.cvRiskLab.totalCholesterolUnit === 'mmol/L' && !isNaN(labCholInput)) 
       ? labCholInput * 38.67 
@@ -1528,6 +1532,9 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
       
       const patientAge = calculateAgeYears(patient);
       
+      const hasSecondBP = vitals && typeof vitals.systolic_2 === 'number' && !isNaN(vitals.systolic_2) && vitals.systolic_2 > 0 && typeof vitals.diastolic_2 === 'number' && !isNaN(vitals.diastolic_2) && vitals.diastolic_2 > 0;
+      const prefilledSBP = hasSecondBP ? vitals.systolic_2?.toString() : vitals?.systolic?.toString();
+      
       // Pre-fill CRA data from previous stations
       const preFilledAssessment = {
         ...initialClinicalAssessment,
@@ -1536,7 +1543,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
           age: patientAge.toString(),
           sex: patient?.gender === 'male' ? 'Men' : 'Women',
           bmi: vitals?.bmi?.toString() || '',
-          sbp: vitals?.systolic?.toString() || '',
+          sbp: prefilledSBP || '',
           isSmoker: vitals?.social_history?.smoking === true ? 'Yes' : (vitals?.social_history?.smoking === false ? 'No' : ''),
           diabetes: (vitals?.rbg >= 200 || vitals?.fbg >= 126) ? 'Yes' : (vitals?.rbg || vitals?.fbg ? 'No' : ''),
           overrides: [],
@@ -1546,7 +1553,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
           age: patientAge.toString(),
           sex: patient?.gender === 'male' ? 'Men' : 'Women',
           bmi: vitals?.bmi?.toString() || '',
-          sbp: vitals?.systolic?.toString() || '',
+          sbp: prefilledSBP || '',
           isSmoker: vitals?.social_history?.smoking === true ? 'Yes' : (vitals?.social_history?.smoking === false ? 'No' : ''),
           diabetes: (vitals?.rbg >= 200 || vitals?.fbg >= 126) ? 'Yes' : (vitals?.rbg || vitals?.fbg ? 'No' : ''),
           totalCholesterol: vitals?.total_cholesterol?.toString() || '',
@@ -1791,7 +1798,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
           <Grid container spacing={3} sx={{ mt: 1 }}>
             {/* LEFT: Vitals */}
             <Grid size={{ xs: 12, md: 2.5 }} sx={{ position: 'sticky', top: 80, alignSelf: 'flex-start', maxHeight: '80vh', overflowY: 'auto' }}>
-              <VitalsSnapshot vitals={currentVitals} />
+              <VitalsSnapshot vitals={currentVitals} gender={selectedPatient?.gender} />
             </Grid>
 
             {/* MIDDLE: Assessment & Diagnosis */}

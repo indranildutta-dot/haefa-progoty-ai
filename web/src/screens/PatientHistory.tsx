@@ -298,7 +298,14 @@ const PatientHistory: React.FC = () => {
                             <Stack spacing={0.5}>
                               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <Typography variant="caption" color="text.secondary">BP:</Typography>
-                                <Typography variant="caption" fontWeight="bold">{vitals.systolic || '--'}/{vitals.diastolic || '--'} mmHg</Typography>
+                                {(() => {
+                                  const cv = vitals;
+                                  const hasSecond = cv && cv.systolic_2 !== undefined && cv.systolic_2 !== null && !isNaN(cv.systolic_2) && cv.systolic_2 > 0 &&
+                                                   cv.diastolic_2 !== undefined && cv.diastolic_2 !== null && !isNaN(cv.diastolic_2) && cv.diastolic_2 > 0;
+                                  const sys = hasSecond ? cv.systolic_2 : cv?.systolic;
+                                  const dia = hasSecond ? cv.diastolic_2 : cv?.diastolic;
+                                  return <Typography variant="caption" fontWeight="bold">{sys || '--'}/{dia || '--'} mmHg</Typography>;
+                                })()}
                               </Box>
                               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <Typography variant="caption" color="text.secondary">HR:</Typography>

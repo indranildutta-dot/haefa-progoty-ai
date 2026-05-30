@@ -11,7 +11,12 @@ import {
   TextField,
   InputAdornment
 } from '@mui/material';
-import { ArrowBack, Email, Lock, Visibility, VisibilityOff, Login } from '@mui/icons-material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import EmailIcon from '@mui/icons-material/Email';
+import LockIcon from '@mui/icons-material/Lock';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import LoginIcon from '@mui/icons-material/Login';
 import { loginWithEmailAndPassword } from '../services/authService';
 import { CountryConfig } from '../config/countries';
 
@@ -57,7 +62,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ selectedCountry, onBack }) => {
       <Paper elevation={0} sx={{ p: 4, borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
         <Box sx={{ mb: 4, display: 'flex', alignItems: 'center' }}>
           <IconButton onClick={onBack} sx={{ mr: 2 }}>
-            <ArrowBack />
+            <ArrowBackIcon />
           </IconButton>
           <Box>
             <Typography variant="h4" fontWeight={800}>
@@ -84,14 +89,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ selectedCountry, onBack }) => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={loading}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Email color="action" />
-                  </InputAdornment>
-                ),
-              },
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <EmailIcon color="action" />
+                </InputAdornment>
+              ),
             }}
           />
 
@@ -107,25 +110,23 @@ const LoginPage: React.FC<LoginPageProps> = ({ selectedCountry, onBack }) => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={loading}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Lock color="action" />
-                  </InputAdornment>
-                ),
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      aria-label="toggle password visibility"
-                      onClick={() => setShowPassword(!showPassword)}
-                      edge="end"
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              },
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <LockIcon color="action" />
+                </InputAdornment>
+              ),
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label="toggle password visibility"
+                    onClick={() => setShowPassword(!showPassword)}
+                    edge="end"
+                  >
+                    {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                  </IconButton>
+                </InputAdornment>
+              ),
             }}
           />
 
@@ -135,7 +136,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ selectedCountry, onBack }) => {
             variant="contained"
             size="large"
             disabled={loading}
-            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Login />}
+            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <LoginIcon />}
             sx={{ mt: 4, py: 2, fontWeight: 700, borderRadius: 2, fontSize: '1.1rem', textTransform: 'none' }}
           >
             {loading ? 'Signing In...' : 'Sign In to Clinic'}

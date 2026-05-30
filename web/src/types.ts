@@ -45,6 +45,7 @@ export interface Patient {
   age_months?: number;
   age_days?: number;
   phone?: string;
+  email?: string;
   marital_status?: 'single' | 'married' | 'divorced' | 'widowed' | 'separated';
   national_id?: string;
   rohingya_number?: string;

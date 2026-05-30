@@ -248,7 +248,14 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
           <Grid container spacing={1}>
             <Grid size={6}>
               <Typography variant="caption" color="text.secondary" display="block">BP</Typography>
-              <Typography variant="body2" fontWeight="bold">{currentItem.vitals?.systolic}/{currentItem.vitals?.diastolic}</Typography>
+              {(() => {
+                const cv = currentItem.vitals;
+                const hasSecond = cv && cv.systolic_2 !== undefined && cv.systolic_2 !== null && !isNaN(cv.systolic_2) && cv.systolic_2 > 0 &&
+                                 cv.diastolic_2 !== undefined && cv.diastolic_2 !== null && !isNaN(cv.diastolic_2) && cv.diastolic_2 > 0;
+                const sys = hasSecond ? cv.systolic_2 : cv?.systolic;
+                const dia = hasSecond ? cv.diastolic_2 : cv?.diastolic;
+                return <Typography variant="body2" fontWeight="bold">{sys || '--'}/{dia || '--'}</Typography>;
+              })()}
             </Grid>
             <Grid size={6}>
               <Typography variant="caption" color="text.secondary" display="block">BMI</Typography>
@@ -301,7 +308,14 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
                   <Grid size={{ xs: 12, md: 4 }}>
                     <Typography variant="subtitle2" fontWeight="900" color="text.secondary">VITAL SIGNS & TRIAGE</Typography>
                     <Paper variant="outlined" sx={{ p: 2, mt: 1, borderRadius: 2 }}>
-                      <Typography variant="body2">BP: <strong>{item.vitals?.systolic}/{item.vitals?.diastolic}</strong></Typography>
+                      {(() => {
+                        const cv = item.vitals;
+                        const hasSecond = cv && cv.systolic_2 !== undefined && cv.systolic_2 !== null && !isNaN(cv.systolic_2) && cv.systolic_2 > 0 &&
+                                         cv.diastolic_2 !== undefined && cv.diastolic_2 !== null && !isNaN(cv.diastolic_2) && cv.diastolic_2 > 0;
+                        const sys = hasSecond ? cv.systolic_2 : cv?.systolic;
+                        const dia = hasSecond ? cv.diastolic_2 : cv?.diastolic;
+                        return <Typography variant="body2">BP: <strong>{sys || '--'}/{dia || '--'}</strong></Typography>;
+                      })()}
                       <Typography variant="body2">Heart Rate: <strong>{item.vitals?.heartRate} bpm</strong></Typography>
                       <Typography variant="body2">SpO2: <strong>{item.vitals?.oxygenSaturation}%</strong></Typography>
                       <Typography variant="body2">Temp: <strong>{item.vitals?.temperature}°C</strong></Typography>

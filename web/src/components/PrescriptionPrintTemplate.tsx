@@ -320,7 +320,14 @@ const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTe
             <Typography variant="body2" sx={{ mb: 1 }}><strong>Complaints:</strong> {diagnosis?.chief_complaint || diagnosis?.notes || "None recorded"}</Typography>
             <Typography variant="body2" sx={{ mb: 1 }}>
               <strong>O/E:</strong> 
-              {vitals ? ` BP: ${vitals.systolic}/${vitals.diastolic} mmHg, HR: ${vitals.heartRate} bpm, Temp: ${vitals.temperature}°C, SpO2: ${vitals.oxygenSaturation}%` : " No vitals recorded"}
+              {(() => {
+                if (!vitals) return " No vitals recorded";
+                const hasSecond = vitals.systolic_2 !== undefined && vitals.systolic_2 !== null && !isNaN(vitals.systolic_2) && vitals.systolic_2 > 0 &&
+                                 vitals.diastolic_2 !== undefined && vitals.diastolic_2 !== null && !isNaN(vitals.diastolic_2) && vitals.diastolic_2 > 0;
+                const sys = hasSecond ? vitals.systolic_2 : vitals.systolic;
+                const dia = hasSecond ? vitals.diastolic_2 : vitals.diastolic;
+                return ` BP: ${sys || '--'}/${dia || '--'} mmHg, HR: ${vitals.heartRate || '--'} bpm, Temp: ${vitals.temperature || '--'}°C, SpO2: ${vitals.oxygenSaturation || '--'}%`;
+              })()}
             </Typography>
             {!!vitals?.blood_sugar && (
               <Typography variant="body2"><strong>Blood Sugar:</strong> {vitals.blood_sugar} mg/dL</Typography>

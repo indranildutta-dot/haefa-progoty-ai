@@ -42,6 +42,20 @@ const PatientContextBar: React.FC = () => {
   const triage = getTriageStyle(selectedPatient.triage_level || 'standard');
   const vitals = selectedPatient.currentVitals;
 
+  const hasSecondBP = 
+    vitals &&
+    vitals.systolic_2 !== undefined && 
+    vitals.systolic_2 !== null && 
+    !isNaN(vitals.systolic_2) && 
+    vitals.systolic_2 > 0 &&
+    vitals.diastolic_2 !== undefined && 
+    vitals.diastolic_2 !== null && 
+    !isNaN(vitals.diastolic_2) && 
+    vitals.diastolic_2 > 0;
+
+  const displaySystolic = hasSecondBP ? vitals.systolic_2 : vitals?.systolic;
+  const displayDiastolic = hasSecondBP ? vitals.diastolic_2 : vitals?.diastolic;
+
   // 3. Highest Alert Color System (Halo)
   const getHighestAlertColor = () => {
     const colors = {
@@ -92,11 +106,15 @@ const PatientContextBar: React.FC = () => {
       const age = getAgeYears();
 
       // Factor: BP
-      const s = vitals.systolic_2 || vitals.systolic;
-      const d = vitals.diastolic_2 || vitals.diastolic;
-      if (s >= 180 || d >= 120) updatePriority(colors.RED);
-      else if (s >= 130 || d >= 80) updatePriority(colors.YELLOW);
-      else if (s > 0) updatePriority(colors.GREEN);
+      const s = displaySystolic;
+      const d = displayDiastolic;
+      if ((s > 0 && (s > 130 || s < 70)) || (d > 0 && (d > 90 || d < 50))) {
+        updatePriority(colors.RED);
+      } else if ((s > 0 && ((s >= 120 && s <= 130) || (s >= 70 && s < 80))) || (d > 0 && ((d >= 80 && d <= 90) || (d >= 50 && d < 60)))) {
+        updatePriority(colors.YELLOW);
+      } else if (s > 0 || d > 0) {
+        updatePriority(colors.GREEN);
+      }
 
       // Factor: HR
       if (vitals.heartRate > 0) {
@@ -218,13 +236,13 @@ const PatientContextBar: React.FC = () => {
             <Box>
               <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 900, display: 'block', lineHeight: 1 }}>BP</Typography>
               <Typography variant="body2" sx={{ fontWeight: 900, color: '#0f172a' }}>
-                {vitals?.systolic || '--'}/{vitals?.diastolic || '--'}
+                {displaySystolic !== undefined && !isNaN(displaySystolic) ? displaySystolic : '--'}/{displayDiastolic !== undefined && !isNaN(displayDiastolic) ? displayDiastolic : '--'}
               </Typography>
             </Box>
             <Box>
               <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 900, display: 'block', lineHeight: 1 }}>SpO2</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 900, color: (vitals?.oxygenSaturation && vitals.oxygenSaturation < 94) ? '#ef4444' : '#0f172a' }}>
-                {vitals?.oxygenSaturation ? `${vitals.oxygenSaturation}%` : '--'}
+              <Typography variant="body2" sx={{ fontWeight: 900, color: (vitals?.oxygenSaturation && !isNaN(vitals.oxygenSaturation) && vitals.oxygenSaturation > 0 && vitals.oxygenSaturation < 93) ? '#ef4444' : '#0f172a' }}>
+                {vitals?.oxygenSaturation && !isNaN(vitals.oxygenSaturation) && vitals.oxygenSaturation > 0 ? `${vitals.oxygenSaturation}%` : '--'}
               </Typography>
             </Box>
             <Box>
@@ -340,8 +358,7 @@ const PatientContextBar: React.FC = () => {
         )}
 
         {/* BP Alert - Hypertension if second reading is also abnormal (>= 130/80) */}
-        {((vitals?.systolic_2 >= 130 || vitals?.diastolic_2 >= 80) || 
-          (vitals?.systolic_2 === undefined && (vitals?.systolic >= 130 || vitals?.diastolic >= 80))) && (
+        {((displaySystolic >= 130 || displayDiastolic >= 80)) && (
           <Chip 
             icon={<FavoriteIcon style={{ color: 'white', fontSize: 16 }} />}
             label="HYPERTENSION"
@@ -350,7 +367,7 @@ const PatientContextBar: React.FC = () => {
         )}
 
         {/* SpO2 Alert */}
-        {vitals?.oxygenSaturation !== undefined && vitals.oxygenSaturation < 94 && (
+        {vitals?.oxygenSaturation !== undefined && !isNaN(vitals.oxygenSaturation) && vitals.oxygenSaturation > 0 && vitals.oxygenSaturation < 93 && (
           <Chip 
             icon={<OpacityIcon style={{ color: 'white', fontSize: 16 }} />}
             label="LOW SpO2"
