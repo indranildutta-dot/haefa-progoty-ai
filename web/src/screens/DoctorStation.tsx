@@ -103,7 +103,7 @@ const sanitizeForFirestore = (obj: any) => {
 export type SectionStatus = 'Not Started' | 'In Progress' | 'Complete';
 
 export interface ClinicalAssessmentData {
-  complaints: { date: string; description: string; duration: string }[];
+  complaints: { description: string; duration: string; durationUnit: string }[];
   tbScreening: Record<string, string | null>;
   suspectedTBAdditionalSymptoms: Record<string, string | null>;
   suspectedTBExamFindings: Record<string, string | null>;
@@ -784,7 +784,7 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
               disabled={!editModes['complaints']}
               onClick={() => {
                 handleStartSection('complaints');
-                onChange({ ...data, complaints: [...data.complaints, { date: new Date().toISOString().split('T')[0], description: '', duration: '' }] });
+                onChange({ ...data, complaints: [...data.complaints, { description: '', duration: '', durationUnit: 'Days' }] });
               }}
             >
               <AddCircleIcon fontSize="large" />
@@ -792,17 +792,6 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
           </Box>
           {data.complaints.map((complaint, index) => (
             <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: '#f8fafc', p: 1.5, borderRadius: 3, mb: 1 }}>
-              <TextField 
-                type="date" 
-                value={complaint.date || ''} 
-                disabled={!editModes['complaints']}
-                onChange={(e) => {
-                  handleStartSection('complaints');
-                  const newComplaints = [...data.complaints];
-                  newComplaints[index].date = e.target.value;
-                  onChange({ ...data, complaints: newComplaints });
-                }} 
-              />
               <TextField 
                 fullWidth 
                 placeholder="Complaint description" 
@@ -817,6 +806,8 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
               />
               <TextField 
                 placeholder="Duration" 
+                sx={{ width: 120 }}
+                type="number"
                 value={complaint.duration || ''} 
                 disabled={!editModes['complaints']}
                 onChange={(e) => {
@@ -826,6 +817,23 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
                   onChange({ ...data, complaints: newComplaints });
                 }} 
               />
+              <FormControl sx={{ minWidth: 120 }} disabled={!editModes['complaints']}>
+                <Select
+                  displayEmpty
+                  value={complaint.durationUnit || 'Days'}
+                  onChange={(e) => {
+                    handleStartSection('complaints');
+                    const newComplaints = [...data.complaints];
+                    newComplaints[index].durationUnit = e.target.value as string;
+                    onChange({ ...data, complaints: newComplaints });
+                  }}
+                >
+                  <MenuItem value="Days">Days</MenuItem>
+                  <MenuItem value="Weeks">Weeks</MenuItem>
+                  <MenuItem value="Months">Months</MenuItem>
+                  <MenuItem value="Years">Years</MenuItem>
+                </Select>
+              </FormControl>
               <IconButton 
                 color="error" 
                 disabled={!editModes['complaints']}

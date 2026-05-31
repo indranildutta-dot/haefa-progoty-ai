@@ -19,10 +19,12 @@ import { collection, query, where, getDocs, doc, updateDoc, addDoc, serverTimest
 import * as XLSX from 'xlsx';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
+// Change imports
 import { subscribeToQueue, updateQueueStatus, cancelQueueItem } from '../services/queueService';
 import { getPatientById } from '../services/patientService';
 import { getOfflineInventory } from '../services/localDataSync';
 import { getVitalsByEncounter, saveDispensationProgress } from '../services/encounterService';
+import { getInventoryTemplate } from '../services/pharmacyService';
 import { useAppStore } from '../store/useAppStore';
 import SaveIcon from '@mui/icons-material/Save';
 import StationLayout from '../components/StationLayout';
@@ -545,9 +547,8 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
 
   const handleDownloadTemplate = async () => {
     try {
-      const getTemplate = httpsCallable(functions, 'getInventoryTemplate');
-      const result = await getTemplate();
-      const { fileBase64 } = result.data as any;
+      const result = await getInventoryTemplate();
+      const { fileBase64 } = result;
       
       const link = document.createElement('a');
       link.href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${fileBase64}`;
@@ -555,6 +556,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       link.click();
       notify("Template downloaded", "success");
     } catch (err) {
+      console.error(err);
       notify("Error downloading template", "error");
     }
   };

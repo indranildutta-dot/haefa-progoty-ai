@@ -326,7 +326,7 @@ const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTe
               {(() => {
                 const comps = diagnosis?.assessment?.complaints;
                 if (comps && comps.length > 0) {
-                  return comps.map((c: any) => `${c.description} ${c.duration ? `(${c.duration})` : ''}`).join(', ');
+                  return comps.map((c: any) => `${c.description} ${c.duration ? `(${c.duration} ${c.durationUnit || 'Days'})` : ''}`).join(', ');
                 }
                 return diagnosis?.chief_complaint || "None recorded";
               })()}

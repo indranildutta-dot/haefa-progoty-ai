@@ -145,7 +145,7 @@ const BatchEntry: React.FC<BatchEntryProps> = ({ open, onClose, onSuccess }) => 
             Upload a standardized HAEFA Excel template to update medication stock levels for this clinic.
           </Typography>
           <Typography variant="caption" color="primary" fontWeight="700">
-            Required Columns: medication_id, batch_id, expiry_date, quantity, dosage
+            Required Columns: medication_id, batch_id, expiry_date, quantity, dosage, dosage_unit
           </Typography>
         </Box>
 

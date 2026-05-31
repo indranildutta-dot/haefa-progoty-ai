@@ -886,10 +886,19 @@ export const bulkUpload = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "Missing clinicId or file data.");
   }
 
-  const ExcelJS = await import('exceljs');
-  const workbook = new ExcelJS.Workbook();
+  const ExcelJS: any = await import('exceljs');
+  const Workbook = ExcelJS.Workbook || ExcelJS.default?.Workbook;
+  if (!Workbook) {
+    throw new HttpsError("internal", "Failed to load Excel module.");
+  }
+  const workbook = new Workbook();
   
-  await workbook.xlsx.load(Buffer.from(fileBase64, 'base64') as any);
+  try {
+    await workbook.xlsx.load(Buffer.from(fileBase64, 'base64') as any);
+  } catch (err: any) {
+    throw new HttpsError("invalid-argument", "Invalid Excel file format.");
+  }
+  
   const worksheet = workbook.getWorksheet(1);
   const db = await getDb();
   const admin = await getAdmin();
@@ -897,10 +906,25 @@ export const bulkUpload = onCall(async (request) => {
   
   const incomingStock = new Map<string, number>();
 
-  worksheet?.eachRow((row, rowNumber) => {
+  worksheet?.eachRow((row: any, rowNumber: number) => {
     if (rowNumber === 1) return;
     const medId = row.getCell(1).value?.toString().trim() || "";
+    const batchId = row.getCell(2).value?.toString().trim() || "";
+    
+    let expiry_date: any = null;
+    const expiryVal = row.getCell(3).value;
+    if (expiryVal instanceof Date) {
+      expiry_date = admin.firestore.Timestamp.fromDate(expiryVal);
+    } else if (typeof expiryVal === 'string') {
+      const d = new Date(expiryVal);
+      if (!isNaN(d.getTime())) {
+        expiry_date = admin.firestore.Timestamp.fromDate(d);
+      }
+    }
+    
     const qty = Number(row.getCell(4).value) || 0;
+    const base_unit = row.getCell(5).value?.toString().trim() || "";
+    const package_unit = row.getCell(6).value?.toString().trim() || "";
     const dosage = row.getCell(7).value?.toString().trim() || "N/A";
     
     if (!medId || medId.toUpperCase().includes('EXAMPLE')) return;
@@ -909,12 +933,19 @@ export const bulkUpload = onCall(async (request) => {
     incomingStock.set(medLower, (incomingStock.get(medLower) || 0) + qty);
 
     const docRef = db.collection(`clinics/${clinicId}/inventory`).doc();
-    batch.set(docRef, { 
+    const payload: any = { 
       medication_id: medId, 
       med_id_lower: medLower, 
-      dosage, quantity: qty, 
+      dosage, 
+      quantity: qty, 
       created_at: admin.firestore.Timestamp.now() 
-    });
+    };
+    if (batchId) payload.batch_id = batchId;
+    if (expiry_date) payload.expiry_date = expiry_date;
+    if (base_unit) payload.base_unit = base_unit;
+    if (package_unit) payload.package_unit = package_unit;
+    
+    batch.set(docRef, payload);
   });
 
   // Automatically reconcile the incoming stock with pending procurement requests / shortfalls
@@ -964,6 +995,7 @@ export const getInventoryTemplate = onCall(async (request) => {
   const ExcelJS = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Inventory Template');
+  
   sheet.columns = [
     { header: 'medication_id', key: 'name', width: 25 },
     { header: 'batch_id', key: 'batch', width: 15 },
@@ -971,8 +1003,70 @@ export const getInventoryTemplate = onCall(async (request) => {
     { header: 'quantity', key: 'qty', width: 10 },
     { header: 'base_unit', key: 'base', width: 12 },
     { header: 'package_unit', key: 'pkg', width: 12 },
-    { header: 'dosage', key: 'dosage', width: 15 }
+    { header: 'dosage', key: 'dosage', width: 15 },
+    { header: 'dosage_unit', key: 'unit', width: 15 }
   ];
+
+  // Set date format DD/MM/YYYY for the expiry column
+  sheet.getColumn('expiry').numFmt = 'dd/mm/yyyy';
+
+  // Add examples
+  sheet.addRow({
+    name: 'Example: Paracetamol',
+    batch: 'BAT-123',
+    expiry: new Date('2027-12-31T00:00:00Z'),
+    qty: 500,
+    base: 'Tablet',
+    pkg: 'Box',
+    dosage: '500',
+    unit: 'mg'
+  });
+  
+  sheet.addRow({
+    name: 'Example: Amoxicillin',
+    batch: 'AMOX-456',
+    expiry: new Date('2028-06-30T00:00:00Z'),
+    qty: 1000,
+    base: 'Capsule',
+    pkg: 'Bottle',
+    dosage: '250',
+    unit: 'mg'
+  });
+
+  // Make rows 2 and 3 orange
+  [sheet.getRow(2), sheet.getRow(3)].forEach(row => {
+    row.eachCell((cell: any) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFFC000' } // Orange
+      };
+      cell.font = { bold: true };
+    });
+  });
+
+  // Add Data Validation
+  for (let i = 4; i <= 1000; i++) {
+    // Dosage Unit dropdown
+    sheet.getCell(`H${i}`).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ['"mg,g,mcg,ml,IU"']
+    };
+    
+    // Expiry Date hint
+    sheet.getCell(`C${i}`).dataValidation = {
+      type: 'date',
+      operator: 'greaterThan',
+      showErrorMessage: true,
+      allowBlank: true,
+      formulae: [new Date('2000-01-01')],
+      showInputMessage: true,
+      promptTitle: 'Date Format',
+      prompt: 'Enter date as DD/MM/YYYY'
+    };
+  }
+
   const buffer = await workbook.xlsx.writeBuffer();
   return { fileBase64: (buffer as any).toString('base64') };
 });
