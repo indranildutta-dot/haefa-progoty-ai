@@ -49,9 +49,9 @@ const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals, gender }) => {
   const sysVal = hasSecondBP ? vitals.systolic_2 : vitals.systolic;
   const diaVal = hasSecondBP ? vitals.diastolic_2 : vitals.diastolic;
 
-  const isAbnormalTemp = vitals.temperature && (vitals.temperature >= 38.5 || vitals.temperature < 35.0);
+  const isAbnormalTemp = vitals.temperature && (vitals.temperature >= 38.0 || vitals.temperature < 37.0);
   const isAbnormalHR = vitals.heartRate && (vitals.heartRate > 100 || vitals.heartRate < 60);
-  const isAbnormalBP = sysVal && diaVal && (sysVal > 120 || sysVal < 80 || diaVal > 80 || diaVal < 60);
+  const isAbnormalBP = sysVal && diaVal && (sysVal > 129 || sysVal < 110 || diaVal >= 80 || diaVal < 60);
   const isAbnormalO2 = vitals.oxygenSaturation && !isNaN(vitals.oxygenSaturation) && vitals.oxygenSaturation > 0 && vitals.oxygenSaturation < 93;
 
   const getGlucoseStatus = (type: 'fbg' | 'rbg', val: number) => {

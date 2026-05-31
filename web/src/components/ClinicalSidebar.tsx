@@ -154,8 +154,8 @@ const ClinicalSidebar: React.FC = () => {
                     label="Blood Pressure" 
                     value={(!isNaN(displaySys) && !isNaN(displayDia)) ? `${displaySys}/${displayDia}` : '--'} 
                     unit="mmHg" 
-                    isEmergency={(!isNaN(displaySys) && displaySys > 0 && (displaySys > 130 || displaySys < 70)) || (!isNaN(displayDia) && displayDia > 0 && (displayDia > 90 || displayDia < 50))}
-                    isWarning={(!isNaN(displaySys) && displaySys > 0 && ((displaySys >= 120 && displaySys <= 130) || (displaySys >= 70 && displaySys < 80))) || (!isNaN(displayDia) && displayDia > 0 && ((displayDia >= 80 && displayDia <= 90) || (displayDia >= 50 && displayDia < 60)))}
+                    isEmergency={(!isNaN(displaySys) && displaySys > 0 && (displaySys >= 140 || displaySys <= 99)) || (!isNaN(displayDia) && displayDia > 0 && (displayDia > 90 || displayDia < 50))}
+                    isWarning={(!isNaN(displaySys) && displaySys > 0 && ((displaySys >= 130 && displaySys <= 139) || (displaySys >= 100 && displaySys <= 109))) || (!isNaN(displayDia) && displayDia > 0 && ((displayDia >= 80 && displayDia <= 90) || (displayDia >= 50 && displayDia < 60)))}
                   />
                 );
               })()}
@@ -180,8 +180,8 @@ const ClinicalSidebar: React.FC = () => {
                 label="Temperature" 
                 value={v.temperature} 
                 unit="°C" 
-                isEmergency={v.temperature > 40 || (v.temperature > 0 && v.temperature < 35)}
-                isWarning={(v.temperature >= 38.5 && v.temperature <= 40) || (v.temperature >= 35 && v.temperature < 36)}
+                isEmergency={v.temperature >= 39.5 || (v.temperature > 0 && v.temperature < 35.0)}
+                isWarning={(v.temperature >= 38.0 && v.temperature < 39.5) || (v.temperature >= 35.0 && v.temperature < 37.0)}
               />
             </Box>
 

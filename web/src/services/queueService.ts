@@ -38,8 +38,17 @@ export const isPatientInQueue = async (patientId: string) => {
   const snapshot = await getDocs(q);
   if (snapshot.empty) return null;
   
-  const doc = snapshot.docs[0];
-  return { id: doc.id, ...doc.data() } as QueueItem;
+  // Filter out any lingering documents that might have COMPLETED/CANCELLED status 
+  // but failed to delete from active_queues in earlier bugs
+  const activeDocs = snapshot.docs.filter(doc => {
+    const data = doc.data();
+    return data.status !== 'COMPLETED' && data.status !== 'CANCELLED';
+  });
+
+  if (activeDocs.length === 0) return null;
+
+  const docData = activeDocs[0];
+  return { id: docData.id, ...docData.data() } as QueueItem;
 };
 
 export const addToQueue = async (queueData: Omit<QueueItem, 'id' | 'created_at' | 'country_id' | 'clinic_id'>) => {

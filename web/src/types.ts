@@ -254,6 +254,7 @@ export interface DiagnosisRecord {
   provisionalDiagnosisMinor?: string[];
   notes: string;
   treatment_notes?: string;
+  followUpDate?: string;
   chief_complaint?: string;
   labInvestigations?: string[];
   referrals?: string[];

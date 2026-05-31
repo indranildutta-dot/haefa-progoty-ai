@@ -25,7 +25,8 @@ The Vitals workflow is split into three modes (Body Measures, Vital Signs, Labs 
 - **Documentation**: Refer to `/vitals_station.md` for the full specification of fields, thresholds, and logic.
 - **Key Constraints**:
   - **Clinical Thresholds**: Always use the age-based thresholds for Heart Rate (HR) and Respiratory Rate (RR) as defined in `vitals_station.md`.
-  - **Glucose Thresholds**: Use the EMR logic for FBG (Normal < 100, Alert >= 100, High >= 126) and RBG (Normal < 140, Alert >= 140, Critical >= 200).
+  - **Glucose Thresholds**: Use the EMR logic for FBG (Normal 70-99 mg/dL, Prediabetes 100-125 mg/dL, Diabetes Range ≥ 126 mg/dL, Hypoglycemia 55-69 mg/dL, Severe Hypoglycemia < 55 mg/dL) and RBG (Normal 70-139 mg/dL, Elevated 140-199 mg/dL, Critical Alert ≥ 200 mg/dL, Hypoglycemia 55-69 mg/dL, Severe Hypoglycemia < 55 mg/dL).
+  - **SpO2 Alert**: SpO2 warning/abnormal alert is updated to trigger below 93% (low SpO2 banner), with Emergency remaining < 88%.
   - **Patient Halo**: The halo color must reflect the highest severity across all vitals. **Nurse Override** takes absolute precedence if set.
   - **Safety Sentinel Sync**: Ensure the `useEffect` in `VitalsStation.tsx` is maintained to sync inputs with the top bar in real-time.
   - **Units**: Always display units clearly (kg, cm, bpm, %, °C, mmol/L).

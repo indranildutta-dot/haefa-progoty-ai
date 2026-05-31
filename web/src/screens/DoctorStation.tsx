@@ -301,6 +301,7 @@ export interface ConsultationData {
   provisionalDiagnosisMinor: string[];
   notes: string;
   treatment_notes: string;
+  followUpDate: string | null;
   prescriptions: any[];
   assessment: ClinicalAssessmentData;
   labInvestigations: string[];
@@ -308,7 +309,7 @@ export interface ConsultationData {
 }
 
 const COMMON_SYMPTOMS = ['Fever', 'Cough', 'Headache', 'Diarrhea', 'Vomiting', 'Abdominal pain'];
-const COMMON_LABS = ['Complete Blood Count (CBC)', 'Liver Function Test (LFT)', 'Kidney Function Test (KFT)', 'Lipid Profile', 'Urine Routine', 'Blood Sugar (Fasting)', 'Blood Sugar (Random)', 'X-Ray Chest', 'ECG', 'Ultrasound Abdomen'];
+const COMMON_LABS = ['Complete Blood Count (CBC)', 'Liver Function Test (LFT)', 'Kidney Function Test (KFT)', 'Lipid Profile', 'Urine Routine', 'Blood Sugar (Fasting)', 'Blood Sugar (Random)', 'X-Ray Chest', 'ECG', 'Ultrasound Abdomen', 'Sputum Test'];
 const COMMON_REFERRALS = ['Cardiology', 'Dermatology', 'Endocrinology', 'Gastroenterology', 'Neurology', 'Orthopedics', 'Pediatrics', 'Psychiatry', 'Pulmonology', 'Ophthalmology', 'ENT', 'Gynecology'];
 
 // ==========================================
@@ -988,13 +989,34 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
                 }}
                 sx={{ mb: 1 }}
               />
-              <Stack direction="row" spacing={1}>
-                <TextField size="small" label="Dose" value={rx.dose || ''} onChange={(e) => {
+              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                <TextField size="small" label="Dose" value={rx.dose || ''} disabled={!editModes['currentRx']} onChange={(e) => {
                   const newRx = [...data.currentRx];
                   newRx[index].dose = e.target.value;
                   onChange({ ...data, currentRx: newRx });
                 }} />
-                <IconButton color="error" onClick={() => {
+                <TextField size="small" label="Duration" type="number" sx={{ width: 100 }} value={rx.duration || ''} disabled={!editModes['currentRx']} onChange={(e) => {
+                  const newRx = [...data.currentRx];
+                  newRx[index].duration = e.target.value;
+                  onChange({ ...data, currentRx: newRx });
+                }} />
+                <FormControl size="small" sx={{ width: 120 }} disabled={!editModes['currentRx']}>
+                  <InputLabel>Unit</InputLabel>
+                  <Select
+                    value={rx.durationUnit || ''}
+                    label="Unit"
+                    onChange={(e) => {
+                      const newRx = [...data.currentRx];
+                      newRx[index].durationUnit = e.target.value;
+                      onChange({ ...data, currentRx: newRx });
+                    }}
+                  >
+                    <MenuItem value="days">Days</MenuItem>
+                    <MenuItem value="weeks">Weeks</MenuItem>
+                    <MenuItem value="months">Months</MenuItem>
+                  </Select>
+                </FormControl>
+                <IconButton color="error" disabled={!editModes['currentRx']} onClick={() => {
                   const newRx = data.currentRx.filter((_, i) => i !== index);
                   onChange({ ...data, currentRx: newRx });
                 }}><RemoveCircleIcon /></IconButton>
@@ -1019,8 +1041,8 @@ const ClinicalAssessmentPanel: React.FC<AssessmentProps> = ({ data, onChange }) 
       <Accordion expanded={expanded === 'familyHistory'} onChange={handleChange('familyHistory')} disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
         {renderAccordionHeader('familyHistory', 'Family H/O illness', 'familyHistory')}
         <AccordionDetails sx={{ bgcolor: 'white' }}>
-          {renderSectionControls('familyHistory', ['HTN', 'DM', 'Asthma', 'COPD', 'Stroke', 'IHD', 'CKD'])}
-          {['HTN', 'DM', 'Asthma', 'COPD', 'Stroke', 'IHD', 'CKD'].map((illness) => (
+          {renderSectionControls('familyHistory', ['HTN', 'DM', 'Asthma', 'COPD', 'Stroke', 'IHD', 'CKD', 'TB'])}
+          {['HTN', 'DM', 'Asthma', 'COPD', 'Stroke', 'IHD', 'CKD', 'TB'].map((illness) => (
             renderFamilyHistoryGroup(illness, illness)
           ))}
         </AccordionDetails>
@@ -1488,6 +1510,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
     provisionalDiagnosisMinor: [],
     notes: '', 
     treatment_notes: '', 
+    followUpDate: null,
     prescriptions: [], 
     assessment: initialClinicalAssessment,
     labInvestigations: [],
@@ -1573,6 +1596,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
         provisionalDiagnosisMinor: savedDiagnosis?.provisionalDiagnosisMinor || [],
         notes: savedDiagnosis?.notes || '', 
         treatment_notes: savedDiagnosis?.treatment_notes || '', 
+        followUpDate: savedDiagnosis?.followUpDate || null,
         prescriptions: savedPrescription?.prescriptions || [], 
         assessment: savedDiagnosis?.assessment || preFilledAssessment,
         labInvestigations: savedDiagnosis?.labInvestigations || [],
@@ -1967,6 +1991,22 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
                       value={consultData.labInvestigations || []}
                       onChange={(_, newValue) => setConsultData(prev => ({ ...prev, labInvestigations: newValue }))}
                       renderInput={(params) => <TextField {...params} variant="outlined" placeholder="Select Lab Tests..." />}
+                    />
+                  </Box>
+
+                  <Divider />
+
+                  {/* Section 6: Follow-up Plan */}
+                  <Box>
+                    <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>Section 6 — Follow-up Plan</Typography>
+                    <TextField 
+                      fullWidth 
+                      type="date"
+                      label="Follow-up Date"
+                      variant="outlined" 
+                      value={consultData.followUpDate || ''} 
+                      onChange={(e) => setConsultData(prev => ({ ...prev, followUpDate: e.target.value }))} 
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Box>
                 </Box>

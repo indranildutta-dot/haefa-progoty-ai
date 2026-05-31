@@ -92,11 +92,16 @@ export const searchPatients = async (searchParams: {
     )
   );
   
-  const querySnapshot = await getDocs(q);
-  let allPatients = querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  })) as any[]; // Use any to handle legacy fields
+  let allPatients: any[] = [];
+  try {
+    const querySnapshot = await getDocs(q);
+    allPatients = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (err) {
+    console.warn("Firestore search failed (possibly offline), falling back to local search", err);
+  }
   
   if (allPatients.length === 0) {
     try {

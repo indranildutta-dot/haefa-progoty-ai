@@ -270,10 +270,10 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
       const sys = val1;
       const dia = val2;
 
-      const isSysEmergency = !isNaN(sys) && sys > 0 && (sys > 130 || sys < 70);
+      const isSysEmergency = !isNaN(sys) && sys > 0 && (sys >= 140 || sys <= 99);
       const isDiaEmergency = dia !== undefined && !isNaN(dia) && dia > 0 && (dia > 90 || dia < 50);
 
-      const isSysWarning = !isNaN(sys) && sys > 0 && ((sys > 120 && sys <= 130) || (sys >= 70 && sys < 80));
+      const isSysWarning = !isNaN(sys) && sys > 0 && ((sys >= 130 && sys <= 139) || (sys >= 100 && sys <= 109));
       const isDiaWarning = dia !== undefined && !isNaN(dia) && dia > 0 && ((dia > 80 && dia <= 90) || (dia >= 50 && dia < 60));
 
       if (isSysEmergency || isDiaEmergency) return { color: '#ef4444', label: 'CRITICAL' };
@@ -345,8 +345,8 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
       return { color: '#10b981', label: 'NORMAL' };
     }
     if (type === 'temp') {
-      if (val1 > 40 || (val1 > 0 && val1 < 35)) return { color: '#ef4444', label: 'EMERGENCY' };
-      if ((val1 >= 38.5 && val1 <= 40) || (val1 >= 35 && val1 < 36)) return { color: '#f59e0b', label: 'URGENT' };
+      if (val1 >= 39.5 || (val1 > 0 && val1 < 35.0)) return { color: '#ef4444', label: 'EMERGENCY' };
+      if ((val1 >= 38.0 && val1 < 39.5) || (val1 >= 35.0 && val1 < 37.0)) return { color: '#f59e0b', label: 'URGENT' };
       return { color: '#10b981', label: 'NORMAL' };
     }
     return { color: '#e2e8f0', label: '' };
@@ -461,7 +461,7 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
   };
 
   const isBPAbnormal = (s: number, d: number) => {
-    return s < 80 || s > 120 || d < 60 || d > 80;
+    return s < 110 || s > 129 || d < 60 || d >= 80;
   };
 
   const handleSaveVitals = async (nextStatus: EncounterStatus, isSaveProgress: boolean = false) => {

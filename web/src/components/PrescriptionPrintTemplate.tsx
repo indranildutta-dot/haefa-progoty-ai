@@ -8,6 +8,7 @@ import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import QRCode from 'react-qr-code';
 import dayjs from 'dayjs';
+import logoImage from '../assets/logo.png';
 import { 
   getEncounterById, 
   getVitalsByEncounter, 
@@ -243,6 +244,9 @@ const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTe
           </Box>
         </Grid>
         <Grid size={{ xs: 7 }} sx={{ textAlign: 'center' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.5 }}>
+            <img src={logoImage} alt="HAEFA Logo" style={{ height: '48px', objectFit: 'contain' }} />
+          </Box>
           <Typography 
             variant="h6" 
             fontWeight="900" 
@@ -317,7 +321,16 @@ const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTe
         <Grid size={{ xs: 12, md: 6 }}>
           <Typography variant="subtitle2" fontWeight="900" sx={{ mb: 1, textTransform: 'uppercase', color: '#2563eb' }}>Clinical Assessment</Typography>
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, minHeight: 120 }}>
-            <Typography variant="body2" sx={{ mb: 1 }}><strong>Complaints:</strong> {diagnosis?.chief_complaint || diagnosis?.notes || "None recorded"}</Typography>
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              <strong>Complaints:</strong>{' '}
+              {(() => {
+                const comps = diagnosis?.assessment?.complaints;
+                if (comps && comps.length > 0) {
+                  return comps.map((c: any) => `${c.description} ${c.duration ? `(${c.duration})` : ''}`).join(', ');
+                }
+                return diagnosis?.chief_complaint || "None recorded";
+              })()}
+            </Typography>
             <Typography variant="body2" sx={{ mb: 1 }}>
               <strong>O/E:</strong> 
               {(() => {
@@ -406,6 +419,9 @@ const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTe
           <Typography variant="subtitle2" fontWeight="900" sx={{ mb: 1, textTransform: 'uppercase', color: '#2563eb' }}>Advice & Referrals</Typography>
           <Box sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: 3, border: '1px solid #e2e8f0', minHeight: 100 }}>
             <Typography variant="body2" sx={{ mb: 1 }}><strong>Treatment Notes:</strong> {diagnosis?.treatment_notes || "Follow standard care."}</Typography>
+            {diagnosis?.notes && (
+              <Typography variant="body2" sx={{ mb: 1 }}><strong>Additional Notes:</strong> {diagnosis.notes}</Typography>
+            )}
             {diagnosis?.referrals && diagnosis.referrals.length > 0 && (
               <Typography variant="body2" sx={{ mb: 1 }}><strong>Referrals:</strong> {diagnosis.referrals.join(', ')}</Typography>
             )}
@@ -414,7 +430,7 @@ const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTe
             )}
           </Box>
           <Box sx={{ mt: 2 }}>
-            <Typography variant="body2"><strong>Follow-up Date:</strong> ____________________</Typography>
+            <Typography variant="body2"><strong>Follow-up Date:</strong> {diagnosis?.followUpDate ? new Date(diagnosis.followUpDate).toLocaleDateString() : '____________________'}</Typography>
           </Box>
         </Grid>
         <Grid size={{ xs: 5 }}>

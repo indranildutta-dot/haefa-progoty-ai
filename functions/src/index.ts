@@ -345,6 +345,7 @@ export const saveConsultation = onCall(async (request) => {
     provisionalDiagnosisMinor?: string[];
     notes?: string;
     treatment_notes?: string;
+    followUpDate?: string;
     labInvestigations?: any[];
     referrals?: any[];
     assessment?: any;
@@ -367,6 +368,7 @@ export const saveConsultation = onCall(async (request) => {
     provisionalDiagnosisMinor = [],
     notes = "", 
     treatment_notes = "", 
+    followUpDate = null,
     labInvestigations = [], 
     referrals = [], 
     assessment = {},
@@ -445,10 +447,11 @@ export const saveConsultation = onCall(async (request) => {
         provisionalDiagnosisMinor,
         notes,
         treatment_notes,
+        followUpDate,
         labInvestigations,
         referrals,
         assessment,
-        prescriber_name: userProfile.name || "Unknown Doctor",
+        prescriber_name: userProfile.name || request.auth?.token?.name || request.auth?.token?.email || "Unknown Doctor",
         prescriber_reg_no: userProfile.professional_reg_no || "N/A",
         prescriber_body: userProfile.professional_body || "BMDC",
         prescriber_designation: userProfile.designation || "Medical Officer",
@@ -840,10 +843,22 @@ export const dispenseMedication = onCall(async (request) => {
       if (qRef && queueDocSnap?.exists) {
         phase = "WRITE";
         logStep("WRITE", `update queue ${qRef.path} to ${finalStatus}`);
-        transaction.update(qRef, sanitizeData({
-          status: finalStatus,
-          updated_at: admin.firestore.Timestamp.now()
-        }));
+        if (finalStatus === 'COMPLETED') {
+          const archiveRef = db.collection('queues_archive').doc(qRef.id);
+          const qData = queueDocSnap.data();
+          transaction.set(archiveRef, sanitizeData({
+            ...qData,
+            status: finalStatus,
+            station: 'completed',
+            updated_at: admin.firestore.Timestamp.now()
+          }));
+          transaction.delete(qRef);
+        } else {
+          transaction.update(qRef, sanitizeData({
+            status: finalStatus,
+            updated_at: admin.firestore.Timestamp.now()
+          }));
+        }
       }
 
       console.log("[TX] Transaction completed successfully");

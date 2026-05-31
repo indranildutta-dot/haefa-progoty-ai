@@ -99,11 +99,11 @@ export const evaluateTriage = (vitals: Partial<Vitals>, age_years: number = 25, 
   }
 
   // Temperature Checks
-  if (vitals.temperature !== undefined && !isNaN(vitals.temperature)) {
-    if (vitals.temperature > 40) {
+  if (vitals.temperature !== undefined && !isNaN(vitals.temperature) && vitals.temperature > 0) {
+    if (vitals.temperature >= 39.5 || vitals.temperature < 35.0) {
       reasons.push(`Temperature ${vitals.temperature}°C (Emergency)`);
       isCritical = true;
-    } else if (vitals.temperature >= 38.5 && vitals.temperature <= 40) {
+    } else if ((vitals.temperature >= 38.0 && vitals.temperature < 39.5) || (vitals.temperature >= 35.0 && vitals.temperature < 37.0)) {
       reasons.push(`Temperature ${vitals.temperature}°C (Urgent)`);
       urgentCount++;
     }
@@ -115,10 +115,10 @@ export const evaluateTriage = (vitals: Partial<Vitals>, age_years: number = 25, 
   const d = (vitals.diastolic_2 !== undefined && vitals.diastolic_2 !== null && !isNaN(vitals.diastolic_2) && vitals.diastolic_2 > 0) ? vitals.diastolic_2 : vitals.diastolic;
 
   if (s !== undefined && s > 0 && !isNaN(s)) {
-    if (s > 130 || s < 70) {
+    if (s >= 140 || s <= 99) {
       reasons.push(`Systolic BP ${s} mmHg (Critical)`);
       isCritical = true;
-    } else if ((s >= 120 && s <= 130) || (s >= 70 && s < 80)) {
+    } else if ((s >= 130 && s <= 139) || (s >= 100 && s <= 109)) {
       reasons.push(`Systolic BP ${s} mmHg (Warning)`);
       urgentCount++;
     }

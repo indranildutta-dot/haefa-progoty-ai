@@ -32,8 +32,9 @@ The Vitals workflow is split into three distinct modes (stations), typically han
 ### Mode 2: Vital Signs
 *   **Fields**: Systolic BP, Diastolic BP, Heart Rate (bpm), Respiratory Rate (bpm), SpO2 (%), Temperature (°C), Blood Group, Pregnancy Status, Pregnancy Months.
 *   **Blood Pressure (BP)**:
-    *   **Critical**: Systolic ≥ 180 OR Diastolic ≥ 120
-    *   **Warning**: Systolic ≥ 130 OR Diastolic ≥ 80
+    *   **Emergency (Critical)**: Systolic ≥ 140 OR Systolic ≤ 99 OR Diastolic > 90 OR Diastolic < 50
+    *   **Urgent (Warning)**: Systolic 130-139 OR Systolic 100-109 OR Diastolic 80-90 OR Diastolic 50-59
+    *   **Normal**: Systolic 110-129 AND Diastolic 60-79
 *   **Heart Rate (HR) - Age-Based**:
     *   *Newborn (0y 0m)*: 100-160
     *   *Infant (0y >0m)*: 100-150
@@ -52,34 +53,41 @@ The Vitals workflow is split into three distinct modes (stations), typically han
 *   **Oxygen Saturation (SpO2)**:
     *   **Emergency**: < 88%
     *   **Critical**: 88-89%
-    *   **Warning**: 90-92%
-    *   **Normal**: > 92%
+    *   **Warning**: 90-92% (visual alert "LOW SpO2" triggers below 93%)
+    *   **Normal**: ≥ 93%
 *   **Temperature**:
-    *   **Critical**: ≥ 40°C
-    *   **Warning**: ≥ 38.5°C
+    *   **Emergency (Critical)**: ≥ 39.5°C OR < 35°C
+    *   **Urgent (Warning)**: 38.0-39.4°C OR 35.0-36.9°C
+    *   **Normal**: 37.0-37.9°C
 
 ### Mode 3: Labs & Risk
-*   **Fields**: RBG (mg/dL or mmol/L), FBG (mg/dL or mmol/L), Fasting Status (Yes/No), Has Symptoms (Yes/No), Hemoglobin (g/dL or g/L), Allergies, Social History (Smoking, Chewing Tobacco, Betel Nuts, Recreational Drugs, Housing, Water Source), Alcohol Use.
+*   **Fields**: RBG (mg/dL or mmol/L), FBG (mg/dL or mmol/L), Hemoglobin (g/dL or g/L), Allergies, Social History (Smoking, Chewing Tobacco, Betel Nuts, Recreational Drugs, Housing, Water Source), Alcohol Use. (Note: "Patient is Fasting" and "Symptomatic for RBG" context flags have been removed from the station's layout).
 *   **Unit Support**:
     *   **Glucose**: Supports both `mg/dL` and `mmol/L`. Internal storage and triage logic use `mg/dL` (Conversion: `mmol/L * 18 = mg/dL`).
     *   **Hemoglobin**: Supports both `g/dL` and `g/L`. Internal storage and triage logic use `g/dL` (Conversion: `g/L / 10 = g/dL`).
 *   **Fasting Blood Glucose (FBG)**:
-    *   **High (Emergency)**: ≥ 126 mg/dL
-    *   **Alert (Urgent)**: 100-125 mg/dL
-    *   **Normal**: < 100 mg/dL
+    *   **Diabetes Range (Emergency)**: ≥ 126 mg/dL
+    *   **Prediabetes (Urgent)**: 100-125 mg/dL
+    *   **Normal**: 70-99 mg/dL
+    *   **Hypoglycemia (Urgent)**: 55-69 mg/dL
+    *   **Severe Hypoglycemia (Emergency)**: < 55 mg/dL
 *   **Random Blood Glucose (RBG)**:
-    *   **Critical (Emergency)**: ≥ 200 mg/dL
-    *   **Alert (Urgent)**: 140-199 mg/dL
-    *   **Normal**: < 140 mg/dL
+    *   **Critical Alert (Emergency)**: ≥ 200 mg/dL
+    *   **Elevated (Urgent)**: 140-199 mg/dL
+    *   **Normal**: 70-139 mg/dL
+    *   **Hypoglycemia (Urgent)**: 55-69 mg/dL
+    *   **Severe Hypoglycemia (Emergency)**: < 55 mg/dL
 *   **Hemoglobin (Hb) - Age/Sex/Pregnancy Based**:
     *   **Severe Anemia (Emergency)**: < 7.0 g/dL
-    *   **Anemia (Urgent)**:
-        *   *Children (6m - 5y)*: < 11.0 g/dL
-        *   *Children (5y - 11y)*: < 11.5 g/dL
-        *   *Children (12y - 14y)*: < 12.0 g/dL
-        *   *Adult Men*: < 13.0 g/dL
-        *   *Adult Women (Non-pregnant)*: < 12.0 g/dL
-        *   *Pregnant Women*: < 11.0 g/dL
+    *   **Anemia (Urgent/Alert) & Normal Ranges**:
+        *   *Adult Men (≥ 15y)*: Normal is 13.0 - 17.5 g/dL. Urgent High is > 17.5 g/dL. Anemia is < 13.0 g/dL.
+        *   *Adult Women (≥ 15y, Non-pregnant)*: Normal is 12.0 - 15.5 g/dL. Urgent High is > 15.5 g/dL. Anemia is < 12.0 g/dL.
+        *   *Pregnant Women (≥ 15y)*: Normal is 11.0 - 15.5 g/dL. Urgent High is > 15.5 g/dL. Anemia is < 11.0 g/dL.
+        *   *Children (< 15y)*: Anemia thresholds are age-based:
+            *   *Infants (1m - 11m)*: < 10.5 g/dL is Urgent Anemia
+            *   *Children (1y - 5y)*: < 11.0 g/dL is Urgent Anemia
+            *   *Children (6y - 11y)*: < 11.5 g/dL is Urgent Anemia
+            *   *Children (12y - 14y)*: < 12.0 g/dL is Urgent Anemia
 *   **Safety Validations (Impossible Values)**:
     *   **Glucose**: Rejects values < 20 or > 600 mg/dL.
     *   **Hemoglobin**: Rejects values < 3 or > 25 g/dL.
