@@ -496,3 +496,19 @@ export interface SupportTicket {
   internal_notes?: string;
 }
 
+export interface LabReportRecord {
+  id?: string;
+  patient_id: string;
+  encounter_id: string;
+  clinic_id: string;
+  country_id: string;
+  test_name: string; // Name of the lab test, e.g. "Complete Blood Count (CBC)"
+  reported_at: string; // ISO Date / YYYY-MM-DD
+  recorded_by: string; // User ID
+  recorded_by_name: string; // Name of the recorder
+  fields: Record<string, any>; // Key-value data points for this test
+  remarks?: string;
+  created_at: any; // Timestamp
+  updated_at: any; // Timestamp
+}
+

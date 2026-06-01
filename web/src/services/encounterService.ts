@@ -22,7 +22,8 @@ import {
   Prescription, 
   VitalsRecord, 
   DiagnosisRecord, 
-  PrescriptionRecord 
+  PrescriptionRecord,
+  LabReportRecord
 } from "../types";
 import { getSession } from "../utils/session";
 import { logAction } from "./auditService";
@@ -35,6 +36,7 @@ const ENCOUNTERS_ARCHIVE_COLLECTION = "encounters_archive";
 const VITALS_COLLECTION = "vitals";
 const DIAGNOSES_COLLECTION = "diagnoses";
 const PRESCRIPTIONS_COLLECTION = "prescriptions";
+const LAB_REPORTS_COLLECTION = "lab_reports";
 
 // Wrapper for safe offline mutation queuing
 const updateDoc = async (docRef: any, payload: any) => {
@@ -464,12 +466,13 @@ export const getEncountersByPatient = async (patientId: string, includeArchived:
  */
 export const getPatientFullHistory = async (patientId: string) => {
   try {
-    const [encounters, vitals, diagnoses, prescriptions, dispensations] = await Promise.all([
+    const [encounters, vitals, diagnoses, prescriptions, dispensations, labReports] = await Promise.all([
       getPatientHistory(patientId),
       getDocs(query(collection(db, "vitals"), where("patient_id", "==", patientId), orderBy("created_at", "desc"))),
       getDocs(query(collection(db, "diagnoses"), where("patient_id", "==", patientId), orderBy("created_at", "desc"))),
       getDocs(query(collection(db, "prescriptions"), where("patient_id", "==", patientId), orderBy("created_at", "desc"))),
-      getDocs(query(collection(db, "dispensations"), where("patient_id", "==", patientId), orderBy("created_at", "desc")))
+      getDocs(query(collection(db, "dispensations"), where("patient_id", "==", patientId), orderBy("created_at", "desc"))),
+      getDocs(query(collection(db, LAB_REPORTS_COLLECTION), where("patient_id", "==", patientId), orderBy("created_at", "desc")))
     ]);
 
     return {
@@ -477,10 +480,47 @@ export const getPatientFullHistory = async (patientId: string) => {
       vitals: vitals.docs.map(d => ({ id: d.id, ...d.data() })),
       diagnoses: diagnoses.docs.map(d => ({ id: d.id, ...d.data() })),
       prescriptions: prescriptions.docs.map(d => ({ id: d.id, ...d.data() })),
-      dispensations: dispensations.docs.map(d => ({ id: d.id, ...d.data() }))
+      dispensations: dispensations.docs.map(d => ({ id: d.id, ...d.data() })),
+      labReports: labReports.docs.map(d => ({ id: d.id, ...d.data() }))
     };
   } catch (error) {
     console.error("Error fetching full patient history:", error);
+    throw error;
+  }
+};
+
+/**
+ * Saves a new structured lab report in the database.
+ */
+export const saveLabReport = async (labReport: Omit<LabReportRecord, 'id' | 'created_at' | 'updated_at'>) => {
+  try {
+    const payload = {
+      ...labReport,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp()
+    };
+    const docRef = await addDoc(collection(db, LAB_REPORTS_COLLECTION), payload);
+    return docRef.id;
+  } catch (error) {
+    console.error("Error saving lab report:", error);
+    throw error;
+  }
+};
+
+/**
+ * Retrieves all lab reports for a specific patient.
+ */
+export const getPatientLabReports = async (patientId: string) => {
+  try {
+    const q = query(
+      collection(db, LAB_REPORTS_COLLECTION),
+      where("patient_id", "==", patientId),
+      orderBy("created_at", "desc")
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() })) as LabReportRecord[];
+  } catch (error) {
+    console.error("Error fetching patient lab reports:", error);
     throw error;
   }
 };

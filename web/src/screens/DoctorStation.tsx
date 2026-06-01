@@ -53,6 +53,7 @@ import SendIcon from '@mui/icons-material/Send';
 import InfoIcon from '@mui/icons-material/Info';
 import EditIcon from '@mui/icons-material/Edit';
 import HistoryIcon from '@mui/icons-material/History';
+import LabIcon from '@mui/icons-material/Science';
 
 import { auth, functions } from "../firebase";
 import { httpsCallable } from 'firebase/functions';
@@ -68,12 +69,14 @@ import {
   getPatientHistory,
   updateEncounterStatus,
   getDiagnosisByEncounter,
-  getPrescriptionByEncounter
+  getPrescriptionByEncounter,
+  getPatientLabReports
 } from '../services/encounterService';
 import { getPatientById } from '../services/patientService';
 import { useAppStore } from '../store/useAppStore';
 import { calculateAgeYears } from '../utils/patient';
 import { calculateCVRisk, calculateCVRiskLab, getRiskLevel, CVRiskInputs, CVRiskLabInputs, Gender } from '../utils/cvRisk';
+import { LabReportRecord } from '../types';
 
 import StationLayout from '../components/StationLayout';
 import StationSearchHeader from '../components/StationSearchHeader';
@@ -85,6 +88,7 @@ import CancelQueueDialog from '../components/CancelQueueDialog';
 import PrintPrescriptionDialog from '../components/PrintPrescriptionDialog';
 import PrescriptionBuilder from '../components/PrescriptionBuilder';
 import { useFormAutoSave } from '../hooks/useFormAutoSave';
+import { EnterLabReportDialog } from '../components/EnterLabReportDialog';
 import icdData from '../data/icd11PrimaryCareSouthAsia.json';
 
 // ICD-11 Library (Types only, scripts are in index.html)
@@ -1487,6 +1491,8 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
   const [waitingList, setWaitingList] = useState<any[]>([]);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [currentVitals, setCurrentVitals] = useState<any>(null);
+  const [labReports, setLabReports] = useState<LabReportRecord[]>([]);
+  const [labReportDialogOpen, setLabReportDialogOpen] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [openCancelDialog, setOpenCancelDialog] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<any>(null);
@@ -1558,6 +1564,12 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
       }
       
       setCurrentVitals(vitals);
+      try {
+        const reports = await getPatientLabReports(item.patient_id);
+        setLabReports(reports);
+      } catch (e) {
+        console.error("Error fetching patient lab reports:", e);
+      }
       setSelectedPatient({ ...patient, currentVitals: vitals, triage_level: item.triage_level });
       await updateQueueStatus(item.id, 'IN_CONSULTATION' as any);
       
@@ -1830,7 +1842,26 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
           <Grid container spacing={3} sx={{ mt: 1 }}>
             {/* LEFT: Vitals */}
             <Grid size={{ xs: 12, md: 2.5 }} sx={{ position: 'sticky', top: 80, alignSelf: 'flex-start', maxHeight: '80vh', overflowY: 'auto' }}>
-              <VitalsSnapshot vitals={currentVitals} gender={selectedPatient?.gender} />
+              <VitalsSnapshot vitals={currentVitals} gender={selectedPatient?.gender} labReports={labReports} />
+              
+              <Button
+                variant="contained"
+                color="secondary"
+                fullWidth
+                startIcon={<LabIcon />}
+                onClick={() => setLabReportDialogOpen(true)}
+                sx={{ 
+                  mt: 1, 
+                  py: 1.5,
+                  borderRadius: 3.5, 
+                  fontWeight: 'bold', 
+                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+                  bgcolor: '#334155', 
+                  '&:hover': { bgcolor: '#1e293b' } 
+                }}
+              >
+                Record Lab Report
+              </Button>
             </Grid>
 
             {/* MIDDLE: Assessment & Diagnosis */}
@@ -2093,6 +2124,22 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
           </Stack>
         </Box>
       </Dialog>
+
+      {selectedItem && (
+        <EnterLabReportDialog
+          open={labReportDialogOpen}
+          onClose={() => setLabReportDialogOpen(false)}
+          patientId={selectedItem.patient_id}
+          encounterId={selectedItem.encounter_id}
+          patientName={selectedItem.patient_name}
+          onSaveSuccess={async () => {
+            if (selectedItem?.patient_id) {
+              const updatedReports = await getPatientLabReports(selectedItem.patient_id);
+              setLabReports(updatedReports);
+            }
+          }}
+        />
+      )}
     </StationLayout>
   );
 };

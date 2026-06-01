@@ -440,6 +440,54 @@ const PatientHistory: React.FC = () => {
                           )}
                         </Paper>
                       </Grid>
+
+                      {history.labReports && history.labReports.filter((lr: any) => lr.encounter_id === enc.id).length > 0 && (
+                        <Grid size={12}>
+                          <Divider sx={{ my: 2 }} />
+                          <Typography variant="caption" fontWeight="900" sx={{ textTransform: 'uppercase', color: 'primary.main', display: 'flex', alignItems: 'center', mb: 1.5 }}>
+                            <LabIcon sx={{ mr: 1, fontSize: 18 }} /> RETURNED LAB REPORTS ON THIS VISIT ({history.labReports.filter((lr: any) => lr.encounter_id === enc.id).length})
+                          </Typography>
+                          <Grid container spacing={2}>
+                            {history.labReports.filter((lr: any) => lr.encounter_id === enc.id).map((report: any, rIdx: number) => (
+                              <Grid size={{ xs: 12, md: 4 }} key={report.id || rIdx}>
+                                <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 3, bgcolor: '#fafafa', height: '100%', border: '1px solid #cbd5e1' }}>
+                                  <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+                                    <Typography variant="body2" fontWeight="bold" color="primary" sx={{ fontSize: '0.85rem' }}>
+                                      {report.test_name}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>
+                                      Reported: {report.reported_at}
+                                    </Typography>
+                                  </Stack>
+                                  
+                                  <Grid container spacing={1}>
+                                    {Object.entries(report.fields || {}).map(([key, val]) => {
+                                      if (val === undefined || val === null || val === '') return null;
+                                      return (
+                                        <Grid size={6} key={key}>
+                                          <Box sx={{ borderBottom: '1px dashed #e2e8f0', pb: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Typography variant="caption" sx={{ fontSize: '0.68rem', color: 'text.secondary' }}>
+                                              {key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}:
+                                            </Typography>
+                                            <Typography variant="caption" fontWeight="bold" sx={{ fontSize: '0.68rem', color: 'text.primary' }}>
+                                              {String(val)}
+                                            </Typography>
+                                          </Box>
+                                        </Grid>
+                                      );
+                                    })}
+                                  </Grid>
+                                  {report.remarks && (
+                                    <Typography variant="caption" sx={{ display: 'block', mt: 1.5, fontStyle: 'italic', fontSize: '0.64rem', color: 'text.secondary', borderTop: '1px solid #f1f5f9', pt: 0.5 }}>
+                                      Remarks: {report.remarks}
+                                    </Typography>
+                                  )}
+                                </Paper>
+                              </Grid>
+                            ))}
+                          </Grid>
+                        </Grid>
+                      )}
                     </Grid>
                   </AccordionDetails>
                 </Accordion>
