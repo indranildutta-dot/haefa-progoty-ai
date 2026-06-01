@@ -24,6 +24,14 @@ setGlobalOptions({
   maxInstances: 10
 });
 
+const getSafeMillis = (dateObj: any): number => {
+  if (!dateObj) return 0;
+  if (typeof dateObj.toMillis === 'function') return dateObj.toMillis();
+  if (typeof dateObj.getTime === 'function') return dateObj.getTime();
+  const parsed = Date.parse(dateObj);
+  return isNaN(parsed) ? (typeof dateObj === 'number' ? dateObj : 0) : parsed;
+};
+
 // ==========================================
 // ICD-11 INTEGRATION FUNCTIONS
 // ==========================================
@@ -886,16 +894,23 @@ export const bulkUpload = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "Missing clinicId or file data.");
   }
 
-  const ExcelJS: any = await import('exceljs');
-  const Workbook = ExcelJS.Workbook || ExcelJS.default?.Workbook;
+  let ExcelJSModule: any;
+  try {
+    ExcelJSModule = await import('exceljs');
+  } catch (e) {
+    throw new HttpsError("internal", "Could not load exceljs");
+  }
+  
+  const Workbook = ExcelJSModule.Workbook || ExcelJSModule.default?.Workbook;
   if (!Workbook) {
-    throw new HttpsError("internal", "Failed to load Excel module.");
+    throw new HttpsError("internal", "ExcelJS.Workbook is undefined");
   }
   const workbook = new Workbook();
   
   try {
     await workbook.xlsx.load(Buffer.from(fileBase64, 'base64') as any);
   } catch (err: any) {
+    console.error("load error", err);
     throw new HttpsError("invalid-argument", "Invalid Excel file format.");
   }
   
@@ -905,6 +920,8 @@ export const bulkUpload = onCall(async (request) => {
   const batch = db.batch();
   
   const incomingStock = new Map<string, number>();
+
+  let opCount = 0;
 
   worksheet?.eachRow((row: any, rowNumber: number) => {
     if (rowNumber === 1) return;
@@ -925,7 +942,17 @@ export const bulkUpload = onCall(async (request) => {
     const qty = Number(row.getCell(4).value) || 0;
     const base_unit = row.getCell(5).value?.toString().trim() || "";
     const package_unit = row.getCell(6).value?.toString().trim() || "";
-    const dosage = row.getCell(7).value?.toString().trim() || "N/A";
+    
+    let dosage = row.getCell(7).value?.toString().trim() || "";
+    const dosage_unit = row.getCell(8).value?.toString().trim() || "";
+    
+    if (dosage && dosage_unit) {
+      dosage = `${dosage} ${dosage_unit}`;
+    } else if (!dosage && dosage_unit) {
+      dosage = dosage_unit;
+    } else if (!dosage) {
+      dosage = "N/A";
+    }
     
     if (!medId || medId.toUpperCase().includes('EXAMPLE')) return;
     
@@ -945,7 +972,10 @@ export const bulkUpload = onCall(async (request) => {
     if (base_unit) payload.base_unit = base_unit;
     if (package_unit) payload.package_unit = package_unit;
     
-    batch.set(docRef, payload);
+    if (opCount < 400) {
+      batch.set(docRef, payload);
+      opCount++;
+    }
   });
 
   // Automatically reconcile the incoming stock with pending procurement requests / shortfalls
@@ -957,7 +987,7 @@ export const bulkUpload = onCall(async (request) => {
   // Sort natively in JS to prioritize oldest requests first
   const openReqs = openReqsSnap.docs
      .map(d => ({ docSnap: d, data: d.data() }))
-     .sort((a, b) => (a.data.created_at?.toMillis() || 0) - (b.data.created_at?.toMillis() || 0));
+     .sort((a, b) => getSafeMillis(a.data?.created_at) - getSafeMillis(b.data?.created_at));
 
   for (const { docSnap, data } of openReqs) {
      const medLower = (data.medication_name || "").toLowerCase().replace(/\s+/g, '');
@@ -965,7 +995,7 @@ export const bulkUpload = onCall(async (request) => {
         let remainingStock = incomingStock.get(medLower)!;
         let reqQty = data.required_quantity || 0;
         
-        if (remainingStock > 0 && reqQty > 0) {
+        if (remainingStock > 0 && reqQty > 0 && opCount < 500) {
             let fulfilled = Math.min(remainingStock, reqQty);
             let newReqQty = reqQty - fulfilled;
             let newStock = remainingStock - fulfilled;
@@ -977,23 +1007,39 @@ export const bulkUpload = onCall(async (request) => {
                status: newReqQty <= 0 ? 'FULFILLED' : data.status,
                updated_at: admin.firestore.Timestamp.now()
             });
-        } else if (remainingStock > 0 && data.type === 'LOW_STOCK_ALERT') {
+            opCount++;
+        } else if (remainingStock > 0 && data.type === 'LOW_STOCK_ALERT' && opCount < 500) {
             // Fulfill the low stock alert if stock is now > 0
             batch.update(docSnap.ref, {
                status: 'FULFILLED',
                updated_at: admin.firestore.Timestamp.now()
             });
+            opCount++;
         }
      }
   }
 
-  await batch.commit();
+  try {
+    await batch.commit();
+  } catch (batchErr: any) {
+    console.error("Batch error", batchErr);
+    throw new HttpsError("internal", "Failed to commit batch updates.");
+  }
   return { success: true };
 });
 
 export const getInventoryTemplate = onCall(async (request) => {
-  const ExcelJS = await import('exceljs');
-  const workbook = new ExcelJS.Workbook();
+  let ExcelJSModule: any;
+  try {
+    ExcelJSModule = await import('exceljs');
+  } catch (e) {
+    throw new HttpsError("internal", "Could not load exceljs");
+  }
+  const Workbook = ExcelJSModule.Workbook || ExcelJSModule.default?.Workbook;
+  if (!Workbook) {
+    throw new HttpsError("internal", "ExcelJS.Workbook is undefined");
+  }
+  const workbook = new Workbook();
   const sheet = workbook.addWorksheet('Inventory Template');
   
   sheet.columns = [

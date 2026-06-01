@@ -24,7 +24,6 @@ import { subscribeToQueue, updateQueueStatus, cancelQueueItem } from '../service
 import { getPatientById } from '../services/patientService';
 import { getOfflineInventory } from '../services/localDataSync';
 import { getVitalsByEncounter, saveDispensationProgress } from '../services/encounterService';
-import { getInventoryTemplate } from '../services/pharmacyService';
 import { useAppStore } from '../store/useAppStore';
 import SaveIcon from '@mui/icons-material/Save';
 import StationLayout from '../components/StationLayout';
@@ -547,8 +546,9 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
 
   const handleDownloadTemplate = async () => {
     try {
-      const result = await getInventoryTemplate();
-      const { fileBase64 } = result;
+      const getTemplate = httpsCallable(functions, 'getInventoryTemplate');
+      const result = await getTemplate();
+      const { fileBase64 } = result.data as any;
       
       const link = document.createElement('a');
       link.href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${fileBase64}`;
