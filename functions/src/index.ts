@@ -32,6 +32,10 @@ const getSafeMillis = (dateObj: any): number => {
   return isNaN(parsed) ? (typeof dateObj === 'number' ? dateObj : 0) : parsed;
 };
 
+const normalizeDosageKey = (dosageStr: string): string => {
+  return (dosageStr || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+};
+
 // ==========================================
 // ICD-11 INTEGRATION FUNCTIONS
 // ==========================================
@@ -486,7 +490,8 @@ export const saveConsultation = onCall(async (request) => {
               clinic_id: cId,
               medication_name: med.medicationName,
               dosage: `${med.dosageValue}${med.dosageUnit}`,
-              requested_qty: med.quantity,
+              required_quantity: med.quantity,
+              requested_qty: med.quantity, // kept for backward compatibility
               type: 'DOCTOR_ORDER_NON_STOCK',
               status: 'PENDING',
               created_at: serverTime
@@ -738,6 +743,7 @@ export const dispenseMedication = onCall(async (request) => {
         
         results.push(sanitizeData({ 
           medication: medication_name, 
+          dosage: medication_dosage || '',
           dispensed: actualDeducted, 
           mode, 
           substitution: substitution || null, 
@@ -827,9 +833,11 @@ export const dispenseMedication = onCall(async (request) => {
           transaction.set(invLogRef, sanitizeData({
             clinic_id: cId,
             medication_name: res.medication,
+            dosage: res.dosage || '',
             type: 'dispense',
             qty: res.dispensed,
             user_id: authUid,
+            user_name: userProfile.name || "Unknown Pharmacist",
             encounter_id: vId,
             patient_id: pId,
             timestamp: admin.firestore.Timestamp.now()
@@ -862,9 +870,21 @@ export const dispenseMedication = onCall(async (request) => {
           }));
           transaction.delete(qRef);
         } else {
+          let iouReturnDate = null;
+          if (meds && Array.isArray(meds)) {
+            for (const m of meds) {
+              if (m.return_on && (m.mode === 'PARTIAL' || m.mode === 'OUT_OF_STOCK')) {
+                if (!iouReturnDate || m.return_on < iouReturnDate) {
+                  iouReturnDate = m.return_on;
+                }
+              }
+            }
+          }
           transaction.update(qRef, sanitizeData({
             status: finalStatus,
-            updated_at: admin.firestore.Timestamp.now()
+            updated_at: admin.firestore.Timestamp.now(),
+            iou_added_at: admin.firestore.Timestamp.now(),
+            iou_return_date: iouReturnDate || null
           }));
         }
       }
@@ -885,14 +905,17 @@ export const dispenseMedication = onCall(async (request) => {
  * BULK UPLOAD: Uses DYNAMIC IMPORT to prevent discovery timeouts
  */
 export const bulkUpload = onCall(async (request) => {
-  const { clinicId, fileBase64 } = request.data as {
+  const { clinicId, fileBase64, userName } = request.data as {
     clinicId?: string;
     fileBase64?: string;
+    userName?: string;
   };
   
   if (!clinicId || !fileBase64) {
     throw new HttpsError("invalid-argument", "Missing clinicId or file data.");
   }
+  
+  const authUid = request.auth?.uid || "Anonymous";
 
   let ExcelJSModule: any;
   try {
@@ -956,8 +979,10 @@ export const bulkUpload = onCall(async (request) => {
     
     if (!medId || medId.toUpperCase().includes('EXAMPLE')) return;
     
-    const medLower = medId.toLowerCase().replace(/\s+/g, '');
-    incomingStock.set(medLower, (incomingStock.get(medLower) || 0) + qty);
+    const medLower = medId.toLowerCase().trim();
+    const dosageLower = normalizeDosageKey(dosage);
+    const stockKey = `${medLower}|${dosageLower}`;
+    incomingStock.set(stockKey, (incomingStock.get(stockKey) || 0) + qty);
 
     const docRef = db.collection(`clinics/${clinicId}/inventory`).doc();
     const payload: any = { 
@@ -965,7 +990,8 @@ export const bulkUpload = onCall(async (request) => {
       med_id_lower: medLower, 
       dosage, 
       quantity: qty, 
-      created_at: admin.firestore.Timestamp.now() 
+      created_at: admin.firestore.Timestamp.now(),
+      created_by_name: userName || "Pharmacist"
     };
     if (batchId) payload.batch_id = batchId;
     if (expiry_date) payload.expiry_date = expiry_date;
@@ -974,6 +1000,19 @@ export const bulkUpload = onCall(async (request) => {
     
     if (opCount < 400) {
       batch.set(docRef, payload);
+      
+      const invLogRef = db.collection("inventory_logs").doc();
+      batch.set(invLogRef, {
+        clinic_id: clinicId,
+        medication_name: medId,
+        dosage: dosage,
+        type: 'add',
+        qty: qty,
+        user_id: authUid,
+        user_name: userName || "Pharmacist",
+        timestamp: admin.firestore.Timestamp.now()
+      });
+      
       opCount++;
     }
   });
@@ -981,26 +1020,41 @@ export const bulkUpload = onCall(async (request) => {
   // Automatically reconcile the incoming stock with pending procurement requests / shortfalls
   const openReqsSnap = await db.collection("requisitions")
      .where("clinic_id", "==", clinicId)
-     .where("status", "in", ["PENDING", "WAITING_FOR_STOCK"])
      .get();
 
-  // Sort natively in JS to prioritize oldest requests first
+  // Sort natively in JS to prioritize oldest requests first and filter out completed/cancelled ones
   const openReqs = openReqsSnap.docs
      .map(d => ({ docSnap: d, data: d.data() }))
+     .filter(({ data }) => data && data.status !== 'FULFILLED' && data.status !== 'CANCELLED')
      .sort((a, b) => getSafeMillis(a.data?.created_at) - getSafeMillis(b.data?.created_at));
 
   for (const { docSnap, data } of openReqs) {
-     const medLower = (data.medication_name || "").toLowerCase().replace(/\s+/g, '');
-     if (incomingStock.has(medLower)) {
-        let remainingStock = incomingStock.get(medLower)!;
-        let reqQty = data.required_quantity || 0;
+     const medLower = (data.medication_name || "").toLowerCase().trim();
+     const rawDosage = data.medication_dosage || data.dosage || "N/A";
+     const dosageLower = normalizeDosageKey(rawDosage);
+     
+     // First try exact match with dosage, or fall back to match just by name if dosage is generic or N/A
+     let matchedKey = `${medLower}|${dosageLower}`;
+     if (!incomingStock.has(matchedKey)) {
+        // Fallback: look for ANY dosage of this medicine in the uploaded batch if the requirement didn't specify one or vice versa
+        // This is a simple fallback, in a real production system you'd iter over keys.
+        const keys = Array.from(incomingStock.keys());
+        const fuzzyKey = keys.find(k => k.startsWith(`${medLower}|`));
+        if (fuzzyKey) {
+            matchedKey = fuzzyKey;
+        }
+     }
+
+     if (incomingStock.has(matchedKey)) {
+        let remainingStock = incomingStock.get(matchedKey)!;
+        let reqQty = data.required_quantity || data.requested_qty || 0;
         
         if (remainingStock > 0 && reqQty > 0 && opCount < 500) {
             let fulfilled = Math.min(remainingStock, reqQty);
             let newReqQty = reqQty - fulfilled;
             let newStock = remainingStock - fulfilled;
             
-            incomingStock.set(medLower, newStock);
+            incomingStock.set(matchedKey, newStock);
             
             batch.update(docSnap.ref, {
                required_quantity: newReqQty,

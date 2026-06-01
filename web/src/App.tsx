@@ -17,6 +17,7 @@ import QueueBoard from './screens/QueueBoard';
 import AdminUserManagement from './screens/AdminUserManagement';
 import AdminDashboard from './screens/AdminDashboard';
 import AdvancedAnalytics from './screens/AdvancedAnalytics';
+import SupportCenter from './screens/SupportCenter';
 
 import { CircularProgress, Box, Typography, Container, Paper } from '@mui/material';
 import NetworkStatusIndicator from './components/NetworkStatusIndicator';
@@ -156,6 +157,10 @@ const App: React.FC = () => {
 
       <Route path="/analytics" element={
         isAuthorized() ? <AdvancedAnalytics /> : <Navigate to="/" />
+      } />
+
+      <Route path="/support" element={
+        isAuthorized() ? <SupportCenter /> : <Navigate to="/" />
       } />
 
       <Route path="/admin" element={

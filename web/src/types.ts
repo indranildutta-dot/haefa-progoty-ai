@@ -462,3 +462,37 @@ export interface DailySummary {
   comorbidity_map?: Record<string, any>;
   last_updated: Timestamp;
 }
+
+export interface TicketComment {
+  id: string;
+  author_uid: string;
+  author_name: string;
+  author_email: string;
+  author_role: string;
+  body: string;
+  created_at: string; // ISO string for quick sorting and offline compatibility
+}
+
+export interface SupportTicket {
+  id?: string;
+  title: string;
+  description: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  status: 'new' | 'in_progress' | 'waiting_feedback' | 'resolved';
+  station: string;
+  submitter_uid: string;
+  submitter_name: string;
+  submitter_email: string;
+  submitter_role: string;
+  clinic_id?: string;
+  clinic_name?: string;
+  country_id?: string;
+  country_name?: string;
+  userAgent?: string;
+  created_at: any; // Timestamp
+  updated_at: any; // Timestamp
+  attachments?: string[]; // Array of base64-encoded strings (compressed screenshots)
+  comments?: TicketComment[];
+  internal_notes?: string;
+}
+

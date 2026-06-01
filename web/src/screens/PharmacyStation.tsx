@@ -2,12 +2,15 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Typography, Box, Paper, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Button, Chip, Stack, Card, CardContent, Container, Alert, Divider, Grid,
-  IconButton, Tooltip, Tabs, Tab, TextField, ToggleButtonGroup, ToggleButton, CircularProgress, Autocomplete
+  IconButton, Tooltip, Tabs, Tab, TextField, ToggleButtonGroup, ToggleButton, CircularProgress, Autocomplete, Dialog, DialogTitle, DialogContent, DialogActions,
+  Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
 import WarningIcon from '@mui/icons-material/Warning';
 import ErrorIcon from '@mui/icons-material/Error';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CloseIcon from '@mui/icons-material/Close';
 import DownloadIcon from '@mui/icons-material/Download';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import InventoryIcon from '@mui/icons-material/Inventory';
@@ -32,6 +35,8 @@ import PatientContextBar from '../components/PatientContextBar';
 import { useQueueNotifier } from '../hooks/useQueueNotifier'; 
 import CancelQueueDialog from '../components/CancelQueueDialog';
 import PrintPrescriptionDialog from '../components/PrintPrescriptionDialog';
+import InventoryAnalytics from '../components/InventoryAnalytics';
+import BarChartIcon from '@mui/icons-material/BarChart';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -59,6 +64,10 @@ const toMillisSafely = (timestamp: any) => {
   return d ? d.getTime() : 0;
 };
 
+const cleanDosageStr = (str: string) => {
+  return (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+};
+
 const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const { notify, selectedClinic, setSelectedPatient, userProfile } = useAppStore();
   const [activeTab, setActiveTab] = useState(0);
@@ -73,6 +82,14 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const { newArrivalIds } = useQueueNotifier(waitingList);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [lastEncounterId, setLastEncounterId] = useState<string | null>(null);
+
+  const dispensingPatients = useMemo(() => {
+    return waitingList.filter(item => item.status !== 'PHARMACY_IOU');
+  }, [waitingList]);
+
+  const iouPatients = useMemo(() => {
+    return waitingList.filter(item => item.status === 'PHARMACY_IOU');
+  }, [waitingList]);
   
   // History State
   const [historyFromDate, setHistoryFromDate] = useState<Dayjs | null>(dayjs().subtract(7, 'day'));
@@ -112,7 +129,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       
       const matchingInventory = inventory.filter(i => 
         (i.medication_id || '').toLowerCase().trim() === name && 
-        (i.dosage || '').toLowerCase().trim() === dosage
+        cleanDosageStr(i.dosage) === cleanDosageStr(dosage)
       );
       
       const totalStock = matchingInventory.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
@@ -127,6 +144,34 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       return totalStock < 200 || hasExpiringBatch;
     });
   }, [procurementRecords, inventory]);
+
+  const [cancelProcurementState, setCancelProcurementState] = useState<{ open: boolean, name: string, dosage: string, reason: string }>({ open: false, name: '', dosage: '', reason: '' });
+
+  const handleCancelProcurementItem = async () => {
+    if (!selectedClinic || !cancelProcurementState.reason.trim()) return;
+    try {
+      const relatedRecords = reconciledProcurement.filter(r => 
+        (r.medication_name || '').toLowerCase().trim() === cancelProcurementState.name.toLowerCase().trim() &&
+        (r.medication_dosage || r.dosage || '').toLowerCase().trim() === cancelProcurementState.dosage.toLowerCase().trim()
+      );
+
+      const promises = relatedRecords.map(r => 
+        updateDoc(doc(db, "requisitions", r.id), {
+          status: 'CANCELLED',
+          cancellation_reason: cancelProcurementState.reason,
+          cancelled_at: serverTimestamp(),
+          cancelled_by: userProfile?.name || 'Pharmacist'
+        })
+      );
+
+      await Promise.all(promises);
+      notify(`Cancelled procurement for ${cancelProcurementState.name}`, "success");
+      setCancelProcurementState({ open: false, name: '', dosage: '', reason: '' });
+      fetchProcurementReport();
+    } catch (e) {
+      notify("Failed to cancel requisition", "error");
+    }
+  };
 
   const handleMarkAsOrdered = async (medName: string, medDosage: string) => {
     if (!selectedClinic) return;
@@ -708,8 +753,8 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       const catalogData = catalogSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       setCatalog(catalogData);
 
-      // Filter out FULFILLED records to keep the report clean, or show everything
-      const records = reqSnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.status !== 'FULFILLED');
+      // Filter out FULFILLED and CANCELLED records to keep the report clean
+      const records = reqSnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.status !== 'FULFILLED' && r.status !== 'CANCELLED');
       records.sort((a: any, b: any) => toMillisSafely(b.created_at) - toMillisSafely(a.created_at));
       setProcurementRecords(records);
     } catch (e) {
@@ -760,7 +805,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       try {
         const base64 = (e.target?.result as string).split(',')[1];
         const upload = httpsCallable(functions, 'bulkUpload');
-        await upload({ clinicId: selectedClinic.id, fileBase64: base64 });
+        await upload({ clinicId: selectedClinic.id, fileBase64: base64, userName: userProfile?.name || "Pharmacist" });
         notify("Inventory uploaded successfully", "success");
         // Reset input
         event.target.value = '';
@@ -834,77 +879,225 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
             onReprint={handleReprintFromSearch}
           />
 
-          <TableContainer component={Paper} elevation={0} sx={{ p: 2, borderRadius: 4, border: '1px solid #e2e8f0' }}>
-            <Table>
-              <TableHead sx={{ bgcolor: '#f8fafc' }}>
-                <TableRow>
-                  <TableCell>Wait Time</TableCell>
-                  <TableCell>Patient Name</TableCell>
-                  <TableCell align="right">Action</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {waitingList.map(item => {
-                  const isHighlighted = highlightedPatientIds.includes(item.patient_id as string);
-                  const isNew = newArrivalIds.includes(item.id as string);
-                  return (
-                    <TableRow 
-                      key={item.id} 
-                      hover
-                      sx={{ 
-                        bgcolor: isHighlighted ? '#fef9c3' : isNew ? '#dcfce7' : 'inherit',
-                        transition: 'background-color 0.5s ease',
-                        borderLeft: isHighlighted ? '6px solid #facc15' : isNew ? '6px solid #22c55e' : 'none'
-                      }}
-                    >
-                      <TableCell>{formatWaitTime(item.station_entry_at || item.created_at)}</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Typography fontWeight="bold">{item.patient_name}</Typography>
-                          {item.status === 'PHARMACY_IOU' && (
-                            <Chip label="IOU PENDING" size="small" color="warning" sx={{ fontWeight: 900, height: 20 }} />
-                          )}
-                          {isHighlighted && (
-                            <Chip label="MATCH" size="small" color="warning" sx={{ ml: 1, fontWeight: 900, height: 20 }} />
-                          )}
-                        </Stack>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
-                          <Tooltip title="Cancel Visit">
-                            <IconButton 
-                              color="error" 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setCancelTarget(item);
-                              }}
-                              sx={{ mr: 1 }}
-                            >
-                              <CancelIcon />
-                            </IconButton>
-                          </Tooltip>
-                          <Button 
-                            variant="contained" 
-                            color={isHighlighted ? "warning" : "primary"}
-                            onClick={() => handleSelectPatient(item)}
-                          >
-                            Dispense Meds
-                          </Button>
-                        </Stack>
-                      </TableCell>
+          {/* Bucket 1: Patients Waiting for Dispensing */}
+          <Accordion 
+            defaultExpanded 
+            sx={{ 
+              mb: 3, 
+              borderRadius: 4, 
+              border: '1px solid #e2e8f0', 
+              boxShadow: 'none', 
+              '&:before': { display: 'none' }, 
+              overflow: 'hidden' 
+            }}
+          >
+            <AccordionSummary 
+              expandIcon={<ExpandMoreIcon />} 
+              sx={{ bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0', px: 3, py: 1 }}
+            >
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <LocalPharmacyIcon color="primary" sx={{ fontSize: 20 }} />
+                <Typography fontWeight="800" variant="subtitle1" sx={{ color: '#1e293b' }}>
+                  Patients Waiting for Dispensing ({dispensingPatients.length})
+                </Typography>
+              </Stack>
+            </AccordionSummary>
+            <AccordionDetails sx={{ p: 2 }}>
+              <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0' }}>
+                <Table>
+                  <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: '800' }}>Wait Time</TableCell>
+                      <TableCell sx={{ fontWeight: '800' }}>Patient Name</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: '800' }}>Action</TableCell>
                     </TableRow>
-                  );
-                })}
-                {waitingList.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={3} align="center" sx={{ py: 8 }}>
-                      <Typography color="text.secondary">No prescriptions pending in queue.</Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                  </TableHead>
+                  <TableBody>
+                    {dispensingPatients.map(item => {
+                      const isHighlighted = highlightedPatientIds.includes(item.patient_id as string);
+                      const isNew = newArrivalIds.includes(item.id as string);
+                      return (
+                        <TableRow 
+                          key={item.id} 
+                          hover
+                          sx={{ 
+                            bgcolor: isHighlighted ? '#fef9c3' : isNew ? '#dcfce7' : 'inherit',
+                            transition: 'background-color 0.5s ease',
+                            borderLeft: isHighlighted ? '6px solid #facc15' : isNew ? '6px solid #22c55e' : 'none'
+                          }}
+                        >
+                          <TableCell sx={{ width: '150px' }}>{formatWaitTime(item.station_entry_at || item.created_at)}</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold' }}>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Typography fontWeight="bold">{item.patient_name}</Typography>
+                              {isHighlighted && (
+                                <Chip label="MATCH" size="small" color="warning" sx={{ ml: 1, fontWeight: 900, height: 20 }} />
+                              )}
+                            </Stack>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
+                              <Tooltip title="Cancel Visit">
+                                <IconButton 
+                                  color="error" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCancelTarget(item);
+                                  }}
+                                  sx={{ mr: 1 }}
+                                >
+                                  <CancelIcon />
+                                </IconButton>
+                              </Tooltip>
+                              <Button 
+                                variant="contained" 
+                                color={isHighlighted ? "warning" : "primary"}
+                                onClick={() => handleSelectPatient(item)}
+                              >
+                                Dispense Meds
+                              </Button>
+                            </Stack>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {dispensingPatients.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={3} align="center" sx={{ py: 6 }}>
+                          <Typography color="text.secondary">No new prescriptions pending in queue.</Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </AccordionDetails>
+          </Accordion>
+
+          {/* Bucket 2: IOU Pending */}
+          <Accordion 
+            defaultExpanded 
+            sx={{ 
+              mb: 3, 
+              borderRadius: 4, 
+              border: '1px solid #e2e8f0', 
+              boxShadow: 'none', 
+              '&:before': { display: 'none' }, 
+              overflow: 'hidden' 
+            }}
+          >
+            <AccordionSummary 
+              expandIcon={<ExpandMoreIcon />} 
+              sx={{ bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0', px: 3, py: 1 }}
+            >
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <HistoryIcon color="warning" sx={{ fontSize: 20 }} />
+                <Typography fontWeight="800" variant="subtitle1" sx={{ color: '#1e293b' }}>
+                  IOU Pending (Returning Patients) ({iouPatients.length})
+                </Typography>
+              </Stack>
+            </AccordionSummary>
+            <AccordionDetails sx={{ p: 2 }}>
+              <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0' }}>
+                <Table>
+                  <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: '800' }}>Wait Time</TableCell>
+                      <TableCell sx={{ fontWeight: '800' }}>Patient Name & Details</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: '800' }}>Action</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {iouPatients.map(item => {
+                      const isHighlighted = highlightedPatientIds.includes(item.patient_id as string);
+                      const isNew = newArrivalIds.includes(item.id as string);
+                      return (
+                        <TableRow 
+                          key={item.id} 
+                          hover
+                          sx={{ 
+                            bgcolor: isHighlighted ? '#fef9c3' : isNew ? '#dcfce7' : 'inherit',
+                            transition: 'background-color 0.5s ease',
+                            borderLeft: isHighlighted ? '6px solid #facc15' : isNew ? '6px solid #22c55e' : 'none'
+                          }}
+                        >
+                          <TableCell sx={{ width: '150px' }}>{formatWaitTime(item.station_entry_at || item.created_at)}</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold' }}>
+                            <Grid container spacing={2} alignItems="center">
+                              <Grid size={{ xs: 12, sm: 5 }}>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <Typography fontWeight="bold">{item.patient_name}</Typography>
+                                  <Chip label="IOU PENDING" size="small" color="warning" sx={{ fontWeight: 900, height: 20 }} />
+                                  {isHighlighted && (
+                                    <Chip label="MATCH" size="small" color="warning" sx={{ ml: 1, fontWeight: 900, height: 20 }} />
+                                  )}
+                                </Stack>
+                              </Grid>
+                              <Grid size={{ xs: 12, sm: 7 }}>
+                                <Stack direction="row" spacing={3} alignItems="center" sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>
+                                  <Box>
+                                    <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold', color: '#475569', letterSpacing: 0.5 }}>
+                                      ADDED ON
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                      {item.iou_added_at 
+                                        ? dayjs(toDateSafely(item.iou_added_at)).format('DD/MM/YYYY') 
+                                        : (item.updated_at ? dayjs(toDateSafely(item.updated_at)).format('DD/MM/YYYY') : dayjs(toDateSafely(item.created_at)).format('DD/MM/YYYY'))}
+                                    </Typography>
+                                  </Box>
+                                  <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
+                                  <Box>
+                                    <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold', color: '#b45309', letterSpacing: 0.5 }}>
+                                      EXPECTED RETURN
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#d97706' }}>
+                                      {item.iou_return_date 
+                                        ? dayjs(item.iou_return_date).format('DD/MM/YYYY') 
+                                        : 'Not specified'}
+                                    </Typography>
+                                  </Box>
+                                </Stack>
+                              </Grid>
+                            </Grid>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
+                              <Tooltip title="Cancel Visit">
+                                <IconButton 
+                                  color="error" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCancelTarget(item);
+                                  }}
+                                  sx={{ mr: 1 }}
+                                >
+                                  <CancelIcon />
+                                </IconButton>
+                              </Tooltip>
+                              <Button 
+                                variant="contained" 
+                                color={isHighlighted ? "warning" : "primary"}
+                                onClick={() => handleSelectPatient(item)}
+                              >
+                                Dispense Meds
+                              </Button>
+                            </Stack>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {iouPatients.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={3} align="center" sx={{ py: 6 }}>
+                          <Typography color="text.secondary">No active IOU pending records.</Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </AccordionDetails>
+          </Accordion>
         </Box>
       ) : (
         <Box sx={{ mt: 2 }}>
@@ -1522,7 +1715,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
 
   const renderProcurementReport = () => {
     // 2. Calculate Procurement Summary (The Buy List) using ONLY reconciled records
-    const summaryMap = new Map<string, { totalRequested: number, name: string, dosage: string, allOrdered: boolean, currentStock: number }>();
+    const summaryMap = new Map<string, { totalRequested: number, name: string, dosage: string, allOrdered: boolean, currentStock: number, hasAlert: boolean }>();
     
     reconciledProcurement.forEach(r => {
       const medName = r.medication_name || 'Unknown';
@@ -1531,31 +1724,39 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       
       const qty = Number(r.required_quantity) || 0;
       
-      const matchingInventory = inventory.filter(i => 
-        (i.medication_id || '').toLowerCase().trim() === medName.toLowerCase().trim() && 
-        (i.dosage || '').toLowerCase().trim() === medDosage.toLowerCase().trim()
-      );
+      const matchingInventory = inventory.filter(i => {
+        const invMed = (i.medication_id || (i as any).name || '').toLowerCase().trim();
+        const reqMed = medName.toLowerCase().trim();
+        if (invMed !== reqMed) return false;
+        
+        const invDosage = (i.dosage || '').toLowerCase().trim();
+        const reqDosage = medDosage.toLowerCase().trim();
+        
+        if (reqDosage === '') return true; // Requisition didn't specify dosage, match any
+        return invDosage === reqDosage;
+      });
       const totalStock = matchingInventory.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
 
-      const existing = summaryMap.get(key) || { totalRequested: 0, name: medName, dosage: medDosage, allOrdered: true, currentStock: totalStock };
+      const existing = summaryMap.get(key) || { totalRequested: 0, name: medName, dosage: medDosage, allOrdered: true, currentStock: totalStock, hasAlert: false };
       
       summaryMap.set(key, {
         name: medName,
         dosage: medDosage,
         totalRequested: existing.totalRequested + qty,
         allOrdered: existing.allOrdered && r.status === 'ORDERED',
-        currentStock: totalStock
+        currentStock: totalStock,
+        hasAlert: existing.hasAlert || r.type === 'LOW_STOCK_ALERT' || r.type === 'EXPIRY_ALERT'
       });
     });
     
-    const summaryList = Array.from(summaryMap.values())
+      const summaryList = Array.from(summaryMap.values())
       .map(item => ({
         ...item,
-        // Calculate dynamic shortfall: Sum of requisitions minus current on-hand inventory
-        total: Math.max(0, item.totalRequested - item.currentStock)
+        // The required_quantity in requisitions ALREADY represents the explicit shortfall.
+        total: item.totalRequested
       }))
       // Keep items that are actually needed OR already ordered
-      .filter(item => item.total > 0 || item.allOrdered)
+      .filter(item => item.total > 0 || item.allOrdered || item.hasAlert)
       .sort((a,b) => b.total - a.total);
 
     return (
@@ -1618,14 +1819,21 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 'bold' }}>Medication</Typography>
                         <Typography variant="body1" fontWeight="900" sx={{ mb: 1, fontSize: '0.9rem', color: item.allOrdered ? 'text.secondary' : '#0c4a6e' }}>{displayName}</Typography>
                       </Box>
-                      {item.allOrdered && (
-                        <Chip label="ORDERED" size="small" color="primary" sx={{ height: 20, fontSize: '0.6rem', fontWeight: 900 }} />
-                      )}
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        {item.allOrdered && (
+                          <Chip label="ORDERED" size="small" color="primary" sx={{ height: 20, fontSize: '0.6rem', fontWeight: 900 }} />
+                        )}
+                        <IconButton size="small" onClick={() => setCancelProcurementState({ open: true, name: item.name, dosage: item.dosage, reason: '' })} sx={{ color: 'text.secondary', p: 0.5 }} title="Cancel/Delete Item">
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
+                      </Stack>
                     </Stack>
                     <Divider sx={{ mb: 1.5, opacity: 0.5 }} />
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                       <Typography variant="caption" color="text.secondary">Total Needed:</Typography>
-                      <Typography variant="h5" color={item.allOrdered ? 'text.secondary' : 'error'} fontWeight="900">{item.total}</Typography>
+                      <Typography variant="h5" color={item.allOrdered ? 'text.secondary' : 'error'} fontWeight="900">
+                        {item.total > 0 ? item.total : (item.hasAlert ? "Review Stock" : item.total)}
+                      </Typography>
                     </Box>
                     <Button 
                       fullWidth 
@@ -1674,10 +1882,14 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                 const itemName = (item.medication_name || '').toLowerCase().trim();
                 const itemDosage = (item.medication_dosage || item.dosage || '').toLowerCase().trim();
 
-                const matchingBatches = inventory.filter(i => 
-                  (i.medication_id || '').toLowerCase().trim() === itemName && 
-                  (i.dosage || '').toLowerCase().trim() === itemDosage
-                );
+                const matchingBatches = inventory.filter(i => {
+                  const invMed = (i.medication_id || (i as any).name || '').toLowerCase().trim();
+                  if (invMed !== itemName) return false;
+                  
+                  const invDosage = (i.dosage || '').toLowerCase().trim();
+                  if (itemDosage === '') return true; // Requisition didn't specify dosage, match any
+                  return cleanDosageStr(invDosage) === cleanDosageStr(itemDosage);
+                });
                 
                 const totalCurrentStock = matchingBatches.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
                 
@@ -1689,7 +1901,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
 
                 const isInCatalog = catalog.some(c => 
                   (c.name || '').toLowerCase().trim() === itemName && 
-                  (c.strength || '').toLowerCase().trim() === itemDosage
+                  cleanDosageStr(c.strength) === cleanDosageStr(itemDosage)
                 );
 
                 if (item.status === 'ORDERED') {
@@ -1786,11 +1998,12 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
               <Tab icon={<InventoryIcon />} label="Medicine Inventory" iconPosition="start" />
               <Tab icon={<HistoryIcon />} label="Dispensing History" iconPosition="start" />
               <Tab icon={<ShoppingCartIcon />} label="Procurement Report" iconPosition="start" />
+              <Tab icon={<BarChartIcon />} label="Inventory Analytics" iconPosition="start" />
             </Tabs>
           </Box>
         )}
 
-        {activeTab === 0 ? renderDispensingView() : activeTab === 1 ? renderInventoryView() : activeTab === 2 ? renderHistoryView() : renderProcurementReport()}
+        {activeTab === 0 ? renderDispensingView() : activeTab === 1 ? renderInventoryView() : activeTab === 2 ? renderHistoryView() : activeTab === 3 ? renderProcurementReport() : <InventoryAnalytics clinicId={selectedClinic?.id || ''} inventory={inventory} />}
       </Container>
 
       <CancelQueueDialog 
@@ -1806,6 +2019,41 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
           encounterId={lastEncounterId} 
         />
       )}
+      <Dialog 
+        open={cancelProcurementState.open} 
+        onClose={() => setCancelProcurementState(prev => ({ ...prev, open: false }))}
+        PaperProps={{ sx: { borderRadius: 3, padding: 2, minWidth: 400 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Cancel Procurement Request</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            You are requesting to remove <strong>{cancelProcurementState.name} {cancelProcurementState.dosage}</strong> from the procurement list. 
+            Please provide a reason for cancellation.
+          </Typography>
+          <TextField
+            fullWidth
+            label="Cancellation Reason"
+            multiline
+            rows={3}
+            value={cancelProcurementState.reason}
+            onChange={(e) => setCancelProcurementState(prev => ({...prev, reason: e.target.value}))}
+            placeholder="e.g., Better alternative available, no longer needed..."
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2, pt: 0 }}>
+          <Button onClick={() => setCancelProcurementState(prev => ({ ...prev, open: false }))} color="inherit">
+            Discard
+          </Button>
+          <Button 
+            onClick={handleCancelProcurementItem} 
+            color="error" 
+            variant="contained" 
+            disabled={!cancelProcurementState.reason.trim()}
+          >
+            Confirm Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </StationLayout>
     </LocalizationProvider>
   );

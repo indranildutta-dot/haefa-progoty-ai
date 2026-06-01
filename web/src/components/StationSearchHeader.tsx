@@ -109,6 +109,9 @@ const StationSearchHeader: React.FC<StationSearchHeaderProps> = ({
       setInputValue(`${patient.given_name} ${patient.family_name}`);
       setOpen(false);
       setQrOpen(false);
+      if (onPatientFound) {
+        onPatientFound(patient, existingQueueItem);
+      }
       return;
     }
 

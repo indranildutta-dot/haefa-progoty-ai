@@ -17,7 +17,8 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Divider
+  Divider,
+  Tooltip
 } from '@mui/material';
 import { 
   Logout, 
@@ -34,7 +35,8 @@ import {
   Science as ScienceIcon,
   AssignmentInd as AssignmentIndIcon,
   ViewQuilt as ViewQuiltIcon,
-  History as HistoryIcon
+  History as HistoryIcon,
+  ContactSupport as SupportIcon
 } from '@mui/icons-material';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
@@ -69,7 +71,8 @@ const TopNavigation: React.FC = () => {
       { label: 'Pharmacy', to: '/pharmacy', icon: <MedicationIcon /> },
       { label: 'Patient History', to: '/patient-history', icon: <HistoryIcon /> },
       { label: 'Queue Board', to: '/queue', icon: <ViewQuiltIcon /> },
-    ] : [])
+    ] : []),
+    { label: 'Support', to: '/support', icon: <SupportIcon /> }
   ];
 
   const toggleDrawer = (open: boolean) => (event: React.KeyboardEvent | React.MouseEvent) => {
@@ -219,7 +222,23 @@ const TopNavigation: React.FC = () => {
             </Box>
           )}
 
-          <Box sx={{ flexGrow: 0, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ flexGrow: 0, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Tooltip title="Help & Support Desk">
+              <IconButton 
+                component={NavLink} 
+                to="/support" 
+                sx={{ 
+                  color: location.pathname === '/support' ? 'primary.main' : 'text.secondary',
+                  bgcolor: location.pathname === '/support' ? 'rgba(15, 23, 42, 0.04)' : 'transparent',
+                  p: 1,
+                  '&:hover': {
+                    bgcolor: 'rgba(15, 23, 42, 0.08)'
+                  }
+                }}
+              >
+                <SupportIcon sx={{ fontSize: 26 }} />
+              </IconButton>
+            </Tooltip>
             <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ p: 0.5 }}>
               <Avatar sx={{ bgcolor: 'primary.main', width: 44, height: 44, border: '2px solid white', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                 <AccountCircle sx={{ fontSize: 32 }} />

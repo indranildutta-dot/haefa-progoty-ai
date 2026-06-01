@@ -39,10 +39,11 @@ export const isPatientInQueue = async (patientId: string) => {
   if (snapshot.empty) return null;
   
   // Filter out any lingering documents that might have COMPLETED/CANCELLED status 
-  // but failed to delete from active_queues in earlier bugs
+  // but failed to delete from active_queues in earlier bugs, and exclude PHARMACY_IOU
+  // so patient can register for a new clinical visit while having an outstanding IOU.
   const activeDocs = snapshot.docs.filter(doc => {
     const data = doc.data();
-    return data.status !== 'COMPLETED' && data.status !== 'CANCELLED';
+    return data.status !== 'COMPLETED' && data.status !== 'CANCELLED' && data.status !== 'PHARMACY_IOU';
   });
 
   if (activeDocs.length === 0) return null;
