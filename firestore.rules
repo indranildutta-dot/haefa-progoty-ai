@@ -9,10 +9,6 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-
     function isGlobalAdmin() {
       return isAuthenticated() && (
         request.auth.uid == "iJaFyejOXrNbGrrA9es4IN7Ykum2" ||
@@ -20,44 +16,51 @@ service cloud.firestore {
           request.auth.token.email == "indranil_dutta@haefa.org" ||
           request.auth.token.email == "ruhul_abid@haefa.org"
         )) ||
-        getUserData().get('role', '') == 'global_admin'
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'global_admin')
       );
     }
 
     function isCountryAdmin(countryId) {
       return isGlobalAdmin() || (
         isAuthenticated() && 
-        getUserData().get('role', '') == 'country_admin' && 
-        countryId in getUserData().get('assignedCountries', [])
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'country_admin' && 
+        countryId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('assignedCountries', [])
       );
     }
 
     function isPharmacist(clinicId) {
       return isGlobalAdmin() || (
         isAuthenticated() && 
-        getUserData().get('role', '') == 'pharmacist' && 
-        clinicId in getUserData().get('assignedClinics', [])
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'pharmacist' && 
+        clinicId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('assignedClinics', [])
       );
     }
 
     function isDoctorOrNurse() {
       return isGlobalAdmin() || (
         isAuthenticated() && 
-        (getUserData().get('role', '') == 'doctor' || getUserData().get('role', '') == 'nurse')
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'doctor' || 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'nurse')
       );
     }
 
     function isApproved() {
       return isGlobalAdmin() || (
         isAuthenticated() && 
-        getUserData().get('isApproved', false) == true
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isApproved', false) == true
       );
     }
 
     function isStaff(clinicId) {
       return isGlobalAdmin() || (
         isAuthenticated() && 
-        clinicId in getUserData().get('assignedClinics', [])
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        clinicId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('assignedClinics', [])
       );
     }
 
@@ -119,6 +122,17 @@ service cloud.firestore {
              data.clinic_id is string &&
              data.country_id is string &&
              data.total_patients is number;
+    }
+
+    function isValidLabReport(data) {
+      return data.keys().hasAll(['patient_id', 'encounter_id', 'clinic_id', 'country_id', 'test_name', 'reported_at', 'recorded_by', 'recorded_by_name', 'fields']) &&
+             data.patient_id is string &&
+             data.encounter_id is string &&
+             data.clinic_id is string &&
+             data.country_id is string &&
+             data.test_name is string &&
+             data.reported_at is string &&
+             data.recorded_by is string;
     }
 
     // ===============================================================
@@ -383,6 +397,22 @@ service cloud.firestore {
         isGlobalAdmin() ||
         resource.data.submitter_uid == request.auth.uid
       );
+      allow delete: if isGlobalAdmin();
+    }
+
+    match /lab_reports/{reportId} {
+      allow read: if isApproved() && (
+        isGlobalAdmin() ||
+        isStaff(resource.data.clinic_id)
+      );
+      allow create: if isApproved() && (
+        isGlobalAdmin() ||
+        isStaff(request.resource.data.clinic_id)
+      ) && isValidLabReport(request.resource.data);
+      allow update: if isApproved() && (
+        isGlobalAdmin() ||
+        isStaff(request.resource.data.clinic_id)
+      ) && isValidLabReport(request.resource.data);
       allow delete: if isGlobalAdmin();
     }
   }

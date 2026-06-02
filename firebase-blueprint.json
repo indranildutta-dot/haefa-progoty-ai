@@ -135,6 +135,53 @@
         "created_at": { "type": "string", "format": "date-time" }
       },
       "required": ["clinic_id", "medication_name", "type", "status", "created_at"]
+    },
+    "LabReport": {
+      "title": "LabReport",
+      "description": "Lab report records entered by medical staff and doctors",
+      "type": "object",
+      "properties": {
+        "patient_id": { "type": "string" },
+        "encounter_id": { "type": "string" },
+        "clinic_id": { "type": "string" },
+        "country_id": { "type": "string" },
+        "test_name": { "type": "string" },
+        "reported_at": { "type": "string" },
+        "recorded_by": { "type": "string" },
+        "recorded_by_name": { "type": "string" },
+        "fields": { "type": "object" },
+        "remarks": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["patient_id", "encounter_id", "clinic_id", "country_id", "test_name", "reported_at", "recorded_by", "recorded_by_name", "fields"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "Helpdesk support ticket",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "status": { "type": "string", "enum": ["new", "in_progress", "waiting_feedback", "resolved"] },
+        "station": { "type": "string" },
+        "submitter_uid": { "type": "string" },
+        "submitter_name": { "type": "string" },
+        "submitter_email": { "type": "string" },
+        "submitter_role": { "type": "string" },
+        "clinic_id": { "type": "string" },
+        "clinic_name": { "type": "string" },
+        "country_id": { "type": "string" },
+        "country_name": { "type": "string" },
+        "userAgent": { "type": "string" },
+        "attachments": { "type": "array" },
+        "comments": { "type": "array" },
+        "internal_notes": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "priority", "status", "station", "submitter_uid", "submitter_name", "submitter_email", "submitter_role"]
     }
   },
   "firestore": {
@@ -181,6 +228,14 @@
     "icd11_common": {
       "schema": "object",
       "description": "Global dictionary of ICD-11 codes"
+    },
+    "lab_reports": {
+      "schema": "LabReport",
+      "description": "Lab report records"
+    },
+    "support_tickets": {
+      "schema": "SupportTicket",
+      "description": "Collection of helpdesk support tickets"
     }
   }
 }

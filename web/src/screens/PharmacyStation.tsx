@@ -1169,10 +1169,11 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                               py: isNewMed ? 0.75 : 0, 
                               borderRadius: 2, 
                               display: 'flex',
+                              flexWrap: 'wrap',
                               alignItems: 'center',
                               justifyContent: 'space-between',
                               width: '100%',
-                              gap: 2,
+                              gap: 1.5,
                               border: isNewMed ? '1px solid #cbd5e1' : 'none',
                               mb: 1
                             }}>
@@ -1985,7 +1986,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
-      <StationLayout title="Pharmacy & Inventory" stationName="Pharmacy" showPatientContext={!!selectedItem}>
+      <StationLayout title="Pharmacy & Inventory" stationName="Pharmacy" showPatientContext={!!selectedItem} hideSidebar={true}>
       <Container maxWidth="xl" sx={{ py: 3 }}>
         {!selectedItem && (
           <Box sx={{ mb: 4 }}>

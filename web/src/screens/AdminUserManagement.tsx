@@ -130,86 +130,109 @@ const AdminUserManagement = () => {
 
   return (
     <StationLayout title="User Management" stationName="Admin">
-      <Box>
-        <Typography variant="h6">Invite/Update Staff</Typography>
-        <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} fullWidth margin="normal" />
-        
-        <FormControl fullWidth margin="normal">
-          <InputLabel>Country</InputLabel>
-          <Select value={selectedCountryId} onChange={(e) => { setSelectedCountryId(e.target.value); setSelectedClinicIds([]); }}>
-            {countries.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-          </Select>
-        </FormControl>
-
-        <FormControl fullWidth margin="normal" disabled={!selectedCountryId}>
-          <InputLabel>Clinics</InputLabel>
-          <Select 
-            multiple 
-            value={selectedClinicIds} 
-            onChange={(e) => setSelectedClinicIds(e.target.value as string[])}
-            input={<OutlinedInput label="Clinics" />}
-            renderValue={(selected) => (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                {selected.map((value) => (
-                  <Chip key={value} label={availableClinics.find(c => c.id === value)?.name} />
-                ))}
-              </Box>
-            )}
-          >
-            {availableClinics.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-          </Select>
-        </FormControl>
-
-        <FormControl fullWidth margin="normal">
-          <InputLabel>Role</InputLabel>
-          <Select value={role} onChange={(e) => setRole(e.target.value)}>
-            <MenuItem value="nurse">Nurse</MenuItem>
-            <MenuItem value="doctor">Doctor</MenuItem>
-            <MenuItem value="pharmacist">Pharmacist</MenuItem>
-            <MenuItem value="country_admin">Country Admin</MenuItem>
-            <MenuItem value="global_admin">Global Admin</MenuItem>
-          </Select>
-        </FormControl>
-
-        <FormControlLabel
-          control={<Switch checked={isApproved} onChange={(e) => setIsApproved(e.target.checked)} />}
-          label="Is Approved"
-        />
-
-        <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
-          <TextField 
-            label="Professional Reg No" 
-            value={professionalRegNo} 
-            onChange={(e) => setProfessionalRegNo(e.target.value)} 
-            fullWidth 
-          />
-          <FormControl fullWidth>
-            <InputLabel>Professional Body</InputLabel>
-            <Select 
-              value={professionalBody} 
-              onChange={(e) => setProfessionalBody(e.target.value)}
-              label="Professional Body"
-            >
-              <MenuItem value="">None</MenuItem>
-              <MenuItem value="BMDC">BMDC (Bangladesh Medical & Dental Council)</MenuItem>
-              <MenuItem value="BNMC">BNMC (Bangladesh Nursing & Midwifery Council)</MenuItem>
-              <MenuItem value="PCB">PCB (Pharmacy Council of Bangladesh)</MenuItem>
-              <MenuItem value="Other">Other</MenuItem>
+      {userProfile?.role === 'global_admin' ? (
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6">Invite/Update Staff</Typography>
+          <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} fullWidth margin="normal" />
+          
+          <FormControl fullWidth margin="normal">
+            <InputLabel>Country</InputLabel>
+            <Select value={selectedCountryId} onChange={(e) => { setSelectedCountryId(e.target.value); setSelectedClinicIds([]); }}>
+              {countries.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>
           </FormControl>
-          <TextField 
-            label="Designation" 
-            value={designation} 
-            onChange={(e) => setDesignation(e.target.value)} 
-            fullWidth 
+
+          <FormControl fullWidth margin="normal" disabled={!selectedCountryId}>
+            <InputLabel>Clinics</InputLabel>
+            <Select 
+              multiple 
+              value={selectedClinicIds} 
+              onChange={(e) => setSelectedClinicIds(e.target.value as string[])}
+              input={<OutlinedInput label="Clinics" />}
+              renderValue={(selected) => (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {selected.map((value) => (
+                    <Chip key={value} label={availableClinics.find(c => c.id === value)?.name} />
+                  ))}
+                </Box>
+              )}
+            >
+              {availableClinics.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth margin="normal">
+            <InputLabel>Role</InputLabel>
+            <Select value={role} onChange={(e) => setRole(e.target.value)}>
+              <MenuItem value="nurse">Nurse</MenuItem>
+              <MenuItem value="doctor">Doctor</MenuItem>
+              <MenuItem value="pharmacist">Pharmacist</MenuItem>
+              <MenuItem value="country_admin">Country Admin</MenuItem>
+              <MenuItem value="global_admin">Global Admin</MenuItem>
+            </Select>
+          </FormControl>
+
+          <FormControlLabel
+            control={<Switch checked={isApproved} onChange={(e) => setIsApproved(e.target.checked)} />}
+            label="Is Approved"
           />
+
+          <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+            <TextField 
+              label="Professional Reg No" 
+              value={professionalRegNo} 
+              onChange={(e) => setProfessionalRegNo(e.target.value)} 
+              fullWidth 
+            />
+            <FormControl fullWidth>
+              <InputLabel>Professional Body</InputLabel>
+              <Select 
+                value={professionalBody} 
+                onChange={(e) => setProfessionalBody(e.target.value)}
+                label="Professional Body"
+              >
+                <MenuItem value="">None</MenuItem>
+                <MenuItem value="BMDC">BMDC (Bangladesh Medical & Dental Council)</MenuItem>
+                <MenuItem value="BNMC">BNMC (Bangladesh Nursing & Midwifery Council)</MenuItem>
+                <MenuItem value="PCB">PCB (Pharmacy Council of Bangladesh)</MenuItem>
+                <MenuItem value="Other">Other</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField 
+              label="Designation" 
+              value={designation} 
+              onChange={(e) => setDesignation(e.target.value)} 
+              fullWidth 
+            />
+          </Box>
+          
+          <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+            <Button variant="contained" onClick={handleSync}>Save Permissions</Button>
+            <Button variant="outlined" onClick={handleClear}>Clear Form</Button>
+          </Box>
         </Box>
-        
-        <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-          <Button variant="contained" onClick={handleSync}>Save Permissions</Button>
-          <Button variant="outlined" onClick={handleClear}>Clear Form</Button>
-        </Box>
-      </Box>
+      ) : (
+        <Paper 
+          variant="outlined" 
+          sx={{ 
+            p: 3, 
+            mb: 4, 
+            borderRadius: 3, 
+            bgcolor: '#fffbeb', 
+            borderColor: '#fef3c7',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1
+          }}
+        >
+          <Typography variant="subtitle1" fontWeight="bold" color="#b45309">
+            Read-Only Policy Mode (Country Admin)
+          </Typography>
+          <Typography variant="body2" color="#78350f">
+            Only <strong>Global Administrators</strong> can invite new staff members, edit roles, or update user permissions. As a Country Administrator, you are permitted to view the staff list and clinic assignments within your designated countries below.
+          </Typography>
+        </Paper>
+      )}
 
       <TextField 
         label="Search Users" 
@@ -240,11 +263,17 @@ const AdminUserManagement = () => {
                 <TableCell>{user.countryCode}</TableCell>
                 <TableCell>{user.isApproved ? 'Yes' : 'No'}</TableCell>
                 <TableCell>
-                  <Button size="small" onClick={() => handleEditUser(user)}>Edit</Button>
-                  {userProfile?.role === 'global_admin' && (
-                    <IconButton size="small" color="error" onClick={() => handleDeleteClick(user)}>
-                      <DeleteIcon />
-                    </IconButton>
+                  {userProfile?.role === 'global_admin' ? (
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      <Button size="small" onClick={() => handleEditUser(user)}>Edit</Button>
+                      <IconButton size="small" color="error" onClick={() => handleDeleteClick(user)}>
+                        <DeleteIcon />
+                      </IconButton>
+                    </Box>
+                  ) : (
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+                      Read-only
+                    </Typography>
                   )}
                 </TableCell>
               </TableRow>

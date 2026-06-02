@@ -732,7 +732,7 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
                 variant="contained" 
                 color="secondary"
                 component={Link} 
-                to="/admin/users" 
+                to="/users" 
                 startIcon={<PeopleIcon />}
                 sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}
               >
