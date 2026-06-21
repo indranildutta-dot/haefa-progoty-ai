@@ -69,8 +69,7 @@ export const subscribeToMyTickets = (
 ) => {
   const q = query(
     collection(db, COLLECTION_NAME),
-    where("submitter_uid", "==", uid),
-    orderBy("created_at", "desc")
+    where("submitter_uid", "==", uid)
   );
 
   return onSnapshot(
@@ -80,6 +79,20 @@ export const subscribeToMyTickets = (
         id: doc.id,
         ...doc.data()
       })) as SupportTicket[];
+
+      // Sort client-side to avoid composite index requirement
+      tickets.sort((a, b) => {
+        const getMs = (t: any) => {
+          if (!t) return 0;
+          if (typeof t === 'string') return new Date(t).getTime();
+          if (typeof t.toMillis === 'function') return t.toMillis();
+          if (t.seconds) return t.seconds * 1000;
+          if (t instanceof Date) return t.getTime();
+          return 0;
+        };
+        return getMs(b.created_at) - getMs(a.created_at);
+      });
+
       onUpdate(tickets);
     },
     (err) => {
@@ -90,16 +103,26 @@ export const subscribeToMyTickets = (
 };
 
 /**
- * Subscribes to real-time updates for ALL tickets (strictly authorized for Administrators).
+ * Subscribes to real-time updates for ALL tickets based on administrative authorization.
  */
 export const subscribeToAllTickets = (
+  role: string,
+  assignedCountries: string[],
   onUpdate: (tickets: SupportTicket[]) => void,
   onError: (err: any) => void
 ) => {
-  const q = query(
-    collection(db, COLLECTION_NAME),
-    orderBy("created_at", "desc")
-  );
+  let q;
+  if (role === 'global_admin') {
+    q = query(collection(db, COLLECTION_NAME));
+  } else if (role === 'country_admin' && assignedCountries && assignedCountries.length > 0) {
+    q = query(
+      collection(db, COLLECTION_NAME),
+      where("country_id", "in", assignedCountries)
+    );
+  } else {
+    // If undefined/mismatched roles, query only own submitted tickets or fall back
+    q = query(collection(db, COLLECTION_NAME), where("submitter_uid", "==", "FORCE_EMPTY_UNKNOWN_ROLE"));
+  }
 
   return onSnapshot(
     q,
@@ -108,10 +131,24 @@ export const subscribeToAllTickets = (
         id: doc.id,
         ...doc.data()
       })) as SupportTicket[];
+
+      // Sort client-side to ensure chronological visual layout without indexing blocks
+      tickets.sort((a, b) => {
+        const getMs = (t: any) => {
+          if (!t) return 0;
+          if (typeof t === 'string') return new Date(t).getTime();
+          if (typeof t.toMillis === 'function') return t.toMillis();
+          if (t.seconds) return t.seconds * 1000;
+          if (t instanceof Date) return t.getTime();
+          return 0;
+        };
+        return getMs(b.created_at) - getMs(a.created_at);
+      });
+
       onUpdate(tickets);
     },
     (err) => {
-      console.error("Error loading all tickets for administrator:", err);
+      console.error("Error loading tickets in admin mode:", err);
       onError(err);
     }
   );

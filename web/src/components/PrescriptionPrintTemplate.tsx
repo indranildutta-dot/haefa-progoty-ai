@@ -38,20 +38,38 @@ const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTe
   const [logoBase64, setLogoBase64] = useState<string>('');
 
   useEffect(() => {
-    if (logoImage) {
-      fetch(logoImage)
-        .then(res => res.blob())
-        .then(blob => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            setLogoBase64(reader.result as string);
-          };
-          reader.readAsDataURL(blob);
-        })
-        .catch(err => {
-          console.error("Error converting HAEFA logo to base64 at runtime:", err);
-        });
-    }
+    const tryFetch = async () => {
+      try {
+        const res = await fetch('/logo.png');
+        if (!res.ok) throw new Error(`HTTP status ${res.status}`);
+        const blob = await res.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setLogoBase64(reader.result as string);
+        };
+        reader.readAsDataURL(blob);
+      } catch (err) {
+        console.warn("Could not fetch /logo.png, trying imported asset path", err);
+        if (logoImage) {
+          fetch(logoImage)
+            .then(res => {
+              if (!res.ok) throw new Error(`HTTP status ${res.status}`);
+              return res.blob();
+            })
+            .then(blob => {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                setLogoBase64(reader.result as string);
+              };
+              reader.readAsDataURL(blob);
+            })
+            .catch(err2 => {
+              console.error("Error converting HAEFA logo to base64 at runtime:", err2);
+            });
+        }
+      }
+    };
+    tryFetch();
   }, []);
   const [error, setError] = useState<string | null>(null);
   const [mergedPrescriptions, setMergedPrescriptions] = useState<Prescription[]>([]);
@@ -263,7 +281,7 @@ const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTe
         </Grid>
         <Grid size={{ xs: 7 }} sx={{ textAlign: 'center' }}>
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.5 }}>
-            <img src={logoBase64 || logoImage} alt="HAEFA Logo" style={{ height: '48px', objectFit: 'contain' }} />
+            <img src={logoBase64 || '/logo.png' || logoImage} alt="HAEFA Logo" style={{ height: '48px', objectFit: 'contain' }} />
           </Box>
           <Typography 
             variant="h6" 

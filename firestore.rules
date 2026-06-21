@@ -388,6 +388,7 @@ service cloud.firestore {
     match /support_tickets/{ticketId} {
       allow read: if isAuthenticated() && (
         isGlobalAdmin() ||
+        isCountryAdmin(resource.data.country_id) ||
         resource.data.submitter_uid == request.auth.uid
       );
       allow create: if isAuthenticated() && (
@@ -395,6 +396,7 @@ service cloud.firestore {
       );
       allow update: if isAuthenticated() && (
         isGlobalAdmin() ||
+        isCountryAdmin(resource.data.country_id) ||
         resource.data.submitter_uid == request.auth.uid
       );
       allow delete: if isGlobalAdmin();

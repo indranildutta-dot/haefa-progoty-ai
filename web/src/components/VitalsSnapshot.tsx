@@ -7,6 +7,7 @@ interface VitalsSnapshotProps {
   vitals: VitalsRecord | null;
   gender?: string;
   labReports?: LabReportRecord[];
+  encounterId?: string;
 }
 
 const formatFieldKey = (key: string): string => {
@@ -58,14 +59,17 @@ const formatFieldKey = (key: string): string => {
   return map[key] || key;
 };
 
-const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals, gender, labReports = [] }) => {
-  if (!vitals) {
+const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals, gender, labReports = [], encounterId }) => {
+  if (!vitals || (encounterId && vitals.encounter_id !== encounterId)) {
     return (
-      <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 3, bgcolor: 'grey.50' }}>
-        <Typography variant="body2" color="textSecondary" align="center">No data recorded for this visit.</Typography>
+      <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 3, bgcolor: '#f8fafc', borderColor: '#e2e8f0' }}>
+        <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 3, fontStyle: 'italic' }}>No data recorded for this visit.</Typography>
       </Paper>
     );
   }
+
+  // Filter labReports to only show the ones matched to this encounter ID
+  const todayLabReports = encounterId ? labReports.filter(r => r.encounter_id === encounterId) : [];
 
   const renderSection = (title: string, items: { label: string; value: any; color?: string; abnormal?: boolean }[]) => (
     <Box sx={{ mb: 3 }}>
@@ -173,13 +177,13 @@ const VitalsSnapshot: React.FC<VitalsSnapshotProps> = ({ vitals, gender, labRepo
         },
       ])}
 
-      {labReports && labReports.length > 0 && (
+      {todayLabReports && todayLabReports.length > 0 && (
         <Box sx={{ mb: 2, mt: 1 }}>
           <Typography variant="caption" fontWeight="900" color="primary" sx={{ textTransform: 'uppercase', mb: 1, display: 'block' }}>
-            RETURNED LAB REPORTS ({labReports.length})
+            RETURNED LAB REPORTS ({todayLabReports.length})
           </Typography>
           <Stack spacing={1.5}>
-            {labReports.map((report, rIdx) => (
+            {todayLabReports.map((report, rIdx) => (
               <Box key={report.id || rIdx} sx={{ p: 1.5, borderRadius: 2, bgcolor: 'white', border: '1px solid #cbd5e1' }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
                   <Typography variant="caption" fontWeight="950" sx={{ color: 'primary.main', fontSize: '0.72rem' }}>

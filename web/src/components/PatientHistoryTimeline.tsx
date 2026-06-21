@@ -38,6 +38,7 @@ import { Encounter, VitalsRecord, DiagnosisRecord, PrescriptionRecord, TriageAss
 import PrescriptionPrintTemplate from './PrescriptionPrintTemplate';
 import PrintPrescriptionDialog from './PrintPrescriptionDialog';
 import { useAppStore } from '../store/useAppStore';
+import { ExpandableAssessmentDetails } from './ExpandableAssessmentDetails';
 
 interface PatientHistoryTimelineProps {
   patientId: string;
@@ -279,6 +280,10 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
               {currentItem.diagnosis?.notes || 'No notes recorded.'}
             </Typography>
           </Box>
+
+          {currentItem.diagnosis && (
+            <ExpandableAssessmentDetails diagnosis={currentItem.diagnosis} />
+          )}
         </CardContent>
       </Card>
 
@@ -330,9 +335,9 @@ const PatientHistoryTimeline: React.FC<PatientHistoryTimelineProps> = ({ patient
                     <Typography variant="subtitle2" fontWeight="900" color="text.secondary">CLINICAL ASSESSMENT</Typography>
                     <Box sx={{ mt: 1 }}>
                       <Typography variant="body1" fontWeight="800">{item.diagnosis?.diagnosis}</Typography>
-                      <Typography variant="body2" sx={{ mt: 1, whiteSpace: 'pre-wrap', color: 'text.secondary', fontStyle: 'italic' }}>
-                        {item.diagnosis?.notes || 'No assessment notes provided.'}
-                      </Typography>
+                      {item.diagnosis && (
+                        <ExpandableAssessmentDetails diagnosis={item.diagnosis} />
+                      )}
                     </Box>
 
                     <Typography variant="subtitle2" fontWeight="900" color="text.secondary" sx={{ mt: 3 }}>PRESCRIPTIONS</Typography>

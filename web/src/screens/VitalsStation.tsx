@@ -525,7 +525,12 @@ const VitalsStation: React.FC<VitalsStationProps> = ({ countryId, mode }) => {
   };
 
   return (
-    <StationLayout title={stationTitle} stationName={stationName} showPatientContext={!!selectedPatient}>
+    <StationLayout 
+      title={stationTitle} 
+      stationName={stationName} 
+      showPatientContext={!!selectedPatient}
+      encounterId={selectedQueueItem?.encounter_id}
+    >
       {!selectedPatient ? (
         <Box>
           <StationSearchHeader 

@@ -55,6 +55,11 @@ import EditIcon from '@mui/icons-material/Edit';
 import HistoryIcon from '@mui/icons-material/History';
 import LabIcon from '@mui/icons-material/Science';
 
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
+
 import { auth, functions, db } from "../firebase";
 import { httpsCallable } from 'firebase/functions';
 import { 
@@ -1680,6 +1685,8 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
           updated_at: serverTimestamp()
         });
 
+        setLastEncounterId(selectedItem.encounter_id);
+        setShowPrintDialog(true);
         clearSavedData();
         setSelectedItem(null);
         setSelectedPatient(null);
@@ -1757,7 +1764,8 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
       title="Doctor Station" 
       stationName="Doctor" 
       showPatientContext={!!selectedItem}
-      hideSidebar={!!selectedItem}
+      hideSidebar={false}
+      encounterId={selectedItem?.encounter_id}
       maxWidth={selectedItem ? false : "xl"}
     >
       {!selectedItem ? (
@@ -1854,34 +1862,29 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
       ) : (
         <Box sx={{ mt: -3, pb: 12 }}>
           <Grid container spacing={3} sx={{ mt: 1 }}>
-            {/* LEFT: Vitals */}
-            <Grid size={{ xs: 12, md: 2.5 }} sx={{ position: 'sticky', top: 80, alignSelf: 'flex-start', maxHeight: '80vh', overflowY: 'auto' }}>
-              <VitalsSnapshot vitals={currentVitals} gender={selectedPatient?.gender} labReports={labReports} />
-              
-              <Button
-                variant="contained"
-                color="secondary"
-                fullWidth
-                startIcon={<LabIcon />}
-                onClick={() => setLabReportDialogOpen(true)}
-                sx={{ 
-                  mt: 1, 
-                  py: 1.5,
-                  borderRadius: 3.5, 
-                  fontWeight: 'bold', 
-                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
-                  bgcolor: '#334155', 
-                  '&:hover': { bgcolor: '#1e293b' } 
-                }}
-              >
-                Record Lab Report
-              </Button>
-            </Grid>
-
-            {/* MIDDLE: Assessment & Diagnosis */}
-            <Grid size={{ xs: 12, md: 7 }}>
+            {/* Assessment & Diagnosis */}
+            <Grid size={{ xs: 12, md: 12 }}>
               <Paper elevation={0} sx={{ p: 4, borderRadius: 4, border: '1px solid #e2e8f0' }}>
-                <Typography variant="h6" fontWeight="900" gutterBottom color="primary">CLINICAL ASSESSMENT</Typography>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                  <Typography variant="h6" fontWeight="900" color="primary">CLINICAL ASSESSMENT</Typography>
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    startIcon={<LabIcon />}
+                    onClick={() => setLabReportDialogOpen(true)}
+                    sx={{ 
+                      py: 1, 
+                      px: 3,
+                      borderRadius: 3, 
+                      fontWeight: 'bold', 
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+                      bgcolor: '#334155', 
+                      '&:hover': { bgcolor: '#1e293b' } 
+                    }}
+                  >
+                    Record Lab Report
+                  </Button>
+                </Stack>
                 <Divider sx={{ mb: 3 }} />
                 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -2052,25 +2055,27 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
                   {/* Section 6: Follow-up Plan */}
                   <Box>
                     <Typography variant="subtitle2" color="primary" fontWeight="800" sx={{ mb: 2 }}>Section 6 — Follow-up Plan</Typography>
-                    <TextField 
-                      fullWidth 
-                      type="date"
-                      label="Follow-up Date"
-                      variant="outlined" 
-                      value={consultData.followUpDate || ''} 
-                      onChange={(e) => setConsultData(prev => ({ ...prev, followUpDate: e.target.value }))} 
-                      InputLabelProps={{ shrink: true }}
-                      inputProps={{ lang: 'en-GB' }}
-                      helperText="Format: DD/MM/YYYY"
-                    />
+                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      <DatePicker
+                        label="Follow-up Date"
+                        value={consultData.followUpDate ? dayjs(consultData.followUpDate) : null}
+                        onChange={(val) => setConsultData(prev => ({ 
+                          ...prev, 
+                          followUpDate: val && val.isValid() ? val.format('YYYY-MM-DD') : null 
+                        }))}
+                        format="DD/MM/YYYY"
+                        slotProps={{ 
+                          textField: { 
+                            fullWidth: true,
+                            variant: "outlined",
+                            helperText: "Format: DD/MM/YYYY"
+                          } 
+                        }}
+                      />
+                    </LocalizationProvider>
                   </Box>
                 </Box>
               </Paper>
-            </Grid>
-
-            {/* RIGHT: History */}
-            <Grid size={{ xs: 12, md: 2.5 }} sx={{ position: 'sticky', top: 80, alignSelf: 'flex-start', maxHeight: '80vh', overflowY: 'auto' }}>
-              <PatientHistoryTimeline patientId={selectedItem.patient_id} />
             </Grid>
           </Grid>
 

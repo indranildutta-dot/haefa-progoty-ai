@@ -135,12 +135,15 @@ const SupportCenter: React.FC = () => {
 
     if (isAdmin) {
       unsubscribe = subscribeToAllTickets(
+        userProfile?.role || '',
+        userProfile?.assignedCountries || [],
         (data) => {
           setTickets(data);
           setLoading(false);
+          setError(null);
         },
         (err) => {
-          setError('Failed to fetch support tickets. Please verify your connection.');
+          setError('Failed to fetch support tickets. Please verify your connection or role permissions.');
           setLoading(false);
         }
       );
@@ -150,9 +153,10 @@ const SupportCenter: React.FC = () => {
         (data) => {
           setTickets(data);
           setLoading(false);
+          setError(null);
         },
         (err) => {
-          setError('Failed to fetch your tickets. Please try again.');
+          setError('Failed to fetch your tickets. Please check your connectivity or try again.');
           setLoading(false);
         }
       );
@@ -161,7 +165,23 @@ const SupportCenter: React.FC = () => {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [user, isAdmin]);
+  }, [user, isAdmin, userProfile]);
+
+  // Prevent default window behavior for dragging files onto the page to prevent browser navigation
+  useEffect(() => {
+    const handleGlobalDragOver = (e: DragEvent) => {
+      e.preventDefault();
+    };
+    const handleGlobalDrop = (e: DragEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('dragover', handleGlobalDragOver);
+    window.addEventListener('drop', handleGlobalDrop);
+    return () => {
+      window.removeEventListener('dragover', handleGlobalDragOver);
+      window.removeEventListener('drop', handleGlobalDrop);
+    };
+  }, []);
 
   // Sync internal admin notes when selected ticket changes (for admins)
   useEffect(() => {
@@ -174,18 +194,15 @@ const SupportCenter: React.FC = () => {
   useEffect(() => {
     if (selectedTicket) {
       const updated = tickets.find(t => t.id === selectedTicket.id);
-      if (updated) {
+      if (updated && updated !== selectedTicket) {
         setSelectedTicket(updated);
       }
     }
-  }, [tickets]);
+  }, [tickets, selectedTicket]);
 
   // 2. Client-side Image Reader with Canvas Compression
-  const handleImageUploadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    Array.from(files).forEach((file) => {
+  const processFileList = (filesList: File[]) => {
+    filesList.forEach((file) => {
       if (!file.type.startsWith('image/')) {
         alert('Please drop or select image files only (PNG/JPG).');
         return;
@@ -227,9 +244,40 @@ const SupportCenter: React.FC = () => {
       };
       reader.readAsDataURL(file);
     });
+  };
+
+  const handleImageUploadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    processFileList(Array.from(files));
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      processFileList(Array.from(files));
     }
   };
 
@@ -439,6 +487,12 @@ const SupportCenter: React.FC = () => {
       showPatientContext={false}
       hideSidebar={true}
     >
+      {error && (
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 3 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
       {selectedTicket ? (
         // Ticket Detailed Conversation and Control Blade
         <Box sx={{ mt: -2 }}>
@@ -1085,6 +1139,10 @@ const SupportCenter: React.FC = () => {
                     
                     <Box 
                       onClick={() => fileInputRef.current?.click()}
+                      onDragOver={handleDragOver}
+                      onDragEnter={handleDragEnter}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
                       sx={{ 
                         border: '2px dashed #cbd5e1', 
                         borderRadius: 3, 

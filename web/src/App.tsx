@@ -108,7 +108,7 @@ const App: React.FC = () => {
         user && selectedCountry ? (
           <ClinicSelection 
             selectedCountry={selectedCountry} 
-            onSelectClinic={(clinic) => setSession(selectedCountry, clinic)} 
+            onSelectClinic={(country, clinic) => setSession(country, clinic)} 
             onBack={() => clearCountry()} 
           />
         ) : <Navigate to="/login" />

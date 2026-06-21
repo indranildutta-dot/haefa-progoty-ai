@@ -37,6 +37,7 @@ interface StationLayoutProps {
   stationName?: string;
   actions?: React.ReactNode;
   maxWidth?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | false;
+  encounterId?: string;
 }
 
 const StationLayout: React.FC<StationLayoutProps> = ({ 
@@ -46,7 +47,8 @@ const StationLayout: React.FC<StationLayoutProps> = ({
   title,
   stationName,
   actions,
-  maxWidth = "xl"
+  maxWidth = "xl",
+  encounterId
 }) => {
   const { isMobile, isTablet, isDesktop } = useResponsiveLayout();
   const navigate = useNavigate();
@@ -141,12 +143,26 @@ const StationLayout: React.FC<StationLayoutProps> = ({
             </Box>
           )}
           
-          {/* Dashboard/Workspace Content with Sidebar */}
-          <Stack direction="row" spacing={4} alignItems="flex-start">
-            <Box sx={{ flexGrow: 1 }}>
+          {/* Dashboard/Workspace Content with Sidebar on the LEFT */}
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={4} alignItems="flex-start" sx={{ width: '100%' }}>
+            {showSidebar && (
+              <Box sx={{ 
+                width: { xs: '100%', md: '28%', lg: '24%', xl: '20%' }, 
+                flexShrink: 0,
+                position: 'sticky',
+                top: 100,
+                display: { xs: 'none', md: 'block' }
+              }}>
+                <ClinicalSidebar encounterId={encounterId} />
+              </Box>
+            )}
+            <Box sx={{ 
+              flexGrow: 1, 
+              minWidth: 0,
+              width: { xs: '100%', md: showSidebar ? 'calc(72% - 32px)' : '100%', lg: showSidebar ? 'calc(76% - 32px)' : '100%', xl: showSidebar ? 'calc(80% - 32px)' : '100%' }
+            }}>
               {children}
             </Box>
-            {showSidebar && <ClinicalSidebar />}
           </Stack>
         </Container>
       </Box>

@@ -4,13 +4,13 @@ import {
   Box, Paper, Chip, Button, Alert, AlertTitle 
 } from '@mui/material';
 import { ArrowBack, CheckCircle, LockClock, Business } from '@mui/icons-material';
-import { CountryConfig, ClinicConfig } from '../config/countries';
+import { countries, CountryConfig, ClinicConfig } from '../config/countries';
 import { useAppStore } from '../store/useAppStore';
 import { useNavigate } from 'react-router-dom';
 
 interface ClinicSelectionProps {
   selectedCountry: CountryConfig;
-  onSelectClinic: (clinic: ClinicConfig) => void;
+  onSelectClinic: (country: CountryConfig, clinic: ClinicConfig) => void;
   onBack: () => void;
 }
 
@@ -31,8 +31,32 @@ const ClinicSelection: React.FC<ClinicSelectionProps> = ({ selectedCountry, onSe
     );
   }, [selectedCountry, userProfile]);
 
+  // Find clinics in other countries that are in the user's assignedClinics list
+  const otherAuthorizedClinics = useMemo(() => {
+    if (!userProfile) return [];
+    if (userProfile.role === 'global_admin') return [];
+
+    const list: Array<{ clinic: ClinicConfig; country: CountryConfig }> = [];
+    const otherCountries = countries.filter(c => c.id !== selectedCountry.id);
+
+    otherCountries.forEach(country => {
+      country.clinics.forEach(clinic => {
+        if (userProfile.assignedClinics?.includes(clinic.id)) {
+          list.push({ clinic, country });
+        }
+      });
+    });
+
+    return list;
+  }, [selectedCountry, userProfile]);
+
   const handleSelect = (clinic: ClinicConfig) => {
-    onSelectClinic(clinic);
+    onSelectClinic(selectedCountry, clinic);
+    navigate('/dashboard'); // Direct entry to dashboard upon selection
+  };
+
+  const handleSelectOther = (country: CountryConfig, clinic: ClinicConfig) => {
+    onSelectClinic(country, clinic);
     navigate('/dashboard'); // Direct entry to dashboard upon selection
   };
 
@@ -68,40 +92,140 @@ const ClinicSelection: React.FC<ClinicSelectionProps> = ({ selectedCountry, onSe
       </Box>
 
       {authorizedClinics.length === 0 ? (
-        <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 4, border: '2px dashed #cbd5e1' }}>
-          <Typography variant="h6" fontWeight={800} color="text.secondary">No Access Found</Typography>
-          <Typography variant="body2" color="text.disabled">
-            You do not have any clinics assigned for {selectedCountry.name} in your Firestore profile.
-          </Typography>
-        </Paper>
+        <Box>
+          <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 4, border: '2px dashed #cbd5e1', mb: 4 }}>
+            <Typography variant="h6" fontWeight={800} color="text.secondary">No Access Found</Typography>
+            <Typography variant="body2" color="text.disabled" sx={{ mt: 1 }}>
+              You do not have any clinics assigned for {selectedCountry.name} in your Firestore profile.
+            </Typography>
+          </Paper>
+
+          {otherAuthorizedClinics.length > 0 && (
+            <Box sx={{ mt: 4 }}>
+              <Typography variant="h5" fontWeight={900} color="primary" sx={{ mb: 1 }}>
+                Your Assigned Clinics In Other Countries
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 4, fontWeight: 600 }}>
+                We found clinics assigned to you in another country. Please click on a clinic below to select it and switch your session automatically:
+              </Typography>
+              <Grid container spacing={3}>
+                {otherAuthorizedClinics.map(({ clinic, country }) => (
+                  <Grid size={{ xs: 12, sm: 6 }} key={clinic.id}>
+                    <Card 
+                      id={`cliniccard-${clinic.id}`}
+                      sx={{ 
+                        borderRadius: 4, 
+                        border: '2px solid transparent',
+                        transition: '0.2s',
+                        '&:hover': {
+                          borderColor: 'primary.main',
+                          boxShadow: '0 12px 24px rgba(0,0,0,0.1)',
+                          transform: 'translateY(-4px)'
+                        }
+                      }}
+                    >
+                      <CardActionArea onClick={() => handleSelectOther(country, clinic)} sx={{ p: 4 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                          <Business color="primary" sx={{ fontSize: 40 }} />
+                          <Chip 
+                            label={`${country.name} ${country.flag}`} 
+                            size="small" 
+                            color="primary"
+                            variant="outlined"
+                            sx={{ fontWeight: 800 }} 
+                          />
+                        </Box>
+                        <Typography variant="h5" fontWeight={900}>{clinic.name}</Typography>
+                        <Typography variant="caption" color="text.disabled" sx={{ letterSpacing: 1 }}>ID: {clinic.id}</Typography>
+                        <Box sx={{ mt: 2 }}>
+                          <Chip label="AUTHORIZED" color="success" size="small" icon={<CheckCircle sx={{ fontSize: 14 }} />} sx={{ fontWeight: 900, borderRadius: 1.5 }} />
+                        </Box>
+                      </CardActionArea>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          )}
+        </Box>
       ) : (
-        <Grid container spacing={3}>
-          {authorizedClinics.map((clinic) => (
-            <Grid size={{ xs: 12, sm: 6 }} key={clinic.id}>
-              <Card 
-                sx={{ 
-                  borderRadius: 4, 
-                  border: '2px solid transparent',
-                  transition: '0.2s',
-                  '&:hover': {
-                    borderColor: 'primary.main',
-                    boxShadow: '0 12px 24px rgba(0,0,0,0.1)',
-                    transform: 'translateY(-4px)'
-                  }
-                }}
-              >
-                <CardActionArea onClick={() => handleSelect(clinic)} sx={{ p: 4 }}>
-                  <Business color="primary" sx={{ fontSize: 40, mb: 2 }} />
-                  <Typography variant="h5" fontWeight={900}>{clinic.name}</Typography>
-                  <Typography variant="caption" color="text.disabled" sx={{ letterSpacing: 1 }}>ID: {clinic.id}</Typography>
-                  <Box sx={{ mt: 2 }}>
-                    <Chip label="AUTHORIZED" color="success" size="small" icon={<CheckCircle sx={{ fontSize: 14 }} />} sx={{ fontWeight: 900, borderRadius: 1.5 }} />
-                  </Box>
-                </CardActionArea>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+        <Box>
+          <Grid container spacing={3}>
+            {authorizedClinics.map((clinic) => (
+              <Grid size={{ xs: 12, sm: 6 }} key={clinic.id}>
+                <Card 
+                  id={`cliniccard-${clinic.id}`}
+                  sx={{ 
+                    borderRadius: 4, 
+                    border: '2px solid transparent',
+                    transition: '0.2s',
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      boxShadow: '0 12px 24px rgba(0,0,0,0.1)',
+                      transform: 'translateY(-4px)'
+                    }
+                  }}
+                >
+                  <CardActionArea onClick={() => handleSelect(clinic)} sx={{ p: 4 }}>
+                    <Business color="primary" sx={{ fontSize: 40, mb: 2 }} />
+                    <Typography variant="h5" fontWeight={900}>{clinic.name}</Typography>
+                    <Typography variant="caption" color="text.disabled" sx={{ letterSpacing: 1 }}>ID: {clinic.id}</Typography>
+                    <Box sx={{ mt: 2 }}>
+                      <Chip label="AUTHORIZED" color="success" size="small" icon={<CheckCircle sx={{ fontSize: 14 }} />} sx={{ fontWeight: 900, borderRadius: 1.5 }} />
+                    </Box>
+                  </CardActionArea>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+
+          {otherAuthorizedClinics.length > 0 && (
+            <Box sx={{ mt: 6 }}>
+              <Typography variant="h6" fontWeight={800} color="text.secondary" sx={{ mb: 2 }}>
+                Clinics In Other Countries
+              </Typography>
+              <Grid container spacing={3}>
+                {otherAuthorizedClinics.map(({ clinic, country }) => (
+                  <Grid size={{ xs: 12, sm: 6 }} key={clinic.id}>
+                    <Card 
+                      id={`cliniccard-${clinic.id}`}
+                      sx={{ 
+                        borderRadius: 4, 
+                        border: '2px solid transparent',
+                        transition: '0.2s',
+                        opacity: 0.8,
+                        '&:hover': {
+                          borderColor: 'primary.main',
+                          boxShadow: '0 12px 24px rgba(0,0,0,0.1)',
+                          transform: 'translateY(-4px)',
+                          opacity: 1
+                        }
+                      }}
+                    >
+                      <CardActionArea onClick={() => handleSelectOther(country, clinic)} sx={{ p: 4 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                          <Business color="primary" sx={{ fontSize: 32 }} />
+                          <Chip 
+                            label={`${country.name} ${country.flag}`} 
+                            size="small" 
+                            color="primary"
+                            variant="outlined"
+                            sx={{ fontWeight: 800 }} 
+                          />
+                        </Box>
+                        <Typography variant="h6" fontWeight={800}>{clinic.name}</Typography>
+                        <Typography variant="caption" color="text.disabled" sx={{ letterSpacing: 1 }}>ID: {clinic.id}</Typography>
+                        <Box sx={{ mt: 2 }}>
+                          <Chip label="AUTHORIZED" color="success" size="small" icon={<CheckCircle sx={{ fontSize: 12 }} />} sx={{ fontWeight: 900, borderRadius: 1.5 }} />
+                        </Box>
+                      </CardActionArea>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          )}
+        </Box>
       )}
     </Container>
   );

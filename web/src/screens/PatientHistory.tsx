@@ -33,6 +33,7 @@ import { parseFatQrData } from '../utils/qrUtils';
 import QrScannerModal from '../components/QrScannerModal';
 import PrintPrescriptionDialog from '../components/PrintPrescriptionDialog';
 import { Patient, Encounter, VitalsRecord, DiagnosisRecord, PrescriptionRecord } from '../types';
+import { ExpandableAssessmentDetails } from '../components/ExpandableAssessmentDetails';
 import { calculateAgeDisplay } from '../utils/patient';
 import dayjs from 'dayjs';
 
@@ -440,6 +441,12 @@ const PatientHistory: React.FC = () => {
                           )}
                         </Paper>
                       </Grid>
+
+                      {diagnosis && (
+                        <Grid size={12}>
+                          <ExpandableAssessmentDetails diagnosis={diagnosis} />
+                        </Grid>
+                      )}
 
                       {history.labReports && history.labReports.filter((lr: any) => lr.encounter_id === enc.id).length > 0 && (
                         <Grid size={12}>

@@ -24,7 +24,7 @@ import {
 import { searchPatients, getPatientById } from '../services/patientService';
 import { addToQueue, subscribeToQueue } from '../services/queueService';
 import { getLatestEncounter, createEncounter } from '../services/encounterService';
-import { Patient, QueueItem, EncounterStatus } from '../types';
+import { Patient, QueueItem, EncounterStatus, TriageLevel } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { getSession } from '../utils/session';
 import { parseFatQrData } from '../utils/qrUtils';
@@ -130,6 +130,20 @@ const StationSearchHeader: React.FC<StationSearchHeaderProps> = ({
         encounterId = await createEncounter(patient.id);
       }
 
+      const isDoctorStation = stationStatus === 'READY_FOR_DOCTOR';
+
+      if (isDoctorStation) {
+        const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
+        const { db } = await import('../firebase');
+        await updateDoc(doc(db, "encounters", encounterId!), {
+          status: 'READY_FOR_DOCTOR',
+          encounter_status: 'READY_FOR_DOCTOR',
+          current_station: 'doctor',
+          triage_level: 'standard',
+          updated_at: serverTimestamp()
+        });
+      }
+
       // Add to queue for this station
       await addToQueue({
         patient_id: patient.id,
@@ -138,7 +152,8 @@ const StationSearchHeader: React.FC<StationSearchHeaderProps> = ({
         status: stationStatus,
         station: stationStatus.toLowerCase().includes('vitals') ? 'vitals' : 
                  stationStatus.toLowerCase().includes('doctor') ? 'doctor' : 
-                 stationStatus.toLowerCase().includes('pharmacy') ? 'pharmacy' : 'registration'
+                 stationStatus.toLowerCase().includes('pharmacy') ? 'pharmacy' : 'registration',
+        triage_level: isDoctorStation ? 'standard' : ((patient.triage_level as TriageLevel) || 'standard')
       });
 
       notify(`Patient ${patient.given_name} added to queue`, 'success');

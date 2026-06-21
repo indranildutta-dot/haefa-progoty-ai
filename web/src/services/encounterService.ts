@@ -164,6 +164,7 @@ export const saveConsultation = async (
       labInvestigations: diagnosisData.labInvestigations || [],
       referrals: diagnosisData.referrals || [],
       assessment: diagnosisData.assessment || null,
+      followUpDate: diagnosisData.followUpDate || null,
       isFinalize
     });
 
@@ -180,12 +181,14 @@ export const saveConsultation = async (
         await firestoreUpdateDoc(qSnapDiag.docs[0].ref, {
           provisionalDiagnosisMajor: diagnosisData.provisionalDiagnosisMajor || [],
           provisionalDiagnosisMinor: diagnosisData.provisionalDiagnosisMinor || [],
+          followUpDate: diagnosisData.followUpDate || null,
         });
       }
 
       await firestoreUpdateDoc(doc(db, ENCOUNTERS_COLLECTION, diagnosisData.encounter_id), {
         provisionalDiagnosisMajor: diagnosisData.provisionalDiagnosisMajor || [],
         provisionalDiagnosisMinor: diagnosisData.provisionalDiagnosisMinor || [],
+        followUpDate: diagnosisData.followUpDate || null,
       });
     } catch (patchErr) {
       console.warn("Failed to apply provisional diagnosis patch", patchErr);

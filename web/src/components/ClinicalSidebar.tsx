@@ -1,65 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Paper, Typography, Divider, Stack, Chip, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
+import React from 'react';
+import { Box, Paper, Typography, Divider, Stack } from '@mui/material';
 import { 
-  ExpandMore as ExpandMoreIcon,
   MonitorWeight as WeightIcon, 
   Height as HeightIcon, 
   Favorite as HeartIcon, 
   Thermostat as TempIcon,
-  Opacity as OpacityIcon,
-  SmokingRooms as TobaccoIcon,
-  WineBar as AlcoholIcon,
-  History as HistoryIcon
+  Opacity as OpacityIcon
 } from '@mui/icons-material';
 import { useAppStore } from '../store/useAppStore';
-import { getEncountersByPatient, getVitalsByEncounter } from '../services/encounterService';
-import { VitalsRecord, Encounter } from '../types';
 import { useLocation } from 'react-router-dom';
 
-const ClinicalSidebar: React.FC = () => {
+interface ClinicalSidebarProps {
+  encounterId?: string;
+}
+
+const ClinicalSidebar: React.FC<ClinicalSidebarProps> = ({ encounterId }) => {
   const { selectedPatient } = useAppStore();
   const location = useLocation();
-  const [lastVisit, setLastVisit] = useState<Encounter | null>(null);
-  const [lastVitals, setLastVitals] = useState<VitalsRecord | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const isAnthropometryPage = location.pathname.includes('vitals-1');
-
-  useEffect(() => {
-    const fetchHistory = async () => {
-      if (!selectedPatient?.id) return;
-      setLoading(true);
-      try {
-        const encounters = await getEncountersByPatient(selectedPatient.id);
-        // The first one is the current one, so we need the second one for "Last Visit"
-        // But wait, if they just started, the current one might be the only one.
-        // We need the most recent COMPLETED or previous encounter.
-        // Actually, let's just get the one that is NOT the current encounter_id if we have it.
-        const currentEncounterId = selectedPatient.latest_encounter_id;
-        const previousEncounters = encounters.filter(e => e.id !== currentEncounterId);
-        
-        if (previousEncounters.length > 0) {
-          const last = previousEncounters[0];
-          setLastVisit(last);
-          const vitals = await getVitalsByEncounter(last.id);
-          setLastVitals(vitals);
-        } else {
-          setLastVisit(null);
-          setLastVitals(null);
-        }
-      } catch (err) {
-        console.error("Error fetching history:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchHistory();
-  }, [selectedPatient?.id, selectedPatient?.latest_encounter_id]);
 
   if (!selectedPatient) return null;
 
   const v = selectedPatient.currentVitals;
+  const isCurrentEncounter = v && encounterId && v.encounter_id === encounterId;
 
   const DataRow = ({ icon, label, value, unit, color, isEmergency, isWarning }: any) => (
     <Box sx={{ 
@@ -81,17 +43,56 @@ const ClinicalSidebar: React.FC = () => {
     </Box>
   );
 
-  const formatDate = (timestamp: any) => {
-    if (!timestamp) return 'N/A';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  };
+  // Station specificity for previous stations only
+  const isVitals1 = location.pathname.includes('vitals-1');
+  const isVitals2 = location.pathname.includes('vitals-2');
+  const isLabsAndRisk = location.pathname.includes('labs-and-risk');
+
+  // Logic: Only show data collected in PREVIOUS stations
+  const showAnthroAllowed = !isVitals1;
+  const showVitalsAllowed = !isVitals1 && !isVitals2;
+  const showLabsAllowed = !isVitals1 && !isVitals2 && !isLabsAndRisk;
+
+  // Real-time Day Presence Checking (strictly require active today's encounter)
+  const hasAnthroData = isCurrentEncounter && v && (
+    (typeof v.weight === 'number' && !isNaN(v.weight) && v.weight > 0) || 
+    (typeof v.height === 'number' && !isNaN(v.height) && v.height > 0) || 
+    (v.muac && !isNaN(v.muac) && v.muac > 0)
+  );
+
+  const hasVitalsData = isCurrentEncounter && v && (
+    (typeof v.systolic === 'number' && !isNaN(v.systolic) && v.systolic > 0) || 
+    (typeof v.heartRate === 'number' && !isNaN(v.heartRate) && v.heartRate > 0) || 
+    (typeof v.temperature === 'number' && !isNaN(v.temperature) && v.temperature > 0)
+  );
+
+  const hasLabsData = isCurrentEncounter && v && (
+    (typeof v.rbg === 'number' && !isNaN(v.rbg) && v.rbg > 0) || 
+    (typeof v.fbg === 'number' && !isNaN(v.fbg) && v.fbg > 0) || 
+    (typeof v.hemoglobin === 'number' && !isNaN(v.hemoglobin) && v.hemoglobin > 0)
+  );
+
+  const displayAnthro = showAnthroAllowed && hasAnthroData;
+  const displayVitals = showVitalsAllowed && hasVitalsData;
+  const displayLabs = showLabsAllowed && hasLabsData;
+
+  const showsAnything = displayAnthro || displayVitals || displayLabs;
+
+  const isAbnormalTemp = v?.temperature && (v.temperature >= 38.0 || v.temperature < 37.0);
+  const isAbnormalHR = v?.heartRate && (v.heartRate > 100 || v.heartRate < 60);
+  
+  const hasSecondBP = v && v.systolic_2 !== undefined && v.systolic_2 !== null && !isNaN(v.systolic_2) && v.systolic_2 > 0 &&
+                      v.diastolic_2 !== undefined && v.diastolic_2 !== null && !isNaN(v.diastolic_2) && v.diastolic_2 > 0;
+  const sysVal = v ? (hasSecondBP ? v.systolic_2 : v.systolic) : NaN;
+  const diaVal = v ? (hasSecondBP ? v.diastolic_2 : v.diastolic) : NaN;
+  const isAbnormalBP = sysVal && diaVal && (sysVal > 129 || sysVal < 110 || diaVal >= 80 || diaVal < 60);
+  const isAbnormalO2 = v?.oxygenSaturation && !isNaN(v.oxygenSaturation) && v.oxygenSaturation > 0 && v.oxygenSaturation < 93;
 
   return (
     <Paper 
       elevation={0} 
       sx={{ 
-        width: 300, 
+        width: '100%', 
         p: 3, 
         borderRadius: 4, 
         border: '1px solid #e2e8f0', 
@@ -99,21 +100,25 @@ const ClinicalSidebar: React.FC = () => {
         height: 'fit-content',
         position: 'sticky',
         top: 100,
-        display: { xs: 'none', sm: 'block' },
         maxHeight: 'calc(100vh - 120px)',
         overflowY: 'auto'
       }}
     >
-      <Typography variant="h6" fontWeight="900" sx={{ mb: 3, color: 'primary.main' }}>
-        CLINICAL SUMMARY
+      <Typography variant="h6" fontWeight="900" sx={{ mb: 3, color: 'primary.main', fontSize: '1rem', letterSpacing: '0.05em' }}>
+        STATION DATA SUMMARY
       </Typography>
 
-      <Stack spacing={3}>
-        {/* Current Visit Data */}
-        {v && (
-          <>
+      {!showsAnything ? (
+        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', textAlign: 'center', py: 4 }}>
+          No data collected today from previous stations.
+        </Typography>
+      ) : (
+        <Stack spacing={4}>
+          {displayAnthro && (
             <Box>
-              <Typography variant="overline" fontWeight="900" color="text.disabled">Anthropometry</Typography>
+              <Typography variant="overline" fontWeight="900" color="text.disabled" sx={{ display: 'block', mb: 1.5 }}>
+                Anthropometry
+              </Typography>
               <Divider sx={{ mb: 2 }} />
               <DataRow icon={<HeightIcon />} label="Height" value={v.height} unit="cm" />
               <DataRow icon={<WeightIcon />} label="Weight" value={v.weight} unit="kg" />
@@ -139,26 +144,22 @@ const ClinicalSidebar: React.FC = () => {
               )}
               {v.blood_group && <DataRow icon={<OpacityIcon />} label="Blood Group" value={v.blood_group} color="error.main" />}
             </Box>
+          )}
 
+          {displayVitals && (
             <Box>
-              <Typography variant="overline" fontWeight="900" color="text.disabled">Vital Signs</Typography>
+              <Typography variant="overline" fontWeight="900" color="text.disabled" sx={{ display: 'block', mb: 1.5 }}>
+                Vital Signs
+              </Typography>
               <Divider sx={{ mb: 2 }} />
-              {(() => {
-                const hasSecondBP = v.systolic_2 !== undefined && v.systolic_2 !== null && !isNaN(v.systolic_2) && v.systolic_2 > 0 &&
-                                    v.diastolic_2 !== undefined && v.diastolic_2 !== null && !isNaN(v.diastolic_2) && v.diastolic_2 > 0;
-                const displaySys = hasSecondBP ? v.systolic_2 : v.systolic;
-                const displayDia = hasSecondBP ? v.diastolic_2 : v.diastolic;
-                return (
-                  <DataRow 
-                    icon={<HeartIcon />} 
-                    label="Blood Pressure" 
-                    value={(!isNaN(displaySys) && !isNaN(displayDia)) ? `${displaySys}/${displayDia}` : '--'} 
-                    unit="mmHg" 
-                    isEmergency={(!isNaN(displaySys) && displaySys > 0 && (displaySys >= 140 || displaySys <= 99)) || (!isNaN(displayDia) && displayDia > 0 && (displayDia > 90 || displayDia < 50))}
-                    isWarning={(!isNaN(displaySys) && displaySys > 0 && ((displaySys >= 130 && displaySys <= 139) || (displaySys >= 100 && displaySys <= 109))) || (!isNaN(displayDia) && displayDia > 0 && ((displayDia >= 80 && displayDia <= 90) || (displayDia >= 50 && displayDia < 60)))}
-                  />
-                );
-              })()}
+              <DataRow 
+                icon={<HeartIcon />} 
+                label="Blood Pressure" 
+                value={(!isNaN(sysVal) && !isNaN(diaVal)) ? `${sysVal}/${diaVal}` : '--'} 
+                unit="mmHg" 
+                isEmergency={(!isNaN(sysVal) && sysVal > 0 && (sysVal >= 140 || sysVal <= 99)) || (!isNaN(diaVal) && diaVal > 0 && (diaVal > 90 || diaVal < 50))}
+                isWarning={(!isNaN(sysVal) && sysVal > 0 && ((sysVal >= 130 && sysVal <= 139) || (sysVal >= 100 && sysVal <= 109))) || (!isNaN(diaVal) && diaVal > 0 && ((diaVal >= 80 && diaVal <= 90) || (diaVal >= 50 && diaVal < 60)))}
+              />
               <DataRow 
                 icon={<HeartIcon />} 
                 label="Heart Rate" 
@@ -184,9 +185,13 @@ const ClinicalSidebar: React.FC = () => {
                 isWarning={(v.temperature >= 38.0 && v.temperature < 39.5) || (v.temperature >= 35.0 && v.temperature < 37.0)}
               />
             </Box>
+          )}
 
+          {displayLabs && (
             <Box>
-              <Typography variant="overline" fontWeight="900" color="text.disabled">Labs & Risk</Typography>
+              <Typography variant="overline" fontWeight="900" color="text.disabled" sx={{ display: 'block', mb: 1.5 }}>
+                Labs & Risk
+              </Typography>
               <Divider sx={{ mb: 2 }} />
               {v.rbg > 0 && (
                 <DataRow 
@@ -212,73 +217,13 @@ const ClinicalSidebar: React.FC = () => {
                   value={v.hemoglobin} 
                   unit="g/dL" 
                   isEmergency={v.hemoglobin < 7}
-                  isWarning={v.hemoglobin < 11} // Simplified warning for sidebar
+                  isWarning={v.hemoglobin < 11}
                 />
               )}
             </Box>
-          </>
-        )}
-
-        {/* Last Visit Section */}
-        <Box>
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-            <HistoryIcon color="primary" sx={{ fontSize: 20 }} />
-            <Typography variant="overline" fontWeight="900" color="primary">Last Visit</Typography>
-          </Stack>
-          <Typography variant="body2" fontWeight="bold" sx={{ mb: 2, color: 'text.secondary' }}>
-            {lastVisit ? formatDate(lastVisit.created_at) : 'None'}
-          </Typography>
-          
-          {lastVisit && lastVitals && (
-            <Stack spacing={1}>
-              <Accordion elevation={0} sx={{ border: '1px solid #f1f5f9', '&:before': { display: 'none' } }}>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="caption" fontWeight="900">ANTHROPOMETRY</Typography>
-                </AccordionSummary>
-                <AccordionDetails sx={{ pt: 0 }}>
-                  <DataRow label="Height" value={lastVitals.height} unit="cm" />
-                  <DataRow label="Weight" value={lastVitals.weight} unit="kg" />
-                  <DataRow 
-                    label="BMI" 
-                    value={lastVitals.bmi} 
-                    unit={lastVitals.bmi_class}
-                    isEmergency={lastVitals.bmi_class === 'Obese'}
-                    isWarning={lastVitals.bmi_class === 'Overweight'}
-                  />
-                </AccordionDetails>
-              </Accordion>
-
-              <Accordion elevation={0} sx={{ border: '1px solid #f1f5f9', '&:before': { display: 'none' } }}>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="caption" fontWeight="900">VITAL SIGNS</Typography>
-                </AccordionSummary>
-                <AccordionDetails sx={{ pt: 0 }}>
-                  {(() => {
-                    const lastHasSecondBP = lastVitals.systolic_2 !== undefined && lastVitals.systolic_2 !== null && !isNaN(lastVitals.systolic_2) && lastVitals.systolic_2 > 0 &&
-                                           lastVitals.diastolic_2 !== undefined && lastVitals.diastolic_2 !== null && !isNaN(lastVitals.diastolic_2) && lastVitals.diastolic_2 > 0;
-                    const lastSys = lastHasSecondBP ? lastVitals.systolic_2 : lastVitals.systolic;
-                    const lastDia = lastHasSecondBP ? lastVitals.diastolic_2 : lastVitals.diastolic;
-                    return <DataRow label="BP" value={`${lastSys}/${lastDia}`} unit="mmHg" />;
-                  })()}
-                  <DataRow label="HR" value={lastVitals.heartRate} unit="bpm" />
-                  <DataRow label="SpO2" value={lastVitals.oxygenSaturation} unit="%" />
-                </AccordionDetails>
-              </Accordion>
-
-              <Accordion elevation={0} sx={{ border: '1px solid #f1f5f9', '&:before': { display: 'none' } }}>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="caption" fontWeight="900">LABS</Typography>
-                </AccordionSummary>
-                <AccordionDetails sx={{ pt: 0 }}>
-                  {lastVitals.rbg > 0 && <DataRow label="RBG" value={lastVitals.rbg} unit="mg/dL" />}
-                  {lastVitals.fbg > 0 && <DataRow label="FBG" value={lastVitals.fbg} unit="mg/dL" />}
-                  {lastVitals.hemoglobin > 0 && <DataRow label="Hb" value={lastVitals.hemoglobin} unit="g/dL" />}
-                </AccordionDetails>
-              </Accordion>
-            </Stack>
           )}
-        </Box>
-      </Stack>
+        </Stack>
+      )}
     </Paper>
   );
 };
