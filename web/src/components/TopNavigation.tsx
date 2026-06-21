@@ -18,7 +18,13 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
-  Tooltip
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Alert
 } from '@mui/material';
 import { 
   Logout, 
@@ -42,13 +48,74 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { logout } from '../services/authService';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import { db } from '../firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 const TopNavigation: React.FC = () => {
-  const { selectedCountry, selectedClinic, clearCountry, clearClinic, user, userProfile } = useAppStore();
+  const { selectedCountry, selectedClinic, clearCountry, clearClinic, user, userProfile, setUser } = useAppStore();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { isMobile, isTablet } = useResponsiveLayout();
   const location = useLocation();
+
+  // Profile modal state
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [profileRegNo, setProfileRegNo] = useState('');
+  const [profileBody, setProfileBody] = useState('');
+  const [profileDesignation, setProfileDesignation] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  const handleOpenProfileModal = () => {
+    setProfileName(userProfile?.name || '');
+    setProfileRegNo(userProfile?.professional_reg_no || '');
+    setProfileBody(userProfile?.professional_body || 'BMDC');
+    setProfileDesignation(userProfile?.designation || 'Medical Officer');
+    setProfileMessage(null);
+    setProfileOpen(true);
+    setAnchorEl(null);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!profileName.trim()) {
+      setProfileMessage({ type: 'error', text: 'Full Name is required.' });
+      return;
+    }
+    setProfileSaving(true);
+    setProfileMessage(null);
+    try {
+      if (user) {
+        await setDoc(doc(db, "users", user.uid), {
+          name: profileName.trim(),
+          professional_reg_no: profileRegNo.trim(),
+          professional_body: profileBody.trim(),
+          designation: profileDesignation.trim(),
+          lastUpdated: serverTimestamp()
+        }, { merge: true });
+
+        setUser(user, {
+          ...userProfile,
+          uid: user.uid,
+          email: user.email || '',
+          isApproved: userProfile?.isApproved ?? true,
+          role: userProfile?.role ?? 'doctor',
+          name: profileName.trim(),
+          professional_reg_no: profileRegNo.trim(),
+          professional_body: profileBody.trim(),
+          designation: profileDesignation.trim()
+        } as any);
+
+        setProfileMessage({ type: 'success', text: 'Profile updated successfully!' });
+        setTimeout(() => setProfileOpen(false), 1200);
+      }
+    } catch (error: any) {
+      console.error(error);
+      setProfileMessage({ type: 'error', text: error.message || 'Failed to update profile.' });
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -256,6 +323,10 @@ const TopNavigation: React.FC = () => {
                 <Typography variant="body2" fontWeight="700">{user.email}</Typography>
               </MenuItem>
               <Divider />
+              <MenuItem onClick={handleOpenProfileModal}>
+                <AccountCircle fontSize="small" sx={{ mr: 1, color: 'primary.main' }} />
+                Edit Clinician Profile
+              </MenuItem>
               <MenuItem onClick={handleLogout}>
                 <Logout fontSize="small" sx={{ mr: 1 }} />
                 Logout
@@ -275,6 +346,91 @@ const TopNavigation: React.FC = () => {
       >
         {drawer}
       </SwipeableDrawer>
+
+      {/* Edit Clinician Profile Dialog */}
+      <Dialog 
+        open={profileOpen} 
+        onClose={() => !profileSaving && setProfileOpen(false)} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 900, pb: 1 }}>
+          Clinician Profile Credentials
+          <Typography variant="body2" color="text.secondary">
+            Keep your professional registration details up to date for prescriptions and auditing.
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers sx={{ py: 3 }}>
+          {profileMessage && (
+            <Alert severity={profileMessage.type} sx={{ mb: 3, borderRadius: 2 }}>
+              {profileMessage.text}
+            </Alert>
+          )}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <TextField
+              label="Full Name (for Prescriptions)"
+              required
+              fullWidth
+              variant="outlined"
+              placeholder="Dr. John Doe"
+              value={profileName}
+              onChange={(e) => setProfileName(e.target.value)}
+              disabled={profileSaving}
+              helperText="This name will appear on active prescriptions and clinical audit logs."
+            />
+            
+            <TextField
+              label="Professional Registration Body"
+              fullWidth
+              variant="outlined"
+              placeholder="BMDC, PCB, etc."
+              value={profileBody}
+              onChange={(e) => setProfileBody(e.target.value)}
+              disabled={profileSaving}
+              helperText="E.g., BMDC (Bangladesh Medical and Dental Council) or PCB for pharmacists."
+            />
+
+            <TextField
+              label="Professional Registration Number (Reg No)"
+              fullWidth
+              variant="outlined"
+              placeholder="E.g. A-12345"
+              value={profileRegNo}
+              onChange={(e) => setProfileRegNo(e.target.value)}
+              disabled={profileSaving}
+              helperText="Required for validation Stamps on dispensed/printed prescriptions."
+            />
+
+            <TextField
+              label="Professional Designation"
+              fullWidth
+              variant="outlined"
+              placeholder="Medical Officer, Consulting Cardologist, Dispenser"
+              value={profileDesignation}
+              onChange={(e) => setProfileDesignation(e.target.value)}
+              disabled={profileSaving}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2.5, gap: 1 }}>
+          <Button 
+            onClick={() => setProfileOpen(false)} 
+            disabled={profileSaving}
+            sx={{ fontWeight: 'bold' }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSaveProfile} 
+            variant="contained" 
+            disabled={profileSaving}
+            sx={{ fontWeight: 'bold', px: 3, borderRadius: 2 }}
+          >
+            {profileSaving ? 'Saving...' : 'Update Profile'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </AppBar>
   );
 };

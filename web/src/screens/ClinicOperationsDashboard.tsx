@@ -725,7 +725,7 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
               Pharmacy
             </Button>
           </Grid>
-          {(userProfile?.role === 'global_admin' || userProfile?.role === 'country_admin') && (
+          {userProfile?.role === 'global_admin' && (
             <Grid size={{ xs: 6, sm: 6, md: 3 }}>
               <Button 
                 fullWidth 

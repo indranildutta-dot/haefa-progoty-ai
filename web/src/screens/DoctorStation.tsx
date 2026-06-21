@@ -55,7 +55,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import HistoryIcon from '@mui/icons-material/History';
 import LabIcon from '@mui/icons-material/Science';
 
-import { auth, functions } from "../firebase";
+import { auth, functions, db } from "../firebase";
 import { httpsCallable } from 'firebase/functions';
 import { 
   subscribeToQueue, 
@@ -1658,7 +1658,7 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
 
     try {
       setIsFinalizing(true);
-      await saveConsultation(cleanPayload, finalPrescriptionData, !!options.isFinalize);
+      await saveConsultation(cleanPayload, finalPrescriptionData, !!(options.isFinalize || options.isComplete));
       
       if (options.isFinalize) {
         await updateQueueStatus(selectedItem.id, 'WAITING_FOR_PHARMACY' as any);
@@ -1669,7 +1669,21 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
         setSelectedPatient(null);
         notify("Consultation finalized.", "success");
       } else if (options.isComplete) {
-        notify("Diagnosis marked as complete.", "success");
+        // Complete the visit entirely (marking queue and encounter as completed since no medicines are needed)
+        await updateQueueStatus(selectedItem.id, 'COMPLETED' as any);
+        
+        const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
+        await updateDoc(doc(db, "encounters", selectedItem.encounter_id), {
+          status: "COMPLETED",
+          encounter_status: "COMPLETED",
+          current_station: "completed",
+          updated_at: serverTimestamp()
+        });
+
+        clearSavedData();
+        setSelectedItem(null);
+        setSelectedPatient(null);
+        notify("Diagnosis marked as complete. Visit finished.", "success");
       } else {
         // Save Progress: Move back to READY_FOR_DOCTOR but preserve wait timer
         await updateQueueStatus(selectedItem.id, 'READY_FOR_DOCTOR' as any, true);
@@ -2046,6 +2060,8 @@ const DoctorStation: React.FC<DoctorStationProps> = ({ countryId }) => {
                       value={consultData.followUpDate || ''} 
                       onChange={(e) => setConsultData(prev => ({ ...prev, followUpDate: e.target.value }))} 
                       InputLabelProps={{ shrink: true }}
+                      inputProps={{ lang: 'en-GB' }}
+                      helperText="Format: DD/MM/YYYY"
                     />
                   </Box>
                 </Box>

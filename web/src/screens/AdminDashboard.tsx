@@ -3,9 +3,11 @@ import { Box, Typography, Button, Paper, Container, Stack, IconButton } from '@m
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useNavigate } from 'react-router-dom';
 import TopNavigation from '../components/TopNavigation';
+import { useAppStore } from '../store/useAppStore';
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { userProfile } = useAppStore();
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f8fafc' }}>
@@ -21,21 +23,23 @@ const AdminDashboard: React.FC = () => {
         </Box>
 
         <Stack spacing={3}>
-          <Paper 
-            elevation={0} 
-            sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0', cursor: 'pointer', '&:hover': { borderColor: '#3b82f6' } }} 
-            onClick={() => navigate('/users')}
-          >
-            <Typography variant="h6" fontWeight="bold" sx={{ mb: 1 }}>
-              User Management
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-              Manage staff, roles, and clinic assignments.
-            </Typography>
-            <Button variant="contained" color="primary" onClick={(e) => { e.stopPropagation(); navigate('/users'); }}>
-              Go To User Management
-            </Button>
-          </Paper>
+          {userProfile?.role === 'global_admin' && (
+            <Paper 
+              elevation={0} 
+              sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0', cursor: 'pointer', '&:hover': { borderColor: '#3b82f6' } }} 
+              onClick={() => navigate('/users')}
+            >
+              <Typography variant="h6" fontWeight="bold" sx={{ mb: 1 }}>
+                User Management
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                Manage staff, roles, and clinic assignments.
+              </Typography>
+              <Button variant="contained" color="primary" onClick={(e) => { e.stopPropagation(); navigate('/users'); }}>
+                Go To User Management
+              </Button>
+            </Paper>
+          )}
 
           <Paper 
             elevation={0} 

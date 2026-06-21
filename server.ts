@@ -7,15 +7,37 @@ import { getFirestore } from "firebase-admin/firestore";
 import * as crypto from "crypto";
 import dotenv from "dotenv";
 
+import fs from "fs";
+
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize Firebase Admin
+// Initialize Firebase Admin with a robust fallback for projectId
 if (!getApps().length) {
+  let projectId = process.env.VITE_FIREBASE_PROJECT_ID;
+  if (!projectId) {
+    try {
+      const pathsToTry = [
+        path.join(process.cwd(), "firebase-applet-config.json"),
+        path.join(process.cwd(), "web", "firebase-applet-config.json"),
+        path.join(__dirname, "firebase-applet-config.json"),
+        path.join(__dirname, "..", "firebase-applet-config.json"),
+      ];
+      for (const configPath of pathsToTry) {
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+          projectId = config.projectId;
+          break;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to read firebase-applet-config.json for Admin fallback:", err);
+    }
+  }
   initializeApp({
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+    projectId: projectId || "haefa-progoty-dev",
   });
 }
 

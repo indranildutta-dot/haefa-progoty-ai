@@ -35,6 +35,24 @@ interface PrescriptionPrintTemplateProps {
 const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTemplateProps>(({ encounterId, onReady }, ref) => {
   const { selectedClinic } = useAppStore();
   const [loading, setLoading] = useState(true);
+  const [logoBase64, setLogoBase64] = useState<string>('');
+
+  useEffect(() => {
+    if (logoImage) {
+      fetch(logoImage)
+        .then(res => res.blob())
+        .then(blob => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setLogoBase64(reader.result as string);
+          };
+          reader.readAsDataURL(blob);
+        })
+        .catch(err => {
+          console.error("Error converting HAEFA logo to base64 at runtime:", err);
+        });
+    }
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [mergedPrescriptions, setMergedPrescriptions] = useState<Prescription[]>([]);
   const [data, setData] = useState<{
@@ -245,7 +263,7 @@ const PrescriptionPrintTemplate = forwardRef<HTMLDivElement, PrescriptionPrintTe
         </Grid>
         <Grid size={{ xs: 7 }} sx={{ textAlign: 'center' }}>
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.5 }}>
-            <img src={logoImage} alt="HAEFA Logo" style={{ height: '48px', objectFit: 'contain' }} />
+            <img src={logoBase64 || logoImage} alt="HAEFA Logo" style={{ height: '48px', objectFit: 'contain' }} />
           </Box>
           <Typography 
             variant="h6" 

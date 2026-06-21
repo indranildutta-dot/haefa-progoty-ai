@@ -38,6 +38,16 @@ const DIAGNOSES_COLLECTION = "diagnoses";
 const PRESCRIPTIONS_COLLECTION = "prescriptions";
 const LAB_REPORTS_COLLECTION = "lab_reports";
 
+const parseTimestampToMillis = (val: any): number => {
+  if (!val) return 0;
+  if (typeof val.toMillis === "function") return val.toMillis();
+  if (typeof val.toDate === "function") return val.toDate().getTime();
+  if (typeof val.seconds === "number") return val.seconds * 1000;
+  if (val instanceof Date) return val.getTime();
+  if (typeof val === "string" || typeof val === "number") return new Date(val as any).getTime();
+  return 0;
+};
+
 // Wrapper for safe offline mutation queuing
 const updateDoc = async (docRef: any, payload: any) => {
   if (!navigator.onLine) {
@@ -200,25 +210,35 @@ export const saveConsultation = async (
 export const getPatientHistory = async (patientId: string): Promise<Encounter[]> => {
   const activeQuery = query(
     collection(db, ENCOUNTERS_COLLECTION),
-    where("patient_id", "==", patientId),
-    orderBy("created_at", "desc"),
-    limit(20)
+    where("patient_id", "==", patientId)
   );
   const activeSnapshot = await getDocs(activeQuery);
   let encounters = activeSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Encounter));
 
+  // Sort encounters desc
+  encounters.sort((a, b) => parseTimestampToMillis(b.created_at) - parseTimestampToMillis(a.created_at));
+
+  // Limit local encounters to 20
+  encounters = encounters.slice(0, 20);
+
   if (encounters.length < 20) {
     const archiveQuery = query(
       collection(db, ENCOUNTERS_ARCHIVE_COLLECTION),
-      where("patient_id", "==", patientId),
-      orderBy("created_at", "desc")
+      where("patient_id", "==", patientId)
     );
     const archiveSnapshot = await getDocs(archiveQuery);
     const archivedEncounters = archiveSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Encounter));
+    
+    // Sort archived encounters desc
+    archivedEncounters.sort((a, b) => parseTimestampToMillis(b.created_at) - parseTimestampToMillis(a.created_at));
+
     encounters = [...encounters, ...archivedEncounters];
   }
   
-  return encounters.sort((a, b) => b.created_at.toMillis() - a.created_at.toMillis());
+  // Final sort to make sure overall order is descending
+  encounters.sort((a, b) => parseTimestampToMillis(b.created_at) - parseTimestampToMillis(a.created_at));
+
+  return encounters;
 };
 
 export const getEncounterById = async (encounterId: string): Promise<Encounter | null> => {
@@ -454,11 +474,15 @@ export const markPrescriptionDispensed = async (prescriptionId: string) => {
 export const getEncountersByPatient = async (patientId: string, includeArchived: boolean = false): Promise<Encounter[]> => {
   const q = query(
     collection(db, includeArchived ? "encounters_archive" : "encounters"),
-    where("patient_id", "==", patientId),
-    orderBy("created_at", "desc")
+    where("patient_id", "==", patientId)
   );
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Encounter[];
+  const encounters = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Encounter[];
+  
+  // Sort client-side by created_at desc to avoid requiring composite indexes
+  encounters.sort((a, b) => parseTimestampToMillis(b.created_at) - parseTimestampToMillis(a.created_at));
+  
+  return encounters;
 };
 
 /**
@@ -468,20 +492,24 @@ export const getPatientFullHistory = async (patientId: string) => {
   try {
     const [encounters, vitals, diagnoses, prescriptions, dispensations, labReports] = await Promise.all([
       getPatientHistory(patientId),
-      getDocs(query(collection(db, "vitals"), where("patient_id", "==", patientId), orderBy("created_at", "desc"))),
-      getDocs(query(collection(db, "diagnoses"), where("patient_id", "==", patientId), orderBy("created_at", "desc"))),
-      getDocs(query(collection(db, "prescriptions"), where("patient_id", "==", patientId), orderBy("created_at", "desc"))),
-      getDocs(query(collection(db, "dispensations"), where("patient_id", "==", patientId), orderBy("created_at", "desc"))),
-      getDocs(query(collection(db, LAB_REPORTS_COLLECTION), where("patient_id", "==", patientId), orderBy("created_at", "desc")))
+      getDocs(query(collection(db, "vitals"), where("patient_id", "==", patientId))),
+      getDocs(query(collection(db, "diagnoses"), where("patient_id", "==", patientId))),
+      getDocs(query(collection(db, "prescriptions"), where("patient_id", "==", patientId))),
+      getDocs(query(collection(db, "dispensations"), where("patient_id", "==", patientId))),
+      getDocs(query(collection(db, LAB_REPORTS_COLLECTION), where("patient_id", "==", patientId)))
     ]);
+
+    const sortByCreatedAtDesc = (items: any[]) => {
+      return [...items].sort((a, b) => parseTimestampToMillis(b.created_at) - parseTimestampToMillis(a.created_at));
+    };
 
     return {
       encounters,
-      vitals: vitals.docs.map(d => ({ id: d.id, ...d.data() })),
-      diagnoses: diagnoses.docs.map(d => ({ id: d.id, ...d.data() })),
-      prescriptions: prescriptions.docs.map(d => ({ id: d.id, ...d.data() })),
-      dispensations: dispensations.docs.map(d => ({ id: d.id, ...d.data() })),
-      labReports: labReports.docs.map(d => ({ id: d.id, ...d.data() }))
+      vitals: sortByCreatedAtDesc(vitals.docs.map(d => ({ id: d.id, ...d.data() }))),
+      diagnoses: sortByCreatedAtDesc(diagnoses.docs.map(d => ({ id: d.id, ...d.data() }))),
+      prescriptions: sortByCreatedAtDesc(prescriptions.docs.map(d => ({ id: d.id, ...d.data() }))),
+      dispensations: sortByCreatedAtDesc(dispensations.docs.map(d => ({ id: d.id, ...d.data() }))),
+      labReports: sortByCreatedAtDesc(labReports.docs.map(d => ({ id: d.id, ...d.data() })))
     };
   } catch (error) {
     console.error("Error fetching full patient history:", error);
@@ -503,6 +531,7 @@ export const saveLabReport = async (labReport: Omit<LabReportRecord, 'id' | 'cre
     return docRef.id;
   } catch (error) {
     console.error("Error saving lab report:", error);
+    handleFirestoreError(error, OperationType.WRITE, LAB_REPORTS_COLLECTION);
     throw error;
   }
 };
@@ -514,13 +543,18 @@ export const getPatientLabReports = async (patientId: string) => {
   try {
     const q = query(
       collection(db, LAB_REPORTS_COLLECTION),
-      where("patient_id", "==", patientId),
-      orderBy("created_at", "desc")
+      where("patient_id", "==", patientId)
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() })) as LabReportRecord[];
+    const reports = snap.docs.map(d => ({ id: d.id, ...d.data() })) as LabReportRecord[];
+    
+    // Sort client-side by created_at desc to avoid requiring composite indexes
+    reports.sort((a, b) => parseTimestampToMillis(b.created_at) - parseTimestampToMillis(a.created_at));
+    
+    return reports;
   } catch (error) {
     console.error("Error fetching patient lab reports:", error);
+    handleFirestoreError(error, OperationType.LIST, LAB_REPORTS_COLLECTION);
     throw error;
   }
 };

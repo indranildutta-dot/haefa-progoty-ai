@@ -152,7 +152,7 @@ const App: React.FC = () => {
       } />
 
       <Route path="/users" element={
-        userProfile?.role === 'global_admin' || userProfile?.role === 'country_admin' ? <AdminUserManagement /> : <Navigate to="/" />
+        userProfile?.role === 'global_admin' ? <AdminUserManagement /> : <Navigate to="/" />
       } />
 
       <Route path="/analytics" element={
