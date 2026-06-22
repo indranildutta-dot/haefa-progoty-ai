@@ -17,7 +17,7 @@ const AdminUserManagement = () => {
   const { userProfile } = useAppStore();
   const [users, setUsers] = useState<any[]>([]);
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('nurse');
+  const [role, setRole] = useState('clinical_assistant');
   const [selectedClinicIds, setSelectedClinicIds] = useState<string[]>([]);
   const [selectedCountryId, setSelectedCountryId] = useState('');
   const [isApproved, setIsApproved] = useState(false);
@@ -70,7 +70,7 @@ const AdminUserManagement = () => {
 
   const handleClear = () => {
     setEmail('');
-    setRole('nurse');
+    setRole('clinical_assistant');
     setSelectedClinicIds([]);
     setSelectedCountryId('');
     setIsApproved(false);
@@ -164,7 +164,8 @@ const AdminUserManagement = () => {
           <FormControl fullWidth margin="normal">
             <InputLabel>Role</InputLabel>
             <Select value={role} onChange={(e) => setRole(e.target.value)}>
-              <MenuItem value="nurse">Nurse</MenuItem>
+              <MenuItem value="clinical_assistant">Clinical Assistant</MenuItem>
+              <MenuItem value="nurse_practitioner">Nurse Practitioner</MenuItem>
               <MenuItem value="doctor">Doctor</MenuItem>
               <MenuItem value="pharmacist">Pharmacist</MenuItem>
               <MenuItem value="country_admin">Country Admin</MenuItem>

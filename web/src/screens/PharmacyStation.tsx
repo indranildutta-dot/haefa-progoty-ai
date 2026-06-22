@@ -242,7 +242,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
         });
 
         const members = Array.from(uniqueMembers.values())
-          .filter(u => u.role === 'doctor' || u.role === 'pharmacist' || u.role === 'nurse' || u.role === 'global_admin')
+          .filter(u => u.role === 'doctor' || u.role === 'nurse_practitioner' || u.role === 'pharmacist' || u.role === 'pharmacy' || u.role === 'clinical_assistant' || u.role === 'nurse' || u.role === 'global_admin')
           .map(u => ({ id: u.id, name: u.name, role: u.role }));
           
         setStaffMembers(members);
@@ -1629,7 +1629,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       {selectedStaff && staffMedSummary.length > 0 && (
           <Paper sx={{ p: 3, mb: 4, borderRadius: 4, bgcolor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
             <Typography variant="subtitle2" fontWeight="900" color="success.main" sx={{ mb: 2, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 1 }}>
-                <CheckCircleIcon sx={{ fontSize: 18 }} /> {selectedStaff.role === 'doctor' ? 'Prescription' : 'Dispensing'} Summary for {selectedStaff.name}
+                <CheckCircleIcon sx={{ fontSize: 18 }} /> {(selectedStaff.role === 'doctor' || selectedStaff.role === 'nurse_practitioner') ? 'Prescription' : 'Dispensing'} Summary for {selectedStaff.name}
             </Typography>
             <Grid container spacing={2}>
                 {staffMedSummary.map((item, idx) => (
@@ -1640,7 +1640,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
                                 <Typography variant="body1" fontWeight="900" noWrap sx={{ mb: 1, fontSize: '0.85rem' }}>{item.medication}</Typography>
                                 <Divider sx={{ mb: 1, opacity: 0.5 }} />
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                    <Typography variant="caption" color="text.secondary">Total {selectedStaff.role === 'doctor' ? 'Prescribed' : 'Dispensed'}:</Typography>
+                                    <Typography variant="caption" color="text.secondary">Total {(selectedStaff.role === 'doctor' || selectedStaff.role === 'nurse_practitioner') ? 'Prescribed' : 'Dispensed'}:</Typography>
                                     <Typography variant="h6" color="success.main" fontWeight="900">{item.total}</Typography>
                                 </Box>
                             </CardContent>

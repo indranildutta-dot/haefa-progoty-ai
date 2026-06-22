@@ -34,6 +34,7 @@ import { collection, query, where, onSnapshot, addDoc, doc } from 'firebase/fire
 import { db } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
 import { countries } from '../config/countries';
+import { canAccessStation } from '../utils/rbac';
 import { QueueItem } from '../types';
 import StationLayout from '../components/StationLayout';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
@@ -502,7 +503,7 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
         </Stack>
       }
     >
-      {userProfile && !userProfile.professional_reg_no && (userProfile.role === 'doctor' || userProfile.role === 'nurse' || userProfile.role === 'pharmacy') && (
+      {userProfile && !userProfile.professional_reg_no && (userProfile.role === 'doctor' || userProfile.role === 'nurse_practitioner' || userProfile.role === 'pharmacy' || userProfile.role === 'pharmacist') && (
         <Alert 
           severity="warning" 
           sx={{ 
@@ -685,7 +686,14 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
         <Divider sx={{ mb: 3 }} />
         <Grid container spacing={2}>
           <Grid size={{ xs: 6, sm: 6, md: 3 }}>
-            <Button fullWidth variant="outlined" component={Link} to="/registration" sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+            <Button 
+              fullWidth 
+              variant="outlined" 
+              component={Link} 
+              to="/registration" 
+              disabled={!canAccessStation(userProfile, 'registration', selectedCountry?.id, selectedClinic?.id)}
+              sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}
+            >
               Registration
             </Button>
           </Grid>
@@ -693,6 +701,7 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
             <Button 
               fullWidth 
               variant="outlined" 
+              disabled={!canAccessStation(userProfile, 'vitals', selectedCountry?.id, selectedClinic?.id)}
               onClick={(e) => setVitalsMenuAnchor(e.currentTarget)}
               sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}
             >
@@ -716,12 +725,26 @@ const ClinicOperationsDashboard: React.FC<ClinicOperationsDashboardProps> = ({ c
             </Menu>
           </Grid>
           <Grid size={{ xs: 6, sm: 6, md: 3 }}>
-            <Button fullWidth variant="outlined" component={Link} to="/doctor" sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+            <Button 
+              fullWidth 
+              variant="outlined" 
+              component={Link} 
+              to="/doctor" 
+              disabled={!canAccessStation(userProfile, 'doctor', selectedCountry?.id, selectedClinic?.id)}
+              sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}
+            >
               Doctor
             </Button>
           </Grid>
           <Grid size={{ xs: 6, sm: 6, md: 3 }}>
-            <Button fullWidth variant="outlined" component={Link} to="/pharmacy" sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+            <Button 
+              fullWidth 
+              variant="outlined" 
+              component={Link} 
+              to="/pharmacy" 
+              disabled={!canAccessStation(userProfile, 'pharmacy', selectedCountry?.id, selectedClinic?.id)}
+              sx={{ py: isMobile ? 1.5 : 2, borderRadius: 3, fontWeight: 'bold', fontSize: isMobile ? '0.75rem' : '0.875rem' }}
+            >
               Pharmacy
             </Button>
           </Grid>

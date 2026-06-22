@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAppStore } from './store/useAppStore';
 import { getUserProfile, subscribeToAuthChanges } from './services/authService';
+import { canAccessStation, isUserApprovedAndClinicScoped } from './utils/rbac';
 
 // FULL SCREEN IMPORTS - Matches your File Explorer exactly
 import LandingPage from './screens/LandingPage';
@@ -116,43 +117,43 @@ const App: React.FC = () => {
 
       {/* STEP 4: PROTECTED CLINICAL STATIONS (Requires Authorized Profile + Active Clinic Session) */}
       <Route path="/dashboard" element={
-        isAuthorized() && selectedClinic ? <ClinicOperationsDashboard countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+        isUserApprovedAndClinicScoped(userProfile, selectedCountry?.id, selectedClinic?.id) ? <ClinicOperationsDashboard countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
       } />
 
       <Route path="/registration" element={
-        isAuthorized() && selectedClinic ? <RegistrationStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+        canAccessStation(userProfile, 'registration', selectedCountry?.id, selectedClinic?.id) ? <RegistrationStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
       } />
 
       <Route path="/vitals-1" element={
-        isAuthorized() && selectedClinic ? <VitalsStation countryId={selectedCountry?.id || ''} mode={1} /> : <Navigate to="/clinic-selection" />
+        canAccessStation(userProfile, 'vitals', selectedCountry?.id, selectedClinic?.id) ? <VitalsStation countryId={selectedCountry?.id || ''} mode={1} /> : <Navigate to="/clinic-selection" />
       } />
 
       <Route path="/vitals-2" element={
-        isAuthorized() && selectedClinic ? <VitalsStation countryId={selectedCountry?.id || ''} mode={2} /> : <Navigate to="/clinic-selection" />
+        canAccessStation(userProfile, 'vitals', selectedCountry?.id, selectedClinic?.id) ? <VitalsStation countryId={selectedCountry?.id || ''} mode={2} /> : <Navigate to="/clinic-selection" />
       } />
 
       <Route path="/labs-and-risk" element={
-        isAuthorized() && selectedClinic ? <VitalsStation countryId={selectedCountry?.id || ''} mode={3} /> : <Navigate to="/clinic-selection" />
+        canAccessStation(userProfile, 'vitals', selectedCountry?.id, selectedClinic?.id) ? <VitalsStation countryId={selectedCountry?.id || ''} mode={3} /> : <Navigate to="/clinic-selection" />
       } />
 
       <Route path="/doctor" element={
-        isAuthorized() && selectedClinic ? <DoctorStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+        canAccessStation(userProfile, 'doctor', selectedCountry?.id, selectedClinic?.id) ? <DoctorStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
       } />
 
       <Route path="/pharmacy" element={
-        isAuthorized() && selectedClinic ? <PharmacyStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+        canAccessStation(userProfile, 'pharmacy', selectedCountry?.id, selectedClinic?.id) ? <PharmacyStation countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
       } />
 
       <Route path="/patient-history" element={
-        isAuthorized() && selectedClinic ? <PatientHistory /> : <Navigate to="/clinic-selection" />
+        isUserApprovedAndClinicScoped(userProfile, selectedCountry?.id, selectedClinic?.id) ? <PatientHistory /> : <Navigate to="/clinic-selection" />
       } />
 
       <Route path="/queue" element={
-        isAuthorized() && selectedClinic ? <QueueBoard countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
+        isUserApprovedAndClinicScoped(userProfile, selectedCountry?.id, selectedClinic?.id) ? <QueueBoard countryId={selectedCountry?.id || ''} /> : <Navigate to="/clinic-selection" />
       } />
 
       <Route path="/users" element={
-        userProfile?.role === 'global_admin' ? <AdminUserManagement /> : <Navigate to="/" />
+        userProfile?.role === 'global_admin' || userProfile?.role === 'country_admin' ? <AdminUserManagement /> : <Navigate to="/" />
       } />
 
       <Route path="/analytics" element={

@@ -25,13 +25,18 @@ const ClinicSelection: React.FC<ClinicSelectionProps> = ({ selectedCountry, onSe
     // Global Admins see everything
     if (userProfile.role === 'global_admin') return selectedCountry.clinics;
 
+    // Country Admins see all clinics in their assigned countries
+    if (userProfile.role === 'country_admin' && Array.isArray(userProfile.assignedCountries) && userProfile.assignedCountries.includes(selectedCountry.id)) {
+      return selectedCountry.clinics;
+    }
+
     // Others see only clinics listed in their 'assignedClinics' array
     return selectedCountry.clinics.filter(clinic => 
       userProfile.assignedClinics?.includes(clinic.id)
     );
   }, [selectedCountry, userProfile]);
 
-  // Find clinics in other countries that are in the user's assignedClinics list
+  // Find clinics in other countries that are in the user's assignedClinics list or assignedCountries list for Country Admins
   const otherAuthorizedClinics = useMemo(() => {
     if (!userProfile) return [];
     if (userProfile.role === 'global_admin') return [];
@@ -40,8 +45,9 @@ const ClinicSelection: React.FC<ClinicSelectionProps> = ({ selectedCountry, onSe
     const otherCountries = countries.filter(c => c.id !== selectedCountry.id);
 
     otherCountries.forEach(country => {
+      const isCountryAdminForOther = userProfile.role === 'country_admin' && Array.isArray(userProfile.assignedCountries) && userProfile.assignedCountries.includes(country.id);
       country.clinics.forEach(clinic => {
-        if (userProfile.assignedClinics?.includes(clinic.id)) {
+        if (isCountryAdminForOther || userProfile.assignedClinics?.includes(clinic.id)) {
           list.push({ clinic, country });
         }
       });
