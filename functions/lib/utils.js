@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sanitizeData = exports.deepSanitize = exports.generateId = exports.checkIsGlobalAdmin = exports.REQUISITION_THRESHOLD = exports.SUPER_ADMIN_EMAILS = exports.getCrypto = exports.getDb = exports.getAdmin = void 0;
+exports.sanitizeData = exports.deepSanitize = exports.generateId = exports.checkIsGlobalAdmin = exports.REQUISITION_THRESHOLD = exports.SUPER_ADMIN_EMAILS = exports.MASTER_ADMINS = exports.getCrypto = exports.getDb = exports.getAdmin = void 0;
 const admin = __importStar(require("firebase-admin"));
 const getAdmin = async () => admin;
 exports.getAdmin = getAdmin;
@@ -46,17 +46,18 @@ const getCrypto = async () => {
     return await Promise.resolve().then(() => __importStar(require("crypto")));
 };
 exports.getCrypto = getCrypto;
-exports.SUPER_ADMIN_EMAILS = [
+exports.MASTER_ADMINS = [
     'indranil_dutta@haefa.org',
     'ruhul_abid@haefa.org'
 ];
-exports.REQUISITION_THRESHOLD = 500;
+exports.SUPER_ADMIN_EMAILS = exports.MASTER_ADMINS;
+exports.REQUISITION_THRESHOLD = 200;
 const checkIsGlobalAdmin = (auth) => {
     if (!auth)
         return false;
     const email = auth.token.email?.toLowerCase();
     const role = auth.token.role;
-    return exports.SUPER_ADMIN_EMAILS.includes(email) || role === 'global_admin';
+    return exports.MASTER_ADMINS.includes(email) || role === 'global_admin';
 };
 exports.checkIsGlobalAdmin = checkIsGlobalAdmin;
 const generateId = async () => {
@@ -93,7 +94,10 @@ const deepSanitize = (data) => {
             constructorName?.endsWith('Transform') ||
             (typeof data._methodName === 'string') ||
             (data._sentinel !== undefined);
-        if (isFieldValue) {
+        const isTimestamp = (data instanceof admin.firestore.Timestamp) ||
+            constructorName === 'Timestamp' ||
+            (typeof data.toDate === 'function' && typeof data.toMillis === 'function');
+        if (isFieldValue || isTimestamp) {
             return data;
         }
         const sanitized = {};

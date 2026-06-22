@@ -495,6 +495,7 @@ export interface SupportTicket {
   attachments?: string[]; // Array of base64-encoded strings (compressed screenshots)
   comments?: TicketComment[];
   internal_notes?: string;
+  is_archived?: boolean;
 }
 
 export interface LabReportRecord {

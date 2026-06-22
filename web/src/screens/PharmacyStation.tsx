@@ -3,13 +3,15 @@ import {
   Typography, Box, Paper, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Button, Chip, Stack, Card, CardContent, Container, Alert, Divider, Grid,
   IconButton, Tooltip, Tabs, Tab, TextField, ToggleButtonGroup, ToggleButton, CircularProgress, Autocomplete, Dialog, DialogTitle, DialogContent, DialogActions,
-  Accordion, AccordionSummary, AccordionDetails
+  Accordion, AccordionSummary, AccordionDetails, Collapse
 } from '@mui/material';
 import WarningIcon from '@mui/icons-material/Warning';
 import ErrorIcon from '@mui/icons-material/Error';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import CloseIcon from '@mui/icons-material/Close';
 import DownloadIcon from '@mui/icons-material/Download';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -48,12 +50,23 @@ interface InventoryItem {
   dosage: string;
   quantity: number;
   expiry_date?: any;
+  batch_id?: string;
+  base_unit?: string;
+  package_unit?: string;
 }
 
 const toDateSafely = (timestamp: any) => {
   if (!timestamp) return null;
   if (typeof timestamp.toDate === 'function') return timestamp.toDate();
   if (timestamp instanceof Date) return timestamp;
+  if (timestamp && typeof timestamp === 'object') {
+    if (typeof timestamp.seconds === 'number') {
+      return new Date(timestamp.seconds * 1000);
+    }
+    if (typeof timestamp._seconds === 'number') {
+      return new Date(timestamp._seconds * 1000);
+    }
+  }
   if (typeof timestamp === 'number') return new Date(timestamp);
   if (typeof timestamp === 'string') return new Date(timestamp);
   return null;
@@ -111,6 +124,8 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   // Inventory State
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [isInventoryLoading, setIsInventoryLoading] = useState(false);
+  const [inventorySearchQuery, setInventorySearchQuery] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   // Procurement State
   const [procurementRecords, setProcurementRecords] = useState<any[]>([]);
@@ -121,54 +136,169 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const [checkoutList, setCheckoutList] = useState<string[]>([]);
 
   const reconciledProcurement = useMemo(() => {
-    const ninetyDaysAfter = dayjs().add(90, 'days');
-    
-    return procurementRecords.filter(record => {
-      const name = (record.medication_name || '').toLowerCase().trim();
-      const dosage = (record.medication_dosage || record.dosage || '').toLowerCase().trim();
-      
-      const matchingInventory = inventory.filter(i => 
-        (i.medication_id || '').toLowerCase().trim() === name && 
-        cleanDosageStr(i.dosage) === cleanDosageStr(dosage)
+    // 1. Map of all unique medications from catalog, inventory, and requisitions
+    const uniqueKeys = new Set<string>();
+    const keyDetails = new Map<string, { name: string, dosage: string, base_unit: string }>();
+
+    const addKey = (name: string, dosage: string, base_unit: string = '') => {
+      const nName = (name || '').trim();
+      const nDosage = (dosage || '').trim();
+      if (!nName) return;
+      const key = `${nName.toLowerCase()}|${cleanDosageStr(nDosage)}`;
+      uniqueKeys.add(key);
+      if (!keyDetails.has(key)) {
+        keyDetails.set(key, { name: nName, dosage: nDosage, base_unit: base_unit });
+      }
+    };
+
+    // Populate from active requisitions (excluding cancelled or fulfilled)
+    procurementRecords.forEach(r => {
+      addKey(r.medication_name || r.name, r.medication_dosage || r.dosage);
+    });
+
+    // Populate from inventory
+    inventory.forEach(i => {
+      addKey(i.medication_id || (i as any).name, i.dosage, i.base_unit);
+    });
+
+    // Helper functions for classification
+    const isBUnitBottle = (medName: string): boolean => {
+      const norm = (medName || '').toLowerCase();
+      return (
+        norm.includes('suspension') ||
+        norm.includes('susp') ||
+        norm.includes('syrup') ||
+        norm.includes('syp') ||
+        norm.includes('bottle') ||
+        norm.includes('btl') ||
+        norm.includes('liquid') ||
+        norm.includes('drops') ||
+        norm.includes('cream') ||
+        norm.includes('ointment') ||
+        norm.includes('lotion') ||
+        norm.includes('soln') ||
+        norm.includes('solution') ||
+        norm.includes('gel') ||
+        norm.includes('spray') ||
+        norm.includes('inhaler') ||
+        norm.includes('fluid')
       );
+    };
+
+    const resultList: any[] = [];
+
+    // For each unique key, evaluate stock and requisitions
+    uniqueKeys.forEach(key => {
+      const details = keyDetails.get(key)!;
+      const nameLower = details.name.toLowerCase().trim();
+      const dosageLower = cleanDosageStr(details.dosage);
+
+      // Find all matching inventory items
+      const matchingInventory = inventory.filter(i => 
+        (i.medication_id || '').toLowerCase().trim() === nameLower && 
+        cleanDosageStr(i.dosage) === dosageLower
+      );
+
+      const currentStock = matchingInventory.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
       
-      const totalStock = matchingInventory.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+      const bUnit = (details.base_unit || (matchingInventory[0]?.base_unit) || '').toLowerCase().trim();
+      const isBottle = bUnit === 'bottle' || (!bUnit && isBUnitBottle(details.name));
+      const threshold = isBottle ? 200 : 1000;
       
-      // TRIGGER: Stock < 200 OR Expiry < 90 days
-      const hasExpiringBatch = matchingInventory.some(i => {
-        const expDate = toDateSafely(i.expiry_date);
-        return expDate && dayjs(expDate).isBefore(ninetyDaysAfter);
+      const lowStockDeficit = Math.max(0, threshold - currentStock);
+
+      // Find all active requisitions in Firestore for this key
+      const activeDbRequisitions = procurementRecords.filter(r => 
+        (r.medication_name || '').toLowerCase().trim() === nameLower && 
+        cleanDosageStr(r.medication_dosage || r.dosage) === dosageLower &&
+        r.status !== 'FULFILLED' && r.status !== 'CANCELLED'
+      );
+
+      // Find if we have any CANCELLED requisitions for this key (representing dismissal by user)
+      const cancelledDbRequisitions = procurementRecords.filter(r => 
+        (r.medication_name || '').toLowerCase().trim() === nameLower && 
+        cleanDosageStr(r.medication_dosage || r.dosage) === dosageLower &&
+        r.status === 'CANCELLED'
+      );
+
+      // Add actual database models to the result list
+      activeDbRequisitions.forEach(r => {
+        resultList.push({
+          ...r,
+          current_stock: currentStock,
+          threshold: threshold,
+          is_bottle: isBottle
+        });
       });
 
-      // SELF-CLEANING: If stock >= 200 AND no batches are expiring, hide from report
-      return totalStock < 200 || hasExpiringBatch;
+      // If we are below threshold, and there are NO active requisitions AND no cancellation tombstones in the DB,
+      // we synthesize a PENDING LOW_STOCK_ALERT requisition so it automatically shows up in the procurement report!
+      if (lowStockDeficit > 0 && activeDbRequisitions.length === 0 && cancelledDbRequisitions.length === 0) {
+        resultList.push({
+          id: `sys-low-${details.name.replace(/\s+/g, '-')}-${details.dosage.replace(/\s+/g, '-')}`,
+          clinic_id: selectedClinic?.id || '',
+          medication_name: details.name,
+          medication_dosage: details.dosage,
+          dosage: details.dosage,
+          required_quantity: lowStockDeficit,
+          requested_qty: lowStockDeficit,
+          current_stock: currentStock,
+          threshold: threshold,
+          is_bottle: isBottle,
+          type: 'LOW_STOCK_ALERT',
+          status: 'PENDING',
+          created_at: dayjs().toDate()
+        });
+      }
     });
-  }, [procurementRecords, inventory]);
+
+    return resultList;
+  }, [procurementRecords, inventory, catalog, selectedClinic]);
 
   const [cancelProcurementState, setCancelProcurementState] = useState<{ open: boolean, name: string, dosage: string, reason: string }>({ open: false, name: '', dosage: '', reason: '' });
 
   const handleCancelProcurementItem = async () => {
     if (!selectedClinic || !cancelProcurementState.reason.trim()) return;
     try {
-      const relatedRecords = reconciledProcurement.filter(r => 
+      const realRecords = reconciledProcurement.filter(r => 
         (r.medication_name || '').toLowerCase().trim() === cancelProcurementState.name.toLowerCase().trim() &&
-        (r.medication_dosage || r.dosage || '').toLowerCase().trim() === cancelProcurementState.dosage.toLowerCase().trim()
+        (r.medication_dosage || r.dosage || '').toLowerCase().trim() === cancelProcurementState.dosage.toLowerCase().trim() &&
+        r.id && !r.id.startsWith('sys-low-')
       );
 
-      const promises = relatedRecords.map(r => 
-        updateDoc(doc(db, "requisitions", r.id), {
+      if (realRecords.length === 0) {
+        // Create a cancelled record in Firestore as a tombstone for this low stock alert so it is muted
+        await addDoc(collection(db, "requisitions"), {
+          clinic_id: selectedClinic.id,
+          medication_name: cancelProcurementState.name,
+          dosage: cancelProcurementState.dosage,
+          medication_dosage: cancelProcurementState.dosage,
+          required_quantity: 0,
+          requested_qty: 0,
+          type: 'LOW_STOCK_ALERT',
           status: 'CANCELLED',
           cancellation_reason: cancelProcurementState.reason,
           cancelled_at: serverTimestamp(),
-          cancelled_by: userProfile?.name || 'Pharmacist'
-        })
-      );
+          cancelled_by: userProfile?.name || 'Pharmacist',
+          created_at: serverTimestamp()
+        });
+      } else {
+        const promises = realRecords.map(r => 
+          updateDoc(doc(db, "requisitions", r.id), {
+            status: 'CANCELLED',
+            cancellation_reason: cancelProcurementState.reason,
+            cancelled_at: serverTimestamp(),
+            cancelled_by: userProfile?.name || 'Pharmacist'
+          })
+        );
+        await Promise.all(promises);
+      }
 
-      await Promise.all(promises);
       notify(`Cancelled procurement for ${cancelProcurementState.name}`, "success");
       setCancelProcurementState({ open: false, name: '', dosage: '', reason: '' });
       fetchProcurementReport();
     } catch (e) {
+      console.error(e);
       notify("Failed to cancel requisition", "error");
     }
   };
@@ -176,23 +306,80 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   const handleMarkAsOrdered = async (medName: string, medDosage: string) => {
     if (!selectedClinic) return;
     try {
-      const relatedRecords = reconciledProcurement.filter(r => 
+      const realRecords = reconciledProcurement.filter(r => 
         (r.medication_name || '').toLowerCase().trim() === medName.toLowerCase().trim() &&
-        (r.medication_dosage || r.dosage || '').toLowerCase().trim() === medDosage.toLowerCase().trim()
+        (r.medication_dosage || r.dosage || '').toLowerCase().trim() === medDosage.toLowerCase().trim() &&
+        r.id && !r.id.startsWith('sys-low-')
       );
 
-      const promises = relatedRecords.map(r => 
-        updateDoc(doc(db, "requisitions", r.id), {
+      // Find the matching inventory to calculate current shortfall/deficit
+      const matchingInventory = inventory.filter(i => 
+        (i.medication_id || '').toLowerCase().trim() === medName.toLowerCase().trim() && 
+        cleanDosageStr(i.dosage) === cleanDosageStr(medDosage)
+      );
+      const currentStock = matchingInventory.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+      
+      const isBtl = (mn: string): boolean => {
+        const norm = (mn || '').toLowerCase();
+        return norm.includes('suspension') || norm.includes('susp') || norm.includes('syrup') || norm.includes('syp') || norm.includes('bottle') || norm.includes('btl') || norm.includes('liquid') || norm.includes('drops') || norm.includes('cream') || norm.includes('ointment') || norm.includes('lotion') || norm.includes('soln') || norm.includes('solution') || norm.includes('gel') || norm.includes('spray') || norm.includes('inhaler') || norm.includes('fluid');
+      };
+      
+      const firstBUnit = (matchingInventory[0]?.base_unit || '').toLowerCase().trim();
+      const isBottle = firstBUnit === 'bottle' || (!firstBUnit && isBtl(medName));
+      const threshold = isBottle ? 200 : 1000;
+      const lowStockDeficit = Math.max(0, threshold - currentStock);
+
+      if (realRecords.length === 0) {
+        // Create a new requisition representing the low stock order
+        const orderQty = lowStockDeficit || 1000;
+        await addDoc(collection(db, "requisitions"), {
+          clinic_id: selectedClinic.id,
+          medication_name: medName,
+          dosage: medDosage,
+          medication_dosage: medDosage,
+          required_quantity: orderQty,
+          requested_qty: orderQty,
+          type: 'LOW_STOCK_ALERT',
           status: 'ORDERED',
           ordered_at: serverTimestamp(),
-          ordered_by: userProfile?.name || 'Pharmacist'
-        })
-      );
+          ordered_by: userProfile?.name || 'Pharmacist',
+          created_at: serverTimestamp()
+        });
+      } else {
+        const promises = realRecords.map(r => 
+          updateDoc(doc(db, "requisitions", r.id), {
+            status: 'ORDERED',
+            ordered_at: serverTimestamp(),
+            ordered_by: userProfile?.name || 'Pharmacist'
+          })
+        );
+        await Promise.all(promises);
 
-      await Promise.all(promises);
+        // Also if we have a low-stock deficit that is larger than the pending doctor orders, 
+        // we can add a secondary requisition for the difference to make sure we restock the full threshold amount!
+        const totalPendingReconciled = realRecords.reduce((sum, r) => sum + (Number(r.required_quantity) || 0), 0);
+        if (lowStockDeficit > totalPendingReconciled) {
+          const diff = lowStockDeficit - totalPendingReconciled;
+          await addDoc(collection(db, "requisitions"), {
+            clinic_id: selectedClinic.id,
+            medication_name: medName,
+            dosage: medDosage,
+            medication_dosage: medDosage,
+            required_quantity: diff,
+            requested_qty: diff,
+            type: 'LOW_STOCK_ALERT',
+            status: 'ORDERED',
+            ordered_at: serverTimestamp(),
+            ordered_by: userProfile?.name || 'Pharmacist',
+            created_at: serverTimestamp()
+          });
+        }
+      }
+
       notify(`Marked ${medName} ${medDosage} as Ordered`, "success");
       fetchProcurementReport();
     } catch (e) {
+      console.error("Error marking as ordered:", e);
       notify("Failed to update requisition status", "error");
     }
   };
@@ -591,9 +778,21 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
 
   const handleDownloadTemplate = async () => {
     try {
-      const getTemplate = httpsCallable(functions, 'getInventoryTemplate');
-      const result = await getTemplate();
-      const { fileBase64 } = result.data as any;
+      let fileBase64: string = "";
+      try {
+        const response = await fetch("/api/pharmacy/get-template");
+        if (response.ok) {
+          const data = await response.json();
+          fileBase64 = data.fileBase64;
+        } else {
+          throw new Error("Local API endpoint returned error: " + response.statusText);
+        }
+      } catch (localErr) {
+        console.warn("Fallback to Cloud Function for download template:", localErr);
+        const getTemplate = httpsCallable(functions, 'getInventoryTemplate');
+        const result = await getTemplate();
+        fileBase64 = (result.data as any).fileBase64;
+      }
       
       const link = document.createElement('a');
       link.href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${fileBase64}`;
@@ -753,8 +952,8 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       const catalogData = catalogSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       setCatalog(catalogData);
 
-      // Filter out FULFILLED and CANCELLED records to keep the report clean
-      const records = reqSnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.status !== 'FULFILLED' && r.status !== 'CANCELLED');
+      // Filter out FULFILLED records to keep the report clean but preserve CANCELLED for check
+      const records = reqSnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.status !== 'FULFILLED');
       records.sort((a: any, b: any) => toMillisSafely(b.created_at) - toMillisSafely(a.created_at));
       setProcurementRecords(records);
     } catch (e) {
@@ -804,8 +1003,23 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     reader.onload = async (e) => {
       try {
         const base64 = (e.target?.result as string).split(',')[1];
-        const upload = httpsCallable(functions, 'bulkUpload');
-        await upload({ clinicId: selectedClinic.id, fileBase64: base64, userName: userProfile?.name || "Pharmacist" });
+        const response = await fetch("/api/pharmacy/bulk-upload", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            clinicId: selectedClinic.id,
+            fileBase64: base64,
+            userName: userProfile?.name || "Pharmacist"
+          })
+        });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to process bulk upload via server.");
+        }
+
         notify("Inventory uploaded successfully", "success");
         // Reset input
         event.target.value = '';
@@ -1488,75 +1702,165 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     </Box>
   );
 
-  const renderInventoryView = () => (
-    <Box>
-      <Stack direction="row" spacing={2} justifyContent="flex-end" mb={3}>
-        <Button 
-          variant="outlined" 
-          startIcon={<DownloadIcon />} 
-          onClick={handleDownloadTemplate}
-        >
-          Download Template
-        </Button>
-        <Button 
-          variant="contained" 
-          component="label" 
-          startIcon={<UploadFileIcon />}
-        >
-          Bulk Upload
-          <input type="file" hidden accept=".xlsx" onChange={handleBulkUpload} />
-        </Button>
-      </Stack>
+  const renderInventoryView = () => {
+    const isBottleMedicine = (medName: string): boolean => {
+      const norm = (medName || '').toLowerCase();
+      return (
+        norm.includes('suspension') ||
+        norm.includes('susp') ||
+        norm.includes('syrup') ||
+        norm.includes('syp') ||
+        norm.includes('bottle') ||
+        norm.includes('btl') ||
+        norm.includes('liquid') ||
+        norm.includes('drops') ||
+        norm.includes('cream') ||
+        norm.includes('ointment') ||
+        norm.includes('lotion') ||
+        norm.includes('soln') ||
+        norm.includes('solution') ||
+        norm.includes('gel') ||
+        norm.includes('spray') ||
+        norm.includes('inhaler') ||
+        norm.includes('drops') ||
+        norm.includes('fluid')
+      );
+    };
 
-      <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 4, border: '1px solid #e2e8f0' }}>
-        <Table>
-          <TableHead sx={{ bgcolor: '#f8fafc' }}>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 'bold' }}>Medication Name</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Dosage</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Current Stock</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Expiry Date</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {isInventoryLoading ? (
-              <TableRow>
-                <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
-                  <CircularProgress size={24} />
-                </TableCell>
-              </TableRow>
-            ) : inventory.length > 0 ? (
-              inventory.map((item) => (
-                <TableRow key={item.id} hover>
-                  <TableCell sx={{ fontWeight: 'bold' }}>{item.medication_id}</TableCell>
-                  <TableCell>{item.dosage}</TableCell>
-                  <TableCell>
-                    <Chip 
-                      label={item.quantity} 
-                      color={item.quantity < 50 ? "error" : item.quantity < 200 ? "warning" : "success"}
-                      size="small"
-                      sx={{ fontWeight: 'bold' }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {item.expiry_date ? (
-                      toDateSafely(item.expiry_date) ? dayjs(toDateSafely(item.expiry_date)).format('DD/MM/YYYY') : 'N/A'
-                    ) : 'N/A'}
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={4} align="center" sx={{ py: 8 }}>
-                  <Typography color="text.secondary">No inventory records found for this clinic.</Typography>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Box>
-  );
+    // 1. Group inventory items by medication_id and dosage
+    const groups: Record<string, {
+      medication_id: string;
+      dosage: string;
+      base_unit: string;
+      totalQuantity: number;
+      isLowStock: boolean;
+      batches: InventoryItem[];
+    }> = {};
+
+    inventory.forEach(item => {
+      const name = (item.medication_id || '').trim();
+      const dosage = (item.dosage || '').trim();
+      const key = `${name.toLowerCase()}|${dosage.toLowerCase()}`;
+
+      if (!groups[key]) {
+        groups[key] = {
+          medication_id: name,
+          dosage: dosage,
+          base_unit: (item.base_unit || '').trim(),
+          totalQuantity: 0,
+          isLowStock: false,
+          batches: []
+        };
+      }
+      
+      groups[key].batches.push(item);
+      groups[key].totalQuantity += Number(item.quantity) || 0;
+    });
+
+    // 2. Perform classification based on threshold rules
+    Object.values(groups).forEach(group => {
+      const bUnit = (group.base_unit || '').toLowerCase().trim();
+      const isBottle = bUnit === 'bottle' || (!bUnit && isBottleMedicine(group.medication_id));
+      const threshold = isBottle ? 200 : 1000;
+      group.isLowStock = group.totalQuantity < threshold;
+
+      // Sort batches by expiry_date ascending (nearest expiry first)
+      group.batches.sort((a, b) => {
+        const dateA = toDateSafely(a.expiry_date);
+        const dateB = toDateSafely(b.expiry_date);
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return dateA.getTime() - dateB.getTime();
+      });
+    });
+
+    // 3. Sort groups alphabetically by name, then dosage
+    const sortedGroups = Object.values(groups).sort((a, b) => {
+      const nameCompare = a.medication_id.localeCompare(b.medication_id);
+      if (nameCompare !== 0) return nameCompare;
+      return a.dosage.localeCompare(b.dosage);
+    });
+
+    // 4. Apply search filter
+    const filteredGroups = sortedGroups.filter(g => 
+      g.medication_id.toLowerCase().includes(inventorySearchQuery.toLowerCase()) ||
+      g.dosage.toLowerCase().includes(inventorySearchQuery.toLowerCase())
+    );
+
+    // 5. Separate into two lists
+    const lowStockList = filteredGroups.filter(g => g.isLowStock);
+    const adequateStockList = filteredGroups.filter(g => !g.isLowStock);
+
+    return (
+      <Box>
+        <Paper sx={{ p: 3, mb: 3, borderRadius: 4, border: '1px solid #e2e8f0', boxShadow: 'none' }}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid size={{ xs: 12, md: 5 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Search Medicine or Dosage"
+                variant="outlined"
+                value={inventorySearchQuery}
+                placeholder="Type to search (e.g., Amoxicillin, 200mg)..."
+                onChange={(e) => setInventorySearchQuery(e.target.value)}
+                InputProps={{
+                  startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1, fontSize: 20 }} />
+                }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, md: 7 }}>
+              <Stack direction="row" spacing={2} justifyContent="flex-end">
+                <Button 
+                  variant="outlined" 
+                  startIcon={<DownloadIcon />} 
+                  onClick={handleDownloadTemplate}
+                  sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 'bold' }}
+                >
+                  Download Template
+                </Button>
+                <Button 
+                  variant="contained" 
+                  component="label" 
+                  startIcon={<UploadFileIcon />}
+                  sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 'bold' }}
+                >
+                  Bulk Upload
+                  <input type="file" hidden accept=".xlsx" onChange={handleBulkUpload} />
+                </Button>
+              </Stack>
+            </Grid>
+          </Grid>
+        </Paper>
+
+        {isInventoryLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Box>
+            {/* Low stock alerts section */}
+            <GroupedInventoryTable 
+              groupsList={lowStockList} 
+              title="MEDICINES LOW IN STOCK" 
+              isLowSection={true} 
+              isBottleMedicine={isBottleMedicine}
+              toDateSafely={toDateSafely}
+            />
+
+            {/* Sufficient stock section */}
+            <GroupedInventoryTable 
+              groupsList={adequateStockList} 
+              title="MEDICINES IN COPIOUS / SUFFICIENT STOCK" 
+              isLowSection={false} 
+              isBottleMedicine={isBottleMedicine}
+              toDateSafely={toDateSafely}
+            />
+          </Box>
+        )}
+      </Box>
+    );
+  };
 
   const renderHistoryView = () => (
     <Box>
@@ -1715,274 +2019,213 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
   );
 
   const renderProcurementReport = () => {
-    // 2. Calculate Procurement Summary (The Buy List) using ONLY reconciled records
-    const summaryMap = new Map<string, { totalRequested: number, name: string, dosage: string, allOrdered: boolean, currentStock: number, hasAlert: boolean }>();
-    
+    // Group reconciled procurement into PENDING and ORDERED maps
+    const needsToOrderMap = new Map<string, { name: string, dosage: string, totalRequested: number, currentStock: number, isBottle: boolean, threshold: number }>();
+    const alreadyOrderedMap = new Map<string, { name: string, dosage: string, totalRequested: number, currentStock: number, isBottle: boolean, threshold: number }>();
+
     reconciledProcurement.forEach(r => {
       const medName = r.medication_name || 'Unknown';
       const medDosage = r.medication_dosage || r.dosage || '';
-      const key = medDosage ? `${medName} ${medDosage}` : medName;
+      const key = `${medName.toLowerCase().trim()}|${cleanDosageStr(medDosage)}`;
       
       const qty = Number(r.required_quantity) || 0;
-      
-      const matchingInventory = inventory.filter(i => {
-        const invMed = (i.medication_id || (i as any).name || '').toLowerCase().trim();
-        const reqMed = medName.toLowerCase().trim();
-        if (invMed !== reqMed) return false;
-        
-        const invDosage = (i.dosage || '').toLowerCase().trim();
-        const reqDosage = medDosage.toLowerCase().trim();
-        
-        if (reqDosage === '') return true; // Requisition didn't specify dosage, match any
-        return invDosage === reqDosage;
-      });
-      const totalStock = matchingInventory.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+      const currentStock = r.current_stock || 0;
+      const isBottle = !!r.is_bottle;
+      const threshold = r.threshold || (isBottle ? 200 : 1000);
 
-      const existing = summaryMap.get(key) || { totalRequested: 0, name: medName, dosage: medDosage, allOrdered: true, currentStock: totalStock, hasAlert: false };
-      
-      summaryMap.set(key, {
-        name: medName,
-        dosage: medDosage,
-        totalRequested: existing.totalRequested + qty,
-        allOrdered: existing.allOrdered && r.status === 'ORDERED',
-        currentStock: totalStock,
-        hasAlert: existing.hasAlert || r.type === 'LOW_STOCK_ALERT' || r.type === 'EXPIRY_ALERT'
-      });
+      if (r.status === 'ORDERED') {
+        const existing = alreadyOrderedMap.get(key) || { name: medName, dosage: medDosage, totalRequested: 0, currentStock: currentStock, isBottle, threshold };
+        alreadyOrderedMap.set(key, { ...existing, totalRequested: existing.totalRequested + qty });
+      } else {
+        const existing = needsToOrderMap.get(key) || { name: medName, dosage: medDosage, totalRequested: 0, currentStock: currentStock, isBottle, threshold };
+        needsToOrderMap.set(key, { ...existing, totalRequested: existing.totalRequested + qty });
+      }
     });
-    
-      const summaryList = Array.from(summaryMap.values())
-      .map(item => ({
-        ...item,
-        // The required_quantity in requisitions ALREADY represents the explicit shortfall.
-        total: item.totalRequested
-      }))
-      // Keep items that are actually needed OR already ordered
-      .filter(item => item.total > 0 || item.allOrdered || item.hasAlert)
-      .sort((a,b) => b.total - a.total);
+
+    const needsToOrderList = Array.from(needsToOrderMap.values()).sort((a,b) => b.totalRequested - a.totalRequested);
+    const alreadyOrderedList = Array.from(alreadyOrderedMap.values()).sort((a,b) => b.totalRequested - a.totalRequested);
 
     return (
-    <Box>
-      <Paper sx={{ p: 4, mb: 4, borderRadius: 5 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Box>
-             <Typography variant="h6" fontWeight="bold">Procurement & Over-prescribed Report</Typography>
-             <Typography variant="body2" color="text.secondary" mt={0.5}>
-                Tracks medicines that are low on stock, missing, or newly prescribed by doctors outside the existing inventory catalog.
-             </Typography>
-          </Box>
-          <Stack direction="row" spacing={2}>
-            <Button 
-              variant="outlined" 
-              onClick={fetchProcurementReport}
-              disabled={isProcurementLoading}
-            >
-              Refresh
-            </Button>
-            <Button 
-              variant="contained" 
-              color="success"
-              startIcon={<DownloadIcon />}
-              onClick={handleDownloadExcel}
-              disabled={reconciledProcurement.length === 0 || isProcurementLoading}
-            >
-              Download .xlsx
-            </Button>
+      <Box>
+        {/* UPPER BANNER / UTILITIES */}
+        <Paper sx={{ p: 4, mb: 4, borderRadius: 5 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Box>
+              <Typography variant="h6" fontWeight="bold">Procurement & Stock Reconsilation</Typography>
+              <Typography variant="body2" color="text.secondary" mt={0.5}>
+                Real-time Buy List automatically synchronized with clinic thresholds (1000 tablets or 200 bottles) and excel uploads.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={2}>
+              <Button 
+                variant="outlined" 
+                onClick={fetchProcurementReport}
+                disabled={isProcurementLoading}
+              >
+                Refresh
+              </Button>
+              <Button 
+                variant="contained" 
+                color="success"
+                startIcon={<DownloadIcon />}
+                onClick={handleDownloadExcel}
+                disabled={reconciledProcurement.length === 0 || isProcurementLoading}
+              >
+                Download .xlsx
+              </Button>
+            </Stack>
           </Stack>
-        </Stack>
-      </Paper>
-
-      {/* PROCUREMENT SUMMARY (THE BUY LIST) */}
-      {summaryList.length > 0 && (
-        <Paper sx={{ p: 3, mb: 4, borderRadius: 4, bgcolor: '#f0f9ff', border: '1px solid #bae6fd' }}>
-          <Typography variant="subtitle2" fontWeight="900" color="primary" sx={{ mb: 2, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ShoppingCartIcon sx={{ fontSize: 18 }} /> Procurement Summary (The Buy List)
-          </Typography>
-          <Grid container spacing={2}>
-            {summaryList.map((item, idx) => {
-              const displayName = item.dosage ? `${item.name} ${item.dosage}` : item.name;
-              return (
-              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={idx}>
-                <Card 
-                  variant="outlined" 
-                  sx={{ 
-                    borderRadius: 3, 
-                    height: '100%', 
-                    border: '1px solid #bae6fd',
-                    opacity: item.allOrdered ? 0.6 : 1,
-                    filter: item.allOrdered ? 'grayscale(0.5)' : 'none',
-                    transition: 'all 0.3s ease',
-                    bgcolor: item.allOrdered ? '#f8fafc' : 'white'
-                  }}
-                >
-                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                      <Box>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 'bold' }}>Medication</Typography>
-                        <Typography variant="body1" fontWeight="900" sx={{ mb: 1, fontSize: '0.9rem', color: item.allOrdered ? 'text.secondary' : '#0c4a6e' }}>{displayName}</Typography>
-                      </Box>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        {item.allOrdered && (
-                          <Chip label="ORDERED" size="small" color="primary" sx={{ height: 20, fontSize: '0.6rem', fontWeight: 900 }} />
-                        )}
-                        <IconButton size="small" onClick={() => setCancelProcurementState({ open: true, name: item.name, dosage: item.dosage, reason: '' })} sx={{ color: 'text.secondary', p: 0.5 }} title="Cancel/Delete Item">
-                          <CloseIcon fontSize="small" />
-                        </IconButton>
-                      </Stack>
-                    </Stack>
-                    <Divider sx={{ mb: 1.5, opacity: 0.5 }} />
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                      <Typography variant="caption" color="text.secondary">Total Needed:</Typography>
-                      <Typography variant="h5" color={item.allOrdered ? 'text.secondary' : 'error'} fontWeight="900">
-                        {item.total > 0 ? item.total : (item.hasAlert ? "Review Stock" : item.total)}
-                      </Typography>
-                    </Box>
-                    <Button 
-                      fullWidth 
-                      size="small" 
-                      variant={item.allOrdered ? "text" : "contained"}
-                      color="primary"
-                      sx={{ mt: 2, fontWeight: 'bold', borderRadius: 2 }}
-                      disabled={item.allOrdered}
-                      onClick={() => handleMarkAsOrdered(item.name, item.dosage)}
-                    >
-                      {item.allOrdered ? "Pending Delivery" : "Mark as Ordered"}
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Grid>
-            )})}
-          </Grid>
         </Paper>
-      )}
 
-      <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 4, border: '1px solid #e2e8f0' }}>
-        <Table>
-          <TableHead sx={{ bgcolor: '#f8fafc' }}>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Medication</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Dosage</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }} align="center">Qty Needed</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }} align="right">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {isProcurementLoading ? (
-              <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
-                  <CircularProgress />
-                </TableCell>
-              </TableRow>
-            ) : reconciledProcurement.length > 0 ? (
-              reconciledProcurement.map((item) => {
-                // Determine Type Badge - Re-evaluate based on strict Matching
-                let badgeLabel = "Patient Shortfall";
-                let badgeColor = '#ef4444'; // Red
-                
-                const itemName = (item.medication_name || '').toLowerCase().trim();
-                const itemDosage = (item.medication_dosage || item.dosage || '').toLowerCase().trim();
+        {isProcurementLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Stack spacing={4}>
+            {/* SECTION 1: NEEDS TO BE ORDERED */}
+            <Paper sx={{ p: 3, borderRadius: 4, bgcolor: '#fff5f5', border: '1px solid #fee2e2' }}>
+              <Typography variant="subtitle2" fontWeight="900" color="error" sx={{ mb: 2, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <ShoppingCartIcon sx={{ fontSize: 18 }} /> Needs to be Ordered (To Plan)
+              </Typography>
+              {needsToOrderList.length > 0 ? (
+                <Grid container spacing={2}>
+                  {needsToOrderList.map((item, idx) => {
+                    const cleanD = (item.dosage || '').trim();
+                    const displayName = cleanD && cleanD !== 'N/A' && cleanD !== '-' ? `${item.name} (${cleanD})` : item.name;
+                    return (
+                      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={`need-${idx}`}>
+                        <Card 
+                          variant="outlined" 
+                          sx={{ 
+                            borderRadius: 3, 
+                            height: '100%', 
+                            border: '1px solid #fecaca',
+                            bgcolor: 'white',
+                            transition: 'all 0.3s ease',
+                            '&:hover': {
+                              transform: 'translateY(-2px)',
+                              boxShadow: '0 4px 12px rgba(220, 38, 38, 0.08)'
+                            }
+                          }}
+                        >
+                          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
+                              <Box>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.2, fontWeight: 'bold' }}>Medication</Typography>
+                                <Typography variant="body1" fontWeight="900" sx={{ fontSize: '0.9rem', color: '#7f1d1d' }}>{displayName}</Typography>
+                              </Box>
+                              <IconButton size="small" onClick={() => setCancelProcurementState({ open: true, name: item.name, dosage: item.dosage, reason: '' })} sx={{ color: 'text.secondary', p: 0.5 }} title="Dismiss Item">
+                                <CloseIcon fontSize="small" />
+                              </IconButton>
+                            </Stack>
+                            <Divider sx={{ mb: 1.5, opacity: 0.5 }} />
+                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                              <Typography variant="caption" color="text.secondary">Current Stock:</Typography>
+                              <Typography variant="caption" fontWeight="bold" color="text.primary">{item.currentStock} {item.isBottle ? 'bottles' : 'tablets'}</Typography>
+                            </Stack>
+                            <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 2 }}>
+                              <Typography variant="caption" color="text.secondary">Qty To Order:</Typography>
+                              <Typography variant="h6" color="error" fontWeight="900">
+                                {item.totalRequested}
+                              </Typography>
+                            </Stack>
+                            <Button 
+                              fullWidth 
+                              size="small" 
+                              variant="contained"
+                              color="primary"
+                              sx={{ fontWeight: 'bold', borderRadius: 2 }}
+                              onClick={() => handleMarkAsOrdered(item.name, item.dosage)}
+                            >
+                              Mark as Ordered
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              ) : (
+                <Box sx={{ py: 4, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">No items left to be ordered. All stocked perfectly!</Typography>
+                </Box>
+              )}
+            </Paper>
 
-                const matchingBatches = inventory.filter(i => {
-                  const invMed = (i.medication_id || (i as any).name || '').toLowerCase().trim();
-                  if (invMed !== itemName) return false;
-                  
-                  const invDosage = (i.dosage || '').toLowerCase().trim();
-                  if (itemDosage === '') return true; // Requisition didn't specify dosage, match any
-                  return cleanDosageStr(invDosage) === cleanDosageStr(itemDosage);
-                });
-                
-                const totalCurrentStock = matchingBatches.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
-                
-                const ninetyDaysAfter = dayjs().add(90, 'days');
-                const hasExpiringBatch = matchingBatches.some(i => {
-                  const expDate = toDateSafely(i.expiry_date);
-                  return expDate && dayjs(expDate).isBefore(ninetyDaysAfter);
-                });
-
-                const isInCatalog = catalog.some(c => 
-                  (c.name || '').toLowerCase().trim() === itemName && 
-                  cleanDosageStr(c.strength) === cleanDosageStr(itemDosage)
-                );
-
-                if (item.status === 'ORDERED') {
-                  badgeLabel = "Ordered / In-Transit";
-                  badgeColor = '#3b82f6'; // Blue
-                } else if (!isInCatalog && item.patient_id) {
-                  badgeLabel = "New Medicine";
-                  badgeColor = '#9333ea'; // Purple
-                } else if (hasExpiringBatch) {
-                  badgeLabel = "Expiring Soon";
-                  badgeColor = '#dc2626'; // Bright Red/Alert
-                } else if (totalCurrentStock === 0) {
-                  badgeLabel = "Out of Stock";
-                  badgeColor = '#ef4444'; // Red
-                } else if (totalCurrentStock < 200) {
-                  badgeLabel = "Low in Stock";
-                  badgeColor = '#f59e0b'; // Orange
-                }
-
-                return (
-                <TableRow key={item.id} hover>
-                  <TableCell>
-                    {item.created_at ? dayjs(toDateSafely(item.created_at)).format('DD/MM/YY HH:mm') : 'N/A'}
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" fontWeight="bold">
-                      {item.medication_name || 'Unknown'} {item.medication_dosage || item.dosage || ''}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" color="text.secondary">
-                      {item.medication_dosage || item.dosage || '-'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                     <Chip 
-                        size="small"
-                        label={badgeLabel}
-                        sx={{ 
-                          fontWeight: 900, 
-                          fontSize: '0.65rem',
-                          bgcolor: badgeColor,
-                          color: 'white'
-                        }}
-                     />
-                  </TableCell>
-                  <TableCell align="center">
-                    <Typography fontWeight="bold" color="error">{item.required_quantity || '-'}</Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    {item.encounter_id && (
-                      <Button 
-                        size="small" 
-                        variant="outlined" 
-                        color="primary"
-                        startIcon={<HistoryIcon sx={{ fontSize: 16 }} />}
-                        onClick={() => {
-                          setLastEncounterId(item.encounter_id);
-                          setShowPrintDialog(true);
-                        }}
-                        sx={{ fontWeight: 'bold', borderRadius: 2 }}
-                      >
-                        View RX
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              )})
-            ) : (
-              <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
-                  <Typography color="text.secondary">No open procurement requisitions found.</Typography>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Box>
-  );};
+            {/* SECTION 2: ALREADY ORDERED (PENDING DELIVERY) */}
+            <Paper sx={{ p: 3, borderRadius: 4, bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <Typography variant="subtitle2" fontWeight="900" color="text.secondary" sx={{ mb: 2, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <HistoryIcon sx={{ fontSize: 18 }} /> Already Ordered (Pending Delivery)
+              </Typography>
+              {alreadyOrderedList.length > 0 ? (
+                <Grid container spacing={2}>
+                  {alreadyOrderedList.map((item, idx) => {
+                    const cleanD = (item.dosage || '').trim();
+                    const displayName = cleanD && cleanD !== 'N/A' && cleanD !== '-' ? `${item.name} (${cleanD})` : item.name;
+                    return (
+                      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={`ordered-${idx}`}>
+                        <Card 
+                          variant="outlined" 
+                          sx={{ 
+                            borderRadius: 3, 
+                            height: '100%', 
+                            border: '1px solid #cbd5e1',
+                            bgcolor: '#f1f5f9',
+                            opacity: 0.85
+                          }}
+                        >
+                          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
+                              <Box>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.2, fontWeight: 'bold' }}>Medication</Typography>
+                                <Typography variant="body1" fontWeight="900" sx={{ fontSize: '0.9rem', color: '#475569' }}>{displayName}</Typography>
+                              </Box>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Chip label="ORDERED" size="small" color="primary" sx={{ height: 20, fontSize: '0.6rem', fontWeight: 900 }} />
+                                <IconButton size="small" onClick={() => setCancelProcurementState({ open: true, name: item.name, dosage: item.dosage, reason: '' })} sx={{ color: 'text.secondary', p: 0.5 }} title="Cancel Order">
+                                  <CloseIcon fontSize="small" />
+                                </IconButton>
+                              </Stack>
+                            </Stack>
+                            <Divider sx={{ mb: 1.5, opacity: 0.5 }} />
+                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                              <Typography variant="caption" color="text.secondary">Current Stock:</Typography>
+                              <Typography variant="caption" fontWeight="bold" color="text.primary">{item.currentStock} {item.isBottle ? 'bottles' : 'tablets'}</Typography>
+                            </Stack>
+                            <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 2 }}>
+                              <Typography variant="caption" color="text.secondary">Expected Refill:</Typography>
+                              <Typography variant="h6" color="text.primary" fontWeight="900">
+                                {item.totalRequested}
+                              </Typography>
+                            </Stack>
+                            <Button 
+                              fullWidth 
+                              size="small" 
+                              variant="text"
+                              color="primary"
+                              disabled
+                              sx={{ fontWeight: 'bold', borderRadius: 2 }}
+                            >
+                              Pending Delivery
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              ) : (
+                <Box sx={{ py: 4, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">No active orders in-transit. Mark elements as ordered above to view them here.</Typography>
+                </Box>
+              )}
+            </Paper>
+          </Stack>
+        )}
+      </Box>
+    );
+  };
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -2057,6 +2300,208 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       </Dialog>
     </StationLayout>
     </LocalizationProvider>
+  );
+};
+
+const InventoryGroupRow: React.FC<{
+  group: any;
+  isLowSection: boolean;
+  isBottleMedicine: (medName: string) => boolean;
+  toDateSafely: (timestamp: any) => Date | null;
+}> = ({ group, isLowSection, isBottleMedicine, toDateSafely }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const bUnit = (group.base_unit || '').toLowerCase().trim();
+  const isBottle = bUnit === 'bottle' || (!bUnit && isBottleMedicine(group.medication_id));
+
+  const getExpiryStatus = (dateVal: any) => {
+    const dateObj = toDateSafely(dateVal);
+    if (!dateObj) return null;
+    const daysDiff = dayjs(dateObj).diff(dayjs(), 'day');
+    if (daysDiff < 0) {
+      return { label: 'EXPIRED', color: 'error' as const };
+    } else if (daysDiff < 90) {
+      return { label: `Expiring in ${daysDiff} days`, color: 'warning' as const };
+    }
+    return null;
+  };
+
+  return (
+    <>
+      <TableRow 
+        hover 
+        onClick={() => setIsExpanded(!isExpanded)} 
+        sx={{ 
+          cursor: 'pointer', 
+          '& > *': { borderBottom: 'unset !important' },
+          bgcolor: isExpanded ? '#f8fafc' : 'inherit'
+        }}
+      >
+        <TableCell>
+          <IconButton size="small" onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}>
+            {isExpanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+          </IconButton>
+        </TableCell>
+        <TableCell sx={{ fontWeight: 'bold' }}>{group.medication_id}</TableCell>
+        <TableCell>{group.dosage}</TableCell>
+        <TableCell>
+          <Chip 
+            label={group.totalQuantity} 
+            color={isLowSection ? "error" : "success"}
+            size="small"
+            sx={{ fontWeight: 'bold' }}
+          />
+        </TableCell>
+        <TableCell>
+          <Typography variant="body2" color="text.secondary">
+            {isBottle ? "Bottle (< 200 low)" : `${group.base_unit || 'Tablet/Capsule'} (< 1000 low)`}
+          </Typography>
+        </TableCell>
+        <TableCell>
+          <Chip 
+            label={isLowSection ? "Low Stock" : "Sufficient"} 
+            color={isLowSection ? "error" : "success"}
+            variant="outlined"
+            size="small"
+            sx={{ textTransform: 'uppercase', fontWeight: 'bold', fontSize: '0.65rem' }}
+          />
+        </TableCell>
+      </TableRow>
+      
+      <TableRow>
+        <TableCell colSpan={6} sx={{ py: 0, px: 2, bgcolor: '#f8fafc' }}>
+          <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+            <Box sx={{ margin: 2 }}>
+              <Typography 
+                variant="subtitle2" 
+                gutterBottom 
+                fontWeight="900" 
+                color="text.secondary" 
+                sx={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em', mb: 2 }}
+              >
+                Batch-wise Breakdown
+              </Typography>
+              <Table size="small" sx={{ mb: 2 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: '700', color: '#64748b' }}>Batch ID</TableCell>
+                    <TableCell sx={{ fontWeight: '700', color: '#64748b' }}>Expiry Date</TableCell>
+                    <TableCell sx={{ fontWeight: '700', color: '#64748b' }}>Quantity</TableCell>
+                    <TableCell sx={{ fontWeight: '700', color: '#64748b' }}>Alerts / Status</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {group.batches.map((batch: any) => {
+                    const expiryState = getExpiryStatus(batch.expiry_date);
+                    return (
+                      <TableRow key={batch.id} hover>
+                        <TableCell sx={{ fontFamily: 'monospace' }}>{batch.batch_id || 'N/A'}</TableCell>
+                        <TableCell>
+                          {batch.expiry_date ? (
+                            toDateSafely(batch.expiry_date) 
+                              ? dayjs(toDateSafely(batch.expiry_date)).format('DD/MM/YYYY') 
+                              : 'N/A'
+                          ) : 'N/A'}
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>{batch.quantity}</TableCell>
+                        <TableCell>
+                          {expiryState ? (
+                            <Chip 
+                              label={expiryState.label} 
+                              color={expiryState.color} 
+                              size="small" 
+                              sx={{ fontWeight: 'bold', fontSize: '0.62rem', height: 20 }} 
+                            />
+                          ) : (
+                            <Typography variant="caption" color="success.main" fontWeight="bold">Healthy</Typography>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </Box>
+          </Collapse>
+        </TableCell>
+      </TableRow>
+    </>
+  );
+};
+
+const GroupedInventoryTable: React.FC<{
+  groupsList: any[];
+  title: string;
+  isLowSection: boolean;
+  isBottleMedicine: (medName: string) => boolean;
+  toDateSafely: (timestamp: any) => Date | null;
+}> = ({ groupsList, title, isLowSection, isBottleMedicine, toDateSafely }) => {
+  return (
+    <Box sx={{ mb: 4 }}>
+      <Paper 
+        sx={{ 
+          p: 2, 
+          mb: 2, 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          bgcolor: isLowSection ? '#fef2f2' : '#f0fdf4', 
+          border: '1px solid', 
+          borderColor: isLowSection ? '#fee2e2' : '#dcfce7', 
+          borderRadius: 4,
+          boxShadow: 'none'
+        }}
+      >
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          <Chip 
+            label={`${groupsList.length} Items`} 
+            color={isLowSection ? "error" : "success"} 
+            size="small" 
+            sx={{ fontWeight: '900' }} 
+          />
+          <Typography variant="subtitle1" fontWeight="bold" color={isLowSection ? "error.main" : "success.main"}>
+            {title}
+          </Typography>
+        </Stack>
+      </Paper>
+      
+      <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 4, border: '1px solid #e2e8f0' }}>
+        <Table>
+          <TableHead sx={{ bgcolor: '#f8fafc' }}>
+            <TableRow>
+              <TableCell sx={{ width: 60 }} />
+              <TableCell sx={{ fontWeight: 'bold' }}>Medication Name</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Dosage</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Total Stock</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Threshold Rule</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {groupsList.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                  <Typography color="text.secondary">No stock items in this section matching your search.</Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              groupsList.map((group) => {
+                const key = `${group.medication_id.toLowerCase()}|${group.dosage.toLowerCase()}`;
+                return (
+                  <InventoryGroupRow 
+                    key={key}
+                    group={group}
+                    isLowSection={isLowSection}
+                    isBottleMedicine={isBottleMedicine}
+                    toDateSafely={toDateSafely}
+                  />
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Box>
   );
 };
 

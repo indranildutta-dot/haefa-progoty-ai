@@ -49,7 +49,9 @@ import {
   HealthAndSafety as HealthIcon,
   PieChart as PieIcon,
   DownloadDone as DownloadDoneIcon,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Archive as ArchiveIcon,
+  Unarchive as UnarchiveIcon
 } from '@mui/icons-material';
 import { useAppStore } from '../store/useAppStore';
 import StationLayout from '../components/StationLayout';
@@ -104,6 +106,7 @@ const SupportCenter: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [stationFilter, setStationFilter] = useState<string>('all');
+  const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
 
   // Form States
   const [formTitle, setFormTitle] = useState('');
@@ -498,6 +501,33 @@ const SupportCenter: React.FC = () => {
     }
   };
 
+  const handleToggleArchive = async () => {
+    if (!selectedTicket || !selectedTicket.id) return;
+    
+    // Check role authorization as extra safety
+    const isSubmitter = selectedTicket.submitter_uid === user?.uid;
+    if (!isAdmin && !isSubmitter) {
+      alert("You do not have permission to archive this ticket.");
+      return;
+    }
+
+    try {
+      const newArchived = !selectedTicket.is_archived;
+      await updateTicketStatusAndMetadata(selectedTicket.id, {
+        is_archived: newArchived
+      });
+      
+      alert(
+        newArchived 
+          ? "Incident archived successfully! It can be accessed under the 'Archived Only' view option." 
+          : "Incident restored successfully! It is now active on the primary dashboard."
+      );
+    } catch (err) {
+      console.error("Failed to alter incident archive state:", err);
+      alert("Failed to update archive state. Please verify your connection.");
+    }
+  };
+
   // Filtered Tickets Computation
   const filteredTickets = useMemo(() => {
     return tickets.filter(ticket => {
@@ -520,19 +550,28 @@ const SupportCenter: React.FC = () => {
       // 4. Station Match
       const matchStation = stationFilter === 'all' || ticket.station === stationFilter;
 
-      return matchSearch && matchStatus && matchPriority && matchStation;
+      // 5. Archive Match
+      let matchArchive = true;
+      if (archiveFilter === 'active') {
+        matchArchive = !ticket.is_archived;
+      } else if (archiveFilter === 'archived') {
+        matchArchive = !!ticket.is_archived;
+      }
+
+      return matchSearch && matchStatus && matchPriority && matchStation && matchArchive;
     });
-  }, [tickets, searchQuery, statusFilter, priorityFilter, stationFilter]);
+  }, [tickets, searchQuery, statusFilter, priorityFilter, stationFilter, archiveFilter]);
 
   // Aggregate Metrics (Admin Dashboard Insight Cards)
   const ticketMetrics = useMemo(() => {
+    const activeTickets = tickets.filter(t => !t.is_archived);
     const counts = {
-      total: tickets.length,
-      new: tickets.filter(t => t.status === 'new').length,
-      inProgress: tickets.filter(t => t.status === 'in_progress').length,
-      waiting: tickets.filter(t => t.status === 'waiting_feedback').length,
-      resolved: tickets.filter(t => t.status === 'resolved').length,
-      critical: tickets.filter(t => t.priority === 'critical' && t.status !== 'resolved').length
+      total: activeTickets.length,
+      new: activeTickets.filter(t => t.status === 'new').length,
+      inProgress: activeTickets.filter(t => t.status === 'in_progress').length,
+      waiting: activeTickets.filter(t => t.status === 'waiting_feedback').length,
+      resolved: activeTickets.filter(t => t.status === 'resolved').length,
+      critical: activeTickets.filter(t => t.priority === 'critical' && t.status !== 'resolved').length
     };
     return counts;
   }, [tickets]);
@@ -921,6 +960,31 @@ const SupportCenter: React.FC = () => {
                   </Box>
                 </Stack>
 
+                {/* Archive/Unarchive Action block accessible to Admin OR Submitter */}
+                {(isAdmin || selectedTicket.submitter_uid === user?.uid) && (
+                  <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid #e2e8f0', mb: 3 }}>
+                    <Typography variant="caption" color="text.secondary" fontWeight="bold" display="block" mb={1}>
+                      INCIDENT RETENTION ACTION
+                    </Typography>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      color={selectedTicket.is_archived ? "success" : "warning"}
+                      startIcon={selectedTicket.is_archived ? <UnarchiveIcon /> : <ArchiveIcon />}
+                      onClick={handleToggleArchive}
+                      sx={{ fontWeight: '900', borderRadius: 3, textTransform: 'uppercase', py: 1 }}
+                    >
+                      {selectedTicket.is_archived ? "Restore / Unarchive" : "Archive Incident"}
+                    </Button>
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1, fontSize: '0.72rem', lineHeight: 1.4 }}>
+                      {selectedTicket.is_archived 
+                        ? "Restoring this ticket makes it active and visible back on the main dashboard tab for active tracking."
+                        : "Archiving hides this ticket from the active list to prevent interface clutter without deleting history."
+                      }
+                    </Typography>
+                  </Box>
+                )}
+
                 {isAdmin && (
                   <>
                     <Divider sx={{ my: 3 }} />
@@ -1065,11 +1129,11 @@ const SupportCenter: React.FC = () => {
               {/* SEARCH & ACCENT FILTERS BAR */}
               <Paper sx={{ p: 3, borderRadius: 4, border: '1px solid #cbd5e1', boxShadow: 'none', mb: 3 }}>
                 <Grid container spacing={2} alignItems="center">
-                  <Grid size={{ xs: 12, md: 4 }}>
+                  <Grid size={{ xs: 12, md: 3 }}>
                     <TextField 
                       fullWidth
                       size="small"
-                      placeholder="Search title, description, user, ticket ID..."
+                      placeholder="Search title, description, user..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       InputProps={{
@@ -1079,7 +1143,7 @@ const SupportCenter: React.FC = () => {
                     />
                   </Grid>
                   
-                  <Grid size={{ xs: 6, sm: 3, md: 2 }}>
+                  <Grid size={{ xs: 6, sm: 4, md: 1.8 }}>
                     <FormControl fullWidth size="small">
                       <InputLabel>Status</InputLabel>
                       <Select 
@@ -1097,7 +1161,7 @@ const SupportCenter: React.FC = () => {
                     </FormControl>
                   </Grid>
 
-                  <Grid size={{ xs: 6, sm: 3, md: 2 }}>
+                  <Grid size={{ xs: 6, sm: 4, md: 1.8 }}>
                     <FormControl fullWidth size="small">
                       <InputLabel>Priority</InputLabel>
                       <Select 
@@ -1115,7 +1179,7 @@ const SupportCenter: React.FC = () => {
                     </FormControl>
                   </Grid>
 
-                  <Grid size={{ xs: 6, sm: 3, md: 2 }}>
+                  <Grid size={{ xs: 6, sm: 4, md: 1.8 }}>
                     <FormControl fullWidth size="small">
                       <InputLabel>Station</InputLabel>
                       <Select 
@@ -1132,7 +1196,23 @@ const SupportCenter: React.FC = () => {
                     </FormControl>
                   </Grid>
 
-                  <Grid size={{ xs: 6, sm: 3, md: 2 }}>
+                  <Grid size={{ xs: 6, sm: 4, md: 1.8 }}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Archive View</InputLabel>
+                      <Select 
+                        value={archiveFilter} 
+                        label="Archive View" 
+                        onChange={(e) => setArchiveFilter(e.target.value as any)}
+                        sx={{ borderRadius: 3 }}
+                      >
+                        <MenuItem value="active">Active Incidents</MenuItem>
+                        <MenuItem value="archived">Archived Only</MenuItem>
+                        <MenuItem value="all">All Incidents</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 4, md: 1.8 }}>
                     <Button 
                       fullWidth
                       variant="outlined" 
@@ -1173,9 +1253,11 @@ const SupportCenter: React.FC = () => {
                           p: 3, 
                           borderRadius: 4, 
                           border: '1px solid #cbd5e1', 
-                          borderLeft: statusTheme.border,
+                          borderLeft: ticket.is_archived ? '5px solid #94a3b8' : statusTheme.border,
                           boxShadow: 'none', 
                           cursor: 'pointer',
+                          bgcolor: ticket.is_archived ? '#f1f5f9' : '#ffffff',
+                          opacity: ticket.is_archived ? 0.8 : 1,
                           '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderColor: 'primary.main' },
                           transition: 'all 0.2s ease',
                           position: 'relative'
@@ -1187,6 +1269,14 @@ const SupportCenter: React.FC = () => {
                               <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'text.secondary', fontFamily: 'monospace' }}>
                                 #{ticket.id?.substr(0, 8)}
                               </Typography>
+                              {ticket.is_archived && (
+                                <Chip 
+                                  icon={<ArchiveIcon sx={{ '&&': { color: '#475569', fontSize: 13 } }} />}
+                                  label="ARCHIVED" 
+                                  size="small" 
+                                  sx={{ fontWeight: '900', height: 20, fontSize: '0.62rem', color: '#475569', bgcolor: '#e2e8f0', border: '1px solid #cbd5e1' }} 
+                                />
+                              )}
                               <Chip 
                                 label={ticket.station} 
                                 size="small" 

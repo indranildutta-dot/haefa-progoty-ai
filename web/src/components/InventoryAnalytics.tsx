@@ -39,6 +39,14 @@ const toDateSafely = (timestamp: any): Date | null => {
   if (!timestamp) return null;
   if (typeof timestamp.toDate === 'function') return timestamp.toDate();
   if (timestamp instanceof Date) return timestamp;
+  if (timestamp && typeof timestamp === 'object') {
+    if (typeof timestamp.seconds === 'number') {
+      return new Date(timestamp.seconds * 1000);
+    }
+    if (typeof timestamp._seconds === 'number') {
+      return new Date(timestamp._seconds * 1000);
+    }
+  }
   if (typeof timestamp === 'number') return new Date(timestamp);
   if (typeof timestamp === 'string') return new Date(timestamp);
   return null;
@@ -73,7 +81,17 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
         );
         const presSnapshot = await getDocs(presQuery);
         
+        // 2b. Fetch dedicated dispensations (to capture items directly logged only in dispensation records)
+        const dispQuery = query(
+          collection(db, "dispensations"),
+          where("clinic_id", "==", clinicId)
+        );
+        const dispSnapshot = await getDocs(dispQuery);
+
         const reconstructedDispLog: InventoryLog[] = [];
+        const processedUniqueKeys = new Set<string>();
+
+        // Process from companion prescriptions records
         presSnapshot.docs.forEach(docSnap => {
           const data = docSnap.data();
           if (data.status !== 'DISPENSED' && data.status !== 'PARTIAL_DISPENSED') return;
@@ -92,6 +110,10 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
               const qty = Number(item.dispensed) || 0;
               
               if (medName && qty > 0) {
+                const itemTime = toDateSafely(timestamp)?.getTime() || 0;
+                const itemKey = `${medName.toLowerCase().trim()}|${cleanDosageStr(medDosage)}|${qty}|${itemTime}`;
+                processedUniqueKeys.add(itemKey);
+
                 reconstructedDispLog.push({
                   id: `pres-${docSnap.id}-${idx}`,
                   medication_name: medName,
@@ -106,7 +128,44 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
           }
         });
 
-        // 3. Keep additions from logged events, and dispensations strictly from reconstructed prescriptions to prevent double-counting
+        // Process from standalone dispensations records
+        dispSnapshot.docs.forEach(docSnap => {
+          const data = docSnap.data();
+          const timestamp = data.created_at || data.updated_at;
+          const pDate = toDateSafely(timestamp);
+          
+          if (pDate && pDate >= fromDateStart) {
+            const user_name = data.dispenser_name || 'Pharmacist';
+            const items = Array.isArray(data.items) ? data.items : [];
+            
+            items.forEach((item: any, idx: number) => {
+              const medName = item.medication || item.medication_name || '';
+              const medDosage = item.dosage || '';
+              const qty = Number(item.dispensed) || 0;
+              
+              if (medName && qty > 0) {
+                const itemTime = toDateSafely(timestamp)?.getTime() || 0;
+                const itemKey = `${medName.toLowerCase().trim()}|${cleanDosageStr(medDosage)}|${qty}|${itemTime}`;
+                
+                // Avoid double counting event
+                if (!processedUniqueKeys.has(itemKey)) {
+                  processedUniqueKeys.add(itemKey);
+                  reconstructedDispLog.push({
+                    id: `disp-${docSnap.id}-${idx}`,
+                    medication_name: medName,
+                    dosage: medDosage,
+                    type: 'dispense' as const,
+                    qty: qty,
+                    user_name: user_name,
+                    timestamp: timestamp
+                  });
+                }
+              }
+            });
+          }
+        });
+
+        // 3. Keep additions from logged events, and dispensations strictly from reconstructed prescriptions/dispensations to prevent double-counting
         const additionLogs = fetchedLogs.filter(l => l.type === 'add');
         setLogs([...additionLogs, ...reconstructedDispLog]);
       } catch (e) {
@@ -121,8 +180,8 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
   const summary = useMemo(() => {
     const toDateEnd = (toDate || dayjs()).endOf('day').toDate();
     const fromDateStart = (fromDate || dayjs()).startOf('day').toDate();
-    const periodLogs = logs.filter(l => l.timestamp && toDateSafely(l.timestamp)! <= toDateEnd);
-    const afterPeriodLogs = logs.filter(l => l.timestamp && toDateSafely(l.timestamp)! > toDateEnd);
+    const periodLogs = logs.filter(l => l.timestamp && (toDateSafely(l.timestamp) || new Date(0)) <= toDateEnd);
+    const afterPeriodLogs = logs.filter(l => l.timestamp && (toDateSafely(l.timestamp) || new Date(0)) > toDateEnd);
 
     const medMap = new Map<string, any>();
     

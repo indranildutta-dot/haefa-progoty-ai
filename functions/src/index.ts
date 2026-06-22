@@ -36,6 +36,80 @@ const normalizeDosageKey = (dosageStr: string): string => {
   return (dosageStr || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 };
 
+const parseExcelDate = (val: any): Date | null => {
+  if (!val) return null;
+  
+  let resolvedVal = val;
+  if (resolvedVal && typeof resolvedVal === 'object') {
+    if ('result' in resolvedVal) {
+      resolvedVal = resolvedVal.result;
+    } else if ('richText' in resolvedVal) {
+      resolvedVal = resolvedVal.richText.map((rt: any) => rt.text || "").join("");
+    } else if ('text' in resolvedVal) {
+      resolvedVal = resolvedVal.text;
+    }
+  }
+
+  if (!resolvedVal) return null;
+
+  let dateObj: Date | null = null;
+
+  if (resolvedVal instanceof Date && !isNaN(resolvedVal.getTime())) {
+    dateObj = new Date(resolvedVal.getTime());
+  } else if (typeof resolvedVal === 'object' && typeof resolvedVal.getTime === 'function') {
+    const time = resolvedVal.getTime();
+    if (typeof time === 'number' && !isNaN(time)) {
+      dateObj = new Date(time);
+    }
+  } else if (typeof resolvedVal === 'number' && !isNaN(resolvedVal)) {
+    const d = new Date((resolvedVal - 25569) * 86400 * 1000);
+    if (!isNaN(d.getTime()) && d.getFullYear() > 1901 && d.getFullYear() < 2100) {
+      dateObj = d;
+    }
+  } else {
+    const strVal = String(resolvedVal).trim();
+    if (strVal && strVal.toLowerCase() !== 'null' && strVal.toLowerCase() !== 'undefined') {
+      const parts = strVal.split(/[\/\-\.]/);
+      if (parts.length === 3) {
+        const p0 = parseInt(parts[0], 10);
+        const p1 = parseInt(parts[1], 10);
+        const p2 = parseInt(parts[2], 10);
+        
+        if (!isNaN(p0) && !isNaN(p1) && !isNaN(p2)) {
+          let day = p0;
+          let month = p1;
+          let year = p2;
+          
+          if (month > 12 && day <= 12) {
+            day = p1;
+            month = p0;
+          }
+          if (year < 100) {
+            year += 2000;
+          }
+          const constructedDate = new Date(year, month - 1, day, 12, 0, 0);
+          if (!isNaN(constructedDate.getTime())) {
+            dateObj = constructedDate;
+          }
+        }
+      }
+      
+      if (!dateObj) {
+        const d = new Date(strVal);
+        if (!isNaN(d.getTime())) {
+          dateObj = d;
+        }
+      }
+    }
+  }
+
+  if (dateObj && !isNaN(dateObj.getTime())) {
+    return new Date(dateObj.getTime());
+  }
+
+  return null;
+};
+
 // ==========================================
 // ICD-11 INTEGRATION FUNCTIONS
 // ==========================================
@@ -949,18 +1023,12 @@ export const bulkUpload = onCall(async (request) => {
   worksheet?.eachRow((row: any, rowNumber: number) => {
     if (rowNumber === 1) return;
     const medId = row.getCell(1).value?.toString().trim() || "";
+    if (!medId || medId.toUpperCase().includes('EXAMPLE') || medId.toLowerCase().includes('save completed file')) return;
     const batchId = row.getCell(2).value?.toString().trim() || "";
     
-    let expiry_date: any = null;
     const expiryVal = row.getCell(3).value;
-    if (expiryVal instanceof Date) {
-      expiry_date = admin.firestore.Timestamp.fromDate(expiryVal);
-    } else if (typeof expiryVal === 'string') {
-      const d = new Date(expiryVal);
-      if (!isNaN(d.getTime())) {
-        expiry_date = admin.firestore.Timestamp.fromDate(d);
-      }
-    }
+    const expiryDateObj = parseExcelDate(expiryVal);
+    const expiry_date = expiryDateObj ? admin.firestore.Timestamp.fromDate(expiryDateObj) : null;
     
     const qty = Number(row.getCell(4).value) || 0;
     const base_unit = row.getCell(5).value?.toString().trim() || "";
@@ -976,8 +1044,6 @@ export const bulkUpload = onCall(async (request) => {
     } else if (!dosage) {
       dosage = "N/A";
     }
-    
-    if (!medId || medId.toUpperCase().includes('EXAMPLE')) return;
     
     const medLower = medId.toLowerCase().trim();
     const dosageLower = normalizeDosageKey(dosage);
@@ -1058,7 +1124,7 @@ export const bulkUpload = onCall(async (request) => {
             
             batch.update(docSnap.ref, {
                required_quantity: newReqQty,
-               status: newReqQty <= 0 ? 'FULFILLED' : data.status,
+               status: newReqQty <= 0 ? 'FULFILLED' : (data.status === 'ORDERED' ? 'ORDERED' : 'PENDING'),
                updated_at: admin.firestore.Timestamp.now()
             });
             opCount++;
@@ -1110,7 +1176,13 @@ export const getInventoryTemplate = onCall(async (request) => {
   // Set date format DD/MM/YYYY for the expiry column
   sheet.getColumn('expiry').numFmt = 'dd/mm/yyyy';
 
-  // Add examples
+  // Add guidance/instruction row (Row 2) - to be ignored by parsing
+  sheet.addRow({
+    name: 'Save completed file in format - Country-Clinic-Date.xlsx    Example: Bangladesh-Dhaka-June 22nd.xlsx'
+  });
+  sheet.mergeCells('A2:H2');
+
+  // Add examples (Rows 3 and 4)
   sheet.addRow({
     name: 'Example: Paracetamol',
     batch: 'BAT-123',
@@ -1133,8 +1205,8 @@ export const getInventoryTemplate = onCall(async (request) => {
     unit: 'mg'
   });
 
-  // Make rows 2 and 3 orange
-  [sheet.getRow(2), sheet.getRow(3)].forEach(row => {
+  // Make rows 2, 3 and 4 orange/yellow
+  [sheet.getRow(2), sheet.getRow(3), sheet.getRow(4)].forEach(row => {
     row.eachCell((cell: any) => {
       cell.fill = {
         type: 'pattern',
@@ -1145,30 +1217,47 @@ export const getInventoryTemplate = onCall(async (request) => {
     });
   });
 
-  // Add Data Validation
-  for (let i = 4; i <= 1000; i++) {
-    // Dosage Unit dropdown
+  // Specifically make cell A2 (the merged cell for guideline) red and bold font
+  const guidanceCell = sheet.getCell('A2');
+  guidanceCell.font = {
+    bold: true,
+    color: { argb: 'FFFF0000' } // Red (FF0000)
+  };
+
+  // Add Data Validation starting from row 5
+  for (let i = 5; i <= 1000; i++) {
+    // Dosage Unit dropdown (Column H)
     sheet.getCell(`H${i}`).dataValidation = {
       type: 'list',
       allowBlank: true,
       formulae: ['"mg,g,mcg,ml,IU"']
     };
+
+    // Base Unit dropdown (Column E)
+    sheet.getCell(`E${i}`).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ['"Tablet,Capsule,Bottle"']
+    };
+
+    // Package Unit dropdown (Column F)
+    sheet.getCell(`F${i}`).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ['"Box,Bottle,Carton,Pack,Strip,Tube,Vial,Case,Piece,Sachet"']
+    };
     
     // Expiry Date hint
     sheet.getCell(`C${i}`).dataValidation = {
-      type: 'date',
-      operator: 'greaterThan',
-      showErrorMessage: true,
       allowBlank: true,
-      formulae: [new Date('2000-01-01')],
       showInputMessage: true,
-      promptTitle: 'Date Format',
-      prompt: 'Enter date as DD/MM/YYYY'
+      promptTitle: 'Expiry Date Format',
+      prompt: 'Please enter as DD/MM/YYYY (e.g., 25/08/2027)'
     };
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
-  return { fileBase64: (buffer as any).toString('base64') };
+  return { fileBase64: Buffer.from(buffer).toString('base64') };
 });
 
 export const stockAlerts = onSchedule("every 24 hours", async (event) => {

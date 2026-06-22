@@ -57,10 +57,21 @@ export const bulkUpload = async (fileBase64: string) => {
     throw new Error("No clinic selected. Inventory must be tied to a specific clinic location.");
   }
 
-  const upload = httpsCallable(functions, 'bulkUpload');
-  
-  return await upload({
-    clinicId: selectedClinic.id,
-    fileBase64
+  const response = await fetch("/api/pharmacy/bulk-upload", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      clinicId: selectedClinic.id,
+      fileBase64
+    })
   });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to parse inventory file in server.");
+  }
+  
+  return await response.json();
 };
