@@ -348,7 +348,24 @@ const SupportCenter: React.FC = () => {
     setCommentAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleCommentPaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+  const handleFormPaste = (e: React.ClipboardEvent<any>) => {
+    const items = e.clipboardData.items;
+    const files: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          files.push(file);
+        }
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      processFileList(files);
+    }
+  };
+
+  const handleCommentPaste = (e: React.ClipboardEvent<any>) => {
     const items = e.clipboardData.items;
     const files: File[] = [];
     for (let i = 0; i < items.length; i++) {
@@ -1260,7 +1277,7 @@ const SupportCenter: React.FC = () => {
                 </Alert>
               )}
 
-              <form onSubmit={handleCreateTicket}>
+              <form onSubmit={handleCreateTicket} onPaste={handleFormPaste}>
                 <Grid container spacing={3}>
                   <Grid size={{ xs: 12 }}>
                     <TextField 
@@ -1316,7 +1333,7 @@ const SupportCenter: React.FC = () => {
                       rows={6}
                       label="Step-by-Step Description of the Issue"
                       variant="outlined"
-                      placeholder="Please specify exactly what you were doing, what you observed, what you expected, and any particular patient ID we can search for if it's localized to a patient record..."
+                      placeholder="Please specify exactly what you were doing, what you observed, what you expected, and any particular patient ID we can search for if it's localized to a patient record... (Tip: You can take a snippet screenshot and Ctrl+V / paste it directly here to attach!)"
                       value={formDesc}
                       onChange={(e) => setFormDesc(e.target.value)}
                       sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
@@ -1348,7 +1365,7 @@ const SupportCenter: React.FC = () => {
                     >
                       <CloudUploadIcon sx={{ fontSize: 36, color: 'text.secondary', mb: 1 }} />
                       <Typography variant="body2" fontWeight="bold">Drag & Drop or Click to Select screenshots</Typography>
-                      <Typography variant="caption" color="text.secondary">Accepted images: PNG, JPG, GIF. Max image storage footprint is managed automatically via compression.</Typography>
+                      <Typography variant="caption" color="text.secondary">Accepted images: PNG, JPG, GIF. Max image storage footprint is managed automatically via compression. (Tip: You can also copy and Ctrl+V / paste images directly!)</Typography>
                     </Box>
 
                     <input 
@@ -1365,19 +1382,26 @@ const SupportCenter: React.FC = () => {
                         {formAttachments.map((base64, index) => (
                           <Paper 
                             key={index} 
+                            onClick={() => setPreviewAttachmentUrl(base64)}
                             sx={{ 
                               position: 'relative', 
                               width: 100, 
                               height: 100, 
                               overflow: 'hidden', 
                               borderRadius: 2, 
-                              border: '2px solid #cbd5e1' 
+                              border: '2px solid #cbd5e1',
+                              cursor: 'pointer',
+                              '&:hover': { transform: 'scale(1.02)', borderColor: 'primary.main' },
+                              transition: 'all 0.15s ease'
                             }}
                           >
                             <img src={base64} alt="Pre-upload" style={{ width: '100%', height: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" />
                             <IconButton 
                               size="small" 
-                              onClick={() => removeAttachmentFromForm(index)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeAttachmentFromForm(index);
+                              }}
                               sx={{ 
                                 position: 'absolute', 
                                 top: 4, 
