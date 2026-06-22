@@ -6,6 +6,20 @@ import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
+// Unregister stale service workers in development to prevent caching issues
+if (import.meta.env.DEV && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    if (registrations.length > 0) {
+      for (const registration of registrations) {
+        registration.unregister();
+      }
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    }
+  });
+}
+
 const theme = createTheme({
   typography: {
     fontFamily: '"Inter", ui-sans-serif, system-ui, sans-serif',

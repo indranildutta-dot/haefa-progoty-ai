@@ -471,6 +471,7 @@ export interface TicketComment {
   author_role: string;
   body: string;
   created_at: string; // ISO string for quick sorting and offline compatibility
+  attachments?: string[]; // Array of base64-encoded strings (compressed screenshots)
 }
 
 export interface SupportTicket {

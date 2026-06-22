@@ -48,7 +48,8 @@ import {
   AdminPanelSettings as AdminIcon,
   HealthAndSafety as HealthIcon,
   PieChart as PieIcon,
-  DownloadDone as DownloadDoneIcon
+  DownloadDone as DownloadDoneIcon,
+  Image as ImageIcon
 } from '@mui/icons-material';
 import { useAppStore } from '../store/useAppStore';
 import StationLayout from '../components/StationLayout';
@@ -116,6 +117,7 @@ const SupportCenter: React.FC = () => {
   // Active Selected Ticket (for Details View)
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [newComment, setNewComment] = useState('');
+  const [commentAttachments, setCommentAttachments] = useState<string[]>([]);
   const [adminNotes, setAdminNotes] = useState('');
   const [isReplying, setIsReplying] = useState(false);
 
@@ -123,6 +125,7 @@ const SupportCenter: React.FC = () => {
   const [previewAttachmentUrl, setPreviewAttachmentUrl] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const commentFileInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = userProfile?.role === 'global_admin' || userProfile?.role === 'country_admin';
 
@@ -285,6 +288,83 @@ const SupportCenter: React.FC = () => {
     setFormAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const processCommentFileList = (filesList: File[]) => {
+    filesList.forEach((file) => {
+      if (!file.type.startsWith('image/')) {
+        alert('Please drop or select image files only (PNG/JPG).');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          // Canvas Compression Logic: Max 800px width/height and 0.7 quality saves huge Firestore document space
+          const canvas = document.createElement('canvas');
+          const MAX_DIM = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_DIM) {
+              height *= MAX_DIM / width;
+              width = MAX_DIM;
+            }
+          } else {
+            if (height > MAX_DIM) {
+              width *= MAX_DIM / height;
+              height = MAX_DIM;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+            setCommentAttachments((prev) => [...prev, compressedBase64]);
+          }
+        };
+        img.src = event.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleCommentImageUploadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    processCommentFileList(Array.from(files));
+
+    if (commentFileInputRef.current) {
+      commentFileInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachmentFromComment = (index: number) => {
+    setCommentAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleCommentPaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const items = e.clipboardData.items;
+    const files: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          files.push(file);
+        }
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      processCommentFileList(files);
+    }
+  };
+
   // 3. Submit Incident
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -343,7 +423,7 @@ const SupportCenter: React.FC = () => {
   // 4. Respond to Ticket (add comment)
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || !selectedTicket || !selectedTicket.id || !user) return;
+    if ((!newComment.trim() && commentAttachments.length === 0) || !selectedTicket || !selectedTicket.id || !user) return;
 
     setIsReplying(true);
     try {
@@ -354,11 +434,13 @@ const SupportCenter: React.FC = () => {
         author_email: user.email || '',
         author_role: userProfile?.role || 'staff',
         body: newComment.trim(),
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        attachments: commentAttachments
       };
 
       await addCommentToTicket(selectedTicket.id, commentPayload);
       setNewComment('');
+      setCommentAttachments([]);
       
       // If a standard user is replying to a ticket that was waiting for feedback, automatically flag status as NEW or IN PROGRESS
       if (!isAdmin && selectedTicket.status === 'waiting_feedback') {
@@ -619,9 +701,39 @@ const SupportCenter: React.FC = () => {
                               />
                             )}
                           </Stack>
-                          <Typography variant="body2" sx={{ wordBreak: 'break-word', lineHeight: 1.5 }}>
-                            {comment.body}
-                          </Typography>
+                          {comment.body && (
+                            <Typography variant="body2" sx={{ wordBreak: 'break-word', lineHeight: 1.5 }}>
+                              {comment.body}
+                            </Typography>
+                          )}
+
+                          {comment.attachments && comment.attachments.length > 0 && (
+                            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1.5 }} gap={1}>
+                              {comment.attachments.map((imgBase64, idx) => (
+                                <Box
+                                  key={idx}
+                                  component="img"
+                                  src={imgBase64}
+                                  referrerPolicy="no-referrer"
+                                  alt={`Comment Attachment ${idx + 1}`}
+                                  sx={{
+                                    width: 80,
+                                    height: 80,
+                                    objectFit: 'cover',
+                                    borderRadius: 2,
+                                    cursor: 'pointer',
+                                    border: isAuthUserComment ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(15,23,42,0.1)',
+                                    transition: 'transform 0.2s',
+                                    '&:hover': {
+                                      transform: 'scale(1.05)',
+                                    },
+                                  }}
+                                  onClick={() => setPreviewAttachmentUrl(imgBase64)}
+                                />
+                              ))}
+                            </Stack>
+                          )}
+
                           <Typography variant="caption" sx={{ mt: 0.5, display: 'block', textAlign: 'right', opacity: 0.7, fontSize: '0.65rem' }}>
                             {dayjs(comment.created_at).format('DD/MM/YYYY HH:mm')}
                           </Typography>
@@ -638,29 +750,109 @@ const SupportCenter: React.FC = () => {
                   </Alert>
                 ) : (
                   <form onSubmit={handleAddComment}>
-                    <Stack direction="row" spacing={1.5}>
+                    {commentAttachments.length > 0 && (
+                      <Stack direction="row" spacing={1.5} sx={{ mb: 2 }} flexWrap="wrap" gap={1}>
+                        {commentAttachments.map((base64, index) => (
+                          <Paper 
+                            key={index} 
+                            sx={{ 
+                              position: 'relative', 
+                              width: 75, 
+                              height: 75, 
+                              overflow: 'hidden', 
+                              borderRadius: 2, 
+                              border: '1px solid #cbd5e1' 
+                            }}
+                          >
+                            <img src={base64} alt="Comment Attachment Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" />
+                            <IconButton 
+                              size="small" 
+                              onClick={() => removeAttachmentFromComment(index)}
+                              sx={{ 
+                                position: 'absolute', 
+                                top: 2, 
+                                right: 2, 
+                                bgcolor: 'rgba(15, 23, 42, 0.85)', 
+                                color: 'white',
+                                p: 0.2,
+                                '&:hover': { bgcolor: '#000' }
+                              }}
+                            >
+                              <CloseIcon sx={{ fontSize: 11 }} />
+                            </IconButton>
+                          </Paper>
+                        ))}
+                      </Stack>
+                    )}
+
+                    {/* Rich-Style Comment Composer Card */}
+                    <Box sx={{ border: '2px solid #e2e8f0', borderRadius: 4, overflow: 'hidden', bgcolor: '#f8fafc', '&:focus-within': { borderColor: 'primary.main', boxShadow: '0 0 0 3px rgba(79, 70, 229, 0.15)' }, transition: 'all 0.15s ease' }}>
                       <TextField 
                         fullWidth
-                        placeholder="Write a message, request clarification, or provide diagnostic details..."
-                        variant="outlined"
-                        size="medium"
+                        multiline
+                        rows={3}
+                        placeholder="Write a message, request clarification, or provide diagnostic details... (Tip: You can take a snippet screenshot and Ctrl+V / paste it directly here to attach!)"
+                        variant="standard"
                         value={newComment}
                         onChange={(e) => setNewComment(e.target.value)}
+                        onPaste={handleCommentPaste}
                         disabled={isReplying}
-                        sx={{ 
-                          '& .MuiOutlinedInput-root': { borderRadius: 4, bgcolor: '#f8fafc' }
+                        slotProps={{
+                          input: {
+                            disableUnderline: true,
+                            sx: { p: 2, bgcolor: '#f8fafc', fontSize: '0.9rem', lineHeight: 1.5 }
+                          }
                         }}
                       />
-                      <Button 
-                        type="submit" 
-                        variant="contained" 
-                        disabled={!newComment.trim() || isReplying}
-                        sx={{ borderRadius: 4, px: 3, minWidth: 100 }}
-                        endIcon={isReplying ? <CircularProgress size={16} /> : <SendIcon />}
-                      >
-                        Reply
-                      </Button>
-                    </Stack>
+                      
+                      {/* Action Bar */}
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', p: 1.5, bgcolor: '#f1f5f9' }}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <input 
+                            type="file" 
+                            ref={commentFileInputRef}
+                            style={{ display: 'none' }} 
+                            multiple 
+                            accept="image/*" 
+                            onChange={handleCommentImageUploadChange}
+                          />
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => commentFileInputRef.current?.click()}
+                            disabled={isReplying}
+                            startIcon={<ImageIcon />}
+                            sx={{
+                              borderColor: commentAttachments.length > 0 ? 'primary.main' : '#cbd5e1',
+                              color: commentAttachments.length > 0 ? 'primary.main' : 'text.primary',
+                              bgcolor: commentAttachments.length > 0 ? 'rgba(79, 70, 229, 0.05)' : 'white',
+                              fontWeight: '700',
+                              borderRadius: 4,
+                              px: 2,
+                              py: 0.75,
+                              fontSize: '0.75rem',
+                              textTransform: 'none',
+                              '&:hover': {
+                                bgcolor: '#f8fafc',
+                                borderColor: 'primary.main'
+                              }
+                            }}
+                          >
+                            {commentAttachments.length > 0 ? `Screenshots Attached (${commentAttachments.length})` : 'Attach Screenshot'}
+                          </Button>
+                        </Stack>
+
+                        <Button 
+                          type="submit" 
+                          variant="contained" 
+                          disabled={(!newComment.trim() && commentAttachments.length === 0) || isReplying}
+                          sx={{ borderRadius: 4, px: 3, py: 0.75, textTransform: 'none', fontWeight: 'bold' }}
+                          endIcon={isReplying ? <CircularProgress size={16} color="inherit" /> : <SendIcon sx={{ fontSize: 16 }} />}
+                        >
+                          Reply
+                        </Button>
+                      </Box>
+                    </Box>
                   </form>
                 )}
               </Paper>
