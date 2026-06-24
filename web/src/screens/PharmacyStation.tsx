@@ -2486,7 +2486,13 @@ const InventoryGroupRow: React.FC<{
         sx={{ 
           cursor: 'pointer', 
           '& > *': { borderBottom: 'unset !important' },
-          bgcolor: isExpanded ? '#f8fafc' : 'inherit'
+          bgcolor: isExpanded 
+            ? '#f8fafc' 
+            : (allBatchesExpired 
+               ? '#fff5f5' // soft light red background for fully expired
+               : (hasExpiredBatches 
+                  ? '#fffbeb' // soft light amber background if some batches are expired
+                  : 'inherit'))
         }}
       >
         <TableCell>
@@ -2494,7 +2500,12 @@ const InventoryGroupRow: React.FC<{
             {isExpanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
           </IconButton>
         </TableCell>
-        <TableCell sx={{ fontWeight: 'bold' }}>{group.medication_id}</TableCell>
+        <TableCell sx={{ fontWeight: 'bold', color: allBatchesExpired ? '#991b1b' : 'inherit' }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            {allBatchesExpired && <span style={{ color: '#ef4444', fontSize: '1.1rem' }}>⚠️</span>}
+            <span>{group.medication_id}</span>
+          </Stack>
+        </TableCell>
         <TableCell>{group.dosage}</TableCell>
         <TableCell>
           <Stack direction="row" spacing={1} alignItems="center">

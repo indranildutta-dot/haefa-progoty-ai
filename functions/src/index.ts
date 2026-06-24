@@ -41,70 +41,151 @@ const parseExcelDate = (val: any): Date | null => {
   
   let resolvedVal = val;
   if (resolvedVal && typeof resolvedVal === 'object') {
-    if ('result' in resolvedVal) {
+    if (resolvedVal instanceof Date) {
+      // Already a Date object
+    } else if (typeof resolvedVal.getTime === 'function') {
+      // Date-like object
+    } else if ('result' in resolvedVal) {
       resolvedVal = resolvedVal.result;
     } else if ('richText' in resolvedVal) {
       resolvedVal = resolvedVal.richText.map((rt: any) => rt.text || "").join("");
     } else if ('text' in resolvedVal) {
       resolvedVal = resolvedVal.text;
+    } else if ('value' in resolvedVal) {
+      resolvedVal = resolvedVal.value;
     }
   }
 
   if (!resolvedVal) return null;
 
-  let dateObj: Date | null = null;
-
+  // 1. Check if already a Date
   if (resolvedVal instanceof Date && !isNaN(resolvedVal.getTime())) {
-    dateObj = new Date(resolvedVal.getTime());
-  } else if (typeof resolvedVal === 'object' && typeof resolvedVal.getTime === 'function') {
+    return new Date(resolvedVal.getTime());
+  }
+  if (typeof resolvedVal === 'object' && typeof resolvedVal.getTime === 'function') {
     const time = resolvedVal.getTime();
     if (typeof time === 'number' && !isNaN(time)) {
-      dateObj = new Date(time);
+      return new Date(time);
     }
-  } else if (typeof resolvedVal === 'number' && !isNaN(resolvedVal)) {
+  }
+
+  // 2. Check if a serial Excel number
+  if (typeof resolvedVal === 'number' && !isNaN(resolvedVal)) {
     const d = new Date((resolvedVal - 25569) * 86400 * 1000);
     if (!isNaN(d.getTime()) && d.getFullYear() > 1901 && d.getFullYear() < 2100) {
-      dateObj = d;
+      return d;
     }
-  } else {
-    const strVal = String(resolvedVal).trim();
-    if (strVal && strVal.toLowerCase() !== 'null' && strVal.toLowerCase() !== 'undefined') {
-      const parts = strVal.split(/[\/\-\.]/);
-      if (parts.length === 3) {
-        const p0 = parseInt(parts[0], 10);
-        const p1 = parseInt(parts[1], 10);
-        const p2 = parseInt(parts[2], 10);
-        
-        if (!isNaN(p0) && !isNaN(p1) && !isNaN(p2)) {
-          let day = p0;
-          let month = p1;
-          let year = p2;
-          
-          if (month > 12 && day <= 12) {
-            day = p1;
-            month = p0;
-          }
-          if (year < 100) {
-            year += 2000;
-          }
-          const constructedDate = new Date(year, month - 1, day, 12, 0, 0);
-          if (!isNaN(constructedDate.getTime())) {
-            dateObj = constructedDate;
-          }
+  }
+
+  // 3. Try to parse as raw string first
+  const strVal = String(resolvedVal).trim();
+  if (!strVal || strVal.toLowerCase() === 'null' || strVal.toLowerCase() === 'undefined' || strVal.toLowerCase() === 'n/a') {
+    return null;
+  }
+
+  // First, try standard parsing on the original raw string
+  const rawParsed = Date.parse(strVal);
+  if (!isNaN(rawParsed)) {
+    const d = new Date(rawParsed);
+    if (d.getFullYear() > 1901 && d.getFullYear() < 2100) {
+      return d;
+    }
+  }
+
+  // If standard parse failed, try custom delimiter cleanup
+  const cleanStr = strVal
+    .replace(/[\s\-\/\.\,]+/g, ' ')
+    .trim();
+
+  const cleanedParsed = Date.parse(cleanStr);
+  if (!isNaN(cleanedParsed)) {
+    const d = new Date(cleanedParsed);
+    if (d.getFullYear() > 1901 && d.getFullYear() < 2100) {
+      return d;
+    }
+  }
+
+  // Split and parse components manually (handles DD/MM/YYYY and other non-standard formats)
+  const parts = cleanStr.split(' ');
+  if (parts.length === 3) {
+    let day = NaN;
+    let month = NaN;
+    let year = NaN;
+
+    const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    const fullMonthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+
+    const parseComponent = (part: string) => {
+      const lower = part.toLowerCase();
+      const mIdx = monthNames.indexOf(lower.substring(0, 3));
+      if (mIdx !== -1) {
+        return { type: 'month', value: mIdx + 1 };
+      }
+      const fullMIdx = fullMonthNames.indexOf(lower);
+      if (fullMIdx !== -1) {
+        return { type: 'month', value: fullMIdx + 1 };
+      }
+      const val = parseInt(part, 10);
+      if (!isNaN(val)) {
+        if (val > 1000) {
+          return { type: 'year', value: val };
+        }
+        return { type: 'number', value: val };
+      }
+      return { type: 'unknown', value: NaN };
+    };
+
+    const comp0 = parseComponent(parts[0]);
+    const comp1 = parseComponent(parts[1]);
+    const comp2 = parseComponent(parts[2]);
+
+    if (comp0.type === 'year') {
+      year = comp0.value;
+      if (comp1.type === 'month') {
+        month = comp1.value;
+        day = comp2.value;
+      } else if (comp1.type === 'number') {
+        month = comp1.value;
+        day = comp2.value;
+      }
+    } else if (comp2.type === 'year' || comp2.type === 'number') {
+      year = comp2.value;
+      if (year < 100) year += 2000;
+
+      if (comp1.type === 'month') {
+        month = comp1.value;
+        day = comp0.value;
+      } else if (comp0.type === 'month') {
+        month = comp0.value;
+        day = comp1.value;
+      } else if (comp0.type === 'number' && comp1.type === 'number') {
+        const val0 = comp0.value;
+        const val1 = comp1.value;
+        if (val0 > 12 && val1 <= 12) {
+          day = val0;
+          month = val1;
+        } else if (val1 > 12 && val0 <= 12) {
+          day = val1;
+          month = val0;
+        } else {
+          // Default to DD/MM/YYYY for ambiguous small numbers
+          day = val0;
+          month = val1;
         }
       }
-      
-      if (!dateObj) {
-        const d = new Date(strVal);
-        if (!isNaN(d.getTime())) {
-          dateObj = d;
-        }
+    }
+
+    if (!isNaN(day) && !isNaN(month) && !isNaN(year) && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const d = new Date(year, month - 1, day, 12, 0, 0);
+      if (!isNaN(d.getTime())) {
+        return d;
       }
     }
   }
 
-  if (dateObj && !isNaN(dateObj.getTime())) {
-    return new Date(dateObj.getTime());
+  const dFallback = new Date(strVal);
+  if (!isNaN(dFallback.getTime()) && dFallback.getFullYear() > 1901 && dFallback.getFullYear() < 2100) {
+    return dFallback;
   }
 
   return null;
@@ -985,7 +1066,10 @@ export const bulkUpload = onCall(async (request) => {
     userName?: string;
   };
   
+  logger.info("[bulkUpload] Cloud Function triggered", { clinicId, userName });
+  
   if (!clinicId || !fileBase64) {
+    logger.error("[bulkUpload] Missing clinicId or fileBase64");
     throw new HttpsError("invalid-argument", "Missing clinicId or file data.");
   }
   
@@ -995,19 +1079,22 @@ export const bulkUpload = onCall(async (request) => {
   try {
     ExcelJSModule = await import('exceljs');
   } catch (e) {
+    logger.error("[bulkUpload] Could not load exceljs dynamic import", e);
     throw new HttpsError("internal", "Could not load exceljs");
   }
   
   const Workbook = ExcelJSModule.Workbook || ExcelJSModule.default?.Workbook;
   if (!Workbook) {
+    logger.error("[bulkUpload] ExcelJS.Workbook is undefined");
     throw new HttpsError("internal", "ExcelJS.Workbook is undefined");
   }
   const workbook = new Workbook();
   
   try {
     await workbook.xlsx.load(Buffer.from(fileBase64, 'base64') as any);
+    logger.info("[bulkUpload] Excel Workbook loaded successfully");
   } catch (err: any) {
-    console.error("load error", err);
+    logger.error("[bulkUpload] load error", err);
     throw new HttpsError("invalid-argument", "Invalid Excel file format.");
   }
   
@@ -1016,26 +1103,130 @@ export const bulkUpload = onCall(async (request) => {
   const admin = await getAdmin();
   const batch = db.batch();
   
+  const headers: string[] = [];
+  const firstRow = worksheet?.getRow(1);
+  if (firstRow) {
+    firstRow.eachCell({ includeEmpty: true }, (cell: any, colNumber: number) => {
+      let val = cell.value;
+      if (val && typeof val === 'object') {
+        if ('result' in val) val = val.result;
+        else if ('richText' in val) val = val.richText.map((rt: any) => rt.text || "").join("");
+        else if ('text' in val) val = val.text;
+        else if ('value' in val) val = val.value;
+      }
+      headers[colNumber] = val ? String(val).trim() : "";
+    });
+  }
+
+  const normalizeKeys = (obj: Record<string, any>): Record<string, any> => {
+    const normalized: Record<string, any> = {};
+    for (const key of Object.keys(obj)) {
+      const normKey = key.toLowerCase().trim().replace(/[\s\-\/\.]+/g, '_');
+      normalized[normKey] = obj[key];
+    }
+    return normalized;
+  };
+
   const incomingStock = new Map<string, number>();
 
   let opCount = 0;
 
   worksheet?.eachRow((row: any, rowNumber: number) => {
     if (rowNumber === 1) return;
-    const medId = row.getCell(1).value?.toString().trim() || "";
+
+    const rowObj: Record<string, any> = {};
+    row.eachCell({ includeEmpty: true }, (cell: any, colNumber: number) => {
+      const header = headers[colNumber];
+      if (header) {
+        rowObj[header] = cell.value;
+      }
+    });
+
+    const normalizedRow = normalizeKeys(rowObj);
+
+    const medId = (
+      normalizedRow["medication_id"] || 
+      normalizedRow["medication_name"] || 
+      normalizedRow["med_id"] || 
+      normalizedRow["medicine_name"] || 
+      normalizedRow["medicine_id"] || 
+      normalizedRow["medication"] || 
+      normalizedRow["name"] || 
+      row.getCell(1).value
+    )?.toString().trim() || "";
+
     if (!medId || medId.toUpperCase().includes('EXAMPLE') || medId.toLowerCase().includes('save completed file')) return;
-    const batchId = row.getCell(2).value?.toString().trim() || "";
+
+    const batchId = (
+      normalizedRow["batch_id"] || 
+      normalizedRow["batch"] || 
+      normalizedRow["batch_no"] || 
+      normalizedRow["batch_number"] || 
+      row.getCell(2).value
+    )?.toString().trim() || "";
     
-    const expiryVal = row.getCell(3).value;
+    const expiryVal = 
+      rowObj["Expiration Date (YYYY-MM-DD)"] ||
+      rowObj["Expiration Date"] ||
+      rowObj["expiry_date"] ||
+      normalizedRow["expiration_date_(yyyy_mm_dd)"] ||
+      normalizedRow["expiration_date"] ||
+      normalizedRow["expiry_date"] ||
+      row.getCell(3).value;
+
     const expiryDateObj = parseExcelDate(expiryVal);
     const expiry_date = expiryDateObj ? admin.firestore.Timestamp.fromDate(expiryDateObj) : null;
     
-    const qty = Number(row.getCell(4).value) || 0;
-    const base_unit = row.getCell(5).value?.toString().trim() || "";
-    const package_unit = row.getCell(6).value?.toString().trim() || "";
+    logger.info(`[bulkUpload] Parsing Row ${rowNumber}: medId="${medId}", batchId="${batchId}", expiryVal="${expiryVal}", parsedExpiry="${expiryDateObj ? expiryDateObj.toISOString() : 'null'}"`);
     
-    let dosage = row.getCell(7).value?.toString().trim() || "";
-    const dosage_unit = row.getCell(8).value?.toString().trim() || "";
+    let qty = 0;
+    const rawQtyVal = 
+      normalizedRow["quantity"] || 
+      normalizedRow["qty"] || 
+      normalizedRow["stock"] || 
+      normalizedRow["amount"] || 
+      row.getCell(4).value;
+
+    if (rawQtyVal !== null && rawQtyVal !== undefined) {
+      if (typeof rawQtyVal === 'number') {
+        qty = rawQtyVal;
+      } else {
+        const rawQtyStr = String(rawQtyVal).trim();
+        const match = rawQtyStr.match(/^[\d\.]+/);
+        if (match) {
+          qty = Number(match[0]) || 0;
+        } else {
+          qty = Number(rawQtyStr) || 0;
+        }
+      }
+    }
+    const base_unit = (
+      normalizedRow["base_unit"] || 
+      normalizedRow["base"] || 
+      normalizedRow["unit"] || 
+      row.getCell(5).value
+    )?.toString().trim() || "";
+
+    const package_unit = (
+      normalizedRow["package_unit"] || 
+      normalizedRow["pkg_unit"] || 
+      normalizedRow["package"] || 
+      row.getCell(6).value
+    )?.toString().trim() || "";
+    
+    let dosage = (
+      normalizedRow["dosage"] || 
+      normalizedRow["dose"] || 
+      normalizedRow["strength"] || 
+      row.getCell(7).value
+    )?.toString().trim() || "";
+
+    const dosage_unit = (
+      normalizedRow["dosage_unit"] || 
+      normalizedRow["dose_unit"] || 
+      normalizedRow["strength_unit"] || 
+      row.getCell(8).value
+    )?.toString().trim() || "";
     
     if (dosage && dosage_unit) {
       dosage = `${dosage} ${dosage_unit}`;
@@ -1141,7 +1332,9 @@ export const bulkUpload = onCall(async (request) => {
 
   try {
     await batch.commit();
+    logger.info("[bulkUpload] Successfully committed bulk upload batch to Firestore", { opCount });
   } catch (batchErr: any) {
+    logger.error("[bulkUpload] Failed to commit bulk upload batch to Firestore", batchErr);
     console.error("Batch error", batchErr);
     throw new HttpsError("internal", "Failed to commit batch updates.");
   }
