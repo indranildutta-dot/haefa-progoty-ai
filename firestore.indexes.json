@@ -141,6 +141,30 @@
         { "fieldPath": "patient_id", "order": "ASCENDING" },
         { "fieldPath": "created_at", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "inventory_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clinic_id", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "dispensations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clinic_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "prescriptions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clinic_id", "order": "ASCENDING" },
+        { "fieldPath": "updated_at", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

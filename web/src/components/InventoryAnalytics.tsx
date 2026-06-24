@@ -20,10 +20,14 @@ interface InventoryLog {
   id: string;
   medication_name: string;
   dosage: string;
-  type: 'add' | 'dispense';
+  type: 'add' | 'dispense' | 'expunge';
   qty: number;
   user_name: string;
   timestamp: any;
+  encounter_id?: string;
+  reason?: string;
+  notes?: string;
+  batch_id?: string;
 }
 
 interface AnalyticsProps {
@@ -68,11 +72,15 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
         // 1. Fetch addition logs from the db
         const logsQuery = query(
           collection(db, "inventory_logs"),
-          where("clinic_id", "==", clinicId),
-          where("timestamp", ">=", fromDateStart)
+          where("clinic_id", "==", clinicId)
         );
         const snapshot = await getDocs(logsQuery);
-        const fetchedLogs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as InventoryLog));
+        const rawLogs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as InventoryLog));
+        const fetchedLogs = rawLogs.filter(log => {
+          const lDate = toDateSafely(log.timestamp);
+          return lDate && lDate >= fromDateStart;
+        });
+        console.log('Fetched Inventory Logs:', fetchedLogs);
         
         // 2. Fetch prescriptions (to reconstruct dispensations directly from clinical source of truth)
         const presQuery = query(
@@ -80,6 +88,8 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
           where("clinic_id", "==", clinicId)
         );
         const presSnapshot = await getDocs(presQuery);
+        const rawPrescriptionData = presSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        console.log('Fetched Prescriptions:', rawPrescriptionData);
         
         // 2b. Fetch dedicated dispensations (to capture items directly logged only in dispensation records)
         const dispQuery = query(
@@ -87,6 +97,8 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
           where("clinic_id", "==", clinicId)
         );
         const dispSnapshot = await getDocs(dispQuery);
+        const rawDispensationData = dispSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        console.log('Fetched Dispensations:', rawDispensationData);
 
         const reconstructedDispLog: InventoryLog[] = [];
         const processedUniqueKeys = new Set<string>();
@@ -103,17 +115,24 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
           if (pDate && pDate >= fromDateStart) {
             const user_name = data.dispenser_name || 'Pharmacist';
             const details = Array.isArray(data.dispensation_details) ? data.dispensation_details : [];
+            const encounterId = data.encounter_id || '';
             
             details.forEach((item: any, idx: number) => {
-              const medName = item.medication || item.medication_name || '';
+              const medName = item.medication || item.medication_name || item.medication_id || '';
               const medDosage = item.dosage || '';
-              const qty = Number(item.dispensed) || 0;
+              const qty = Number(item.dispensed) || Number(item.qty) || Number(item.quantity) || 0;
               
               if (medName && qty > 0) {
                 const itemTime = toDateSafely(timestamp)?.getTime() || 0;
-                const itemKey = `${medName.toLowerCase().trim()}|${cleanDosageStr(medDosage)}|${qty}|${itemTime}`;
-                processedUniqueKeys.add(itemKey);
-
+                const roundedTime = Math.floor(itemTime / 10000) * 10000; // block into 10s windows
+                
+                // Add keys based on semantic fields to prevent double counting
+                const itemKey1 = `${medName.toLowerCase().trim()}|${cleanDosageStr(medDosage)}|${qty}|${encounterId}`;
+                const itemKey2 = `${medName.toLowerCase().trim()}|${cleanDosageStr(medDosage)}|${qty}|${roundedTime}`;
+                
+                processedUniqueKeys.add(itemKey1);
+                processedUniqueKeys.add(itemKey2);
+ 
                 reconstructedDispLog.push({
                   id: `pres-${docSnap.id}-${idx}`,
                   medication_name: medName,
@@ -121,7 +140,8 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
                   type: 'dispense' as const,
                   qty: qty,
                   user_name: user_name,
-                  timestamp: timestamp
+                  timestamp: timestamp,
+                  encounter_id: encounterId
                 });
               }
             });
@@ -137,19 +157,24 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
           if (pDate && pDate >= fromDateStart) {
             const user_name = data.dispenser_name || 'Pharmacist';
             const items = Array.isArray(data.items) ? data.items : [];
+            const encounterId = data.encounter_id || '';
             
             items.forEach((item: any, idx: number) => {
-              const medName = item.medication || item.medication_name || '';
+              const medName = item.medication || item.medication_name || item.medication_id || '';
               const medDosage = item.dosage || '';
-              const qty = Number(item.dispensed) || 0;
+              const qty = Number(item.dispensed) || Number(item.qty) || Number(item.quantity) || 0;
               
               if (medName && qty > 0) {
                 const itemTime = toDateSafely(timestamp)?.getTime() || 0;
-                const itemKey = `${medName.toLowerCase().trim()}|${cleanDosageStr(medDosage)}|${qty}|${itemTime}`;
+                const roundedTime = Math.floor(itemTime / 10000) * 10000;
+                
+                const itemKey1 = `${medName.toLowerCase().trim()}|${cleanDosageStr(medDosage)}|${qty}|${encounterId}`;
+                const itemKey2 = `${medName.toLowerCase().trim()}|${cleanDosageStr(medDosage)}|${qty}|${roundedTime}`;
                 
                 // Avoid double counting event
-                if (!processedUniqueKeys.has(itemKey)) {
-                  processedUniqueKeys.add(itemKey);
+                if (!processedUniqueKeys.has(itemKey1) && !processedUniqueKeys.has(itemKey2)) {
+                  processedUniqueKeys.add(itemKey1);
+                  processedUniqueKeys.add(itemKey2);
                   reconstructedDispLog.push({
                     id: `disp-${docSnap.id}-${idx}`,
                     medication_name: medName,
@@ -157,7 +182,8 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
                     type: 'dispense' as const,
                     qty: qty,
                     user_name: user_name,
-                    timestamp: timestamp
+                    timestamp: timestamp,
+                    encounter_id: encounterId
                   });
                 }
               }
@@ -165,9 +191,42 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
           }
         });
 
-        // 3. Keep additions from logged events, and dispensations strictly from reconstructed prescriptions/dispensations to prevent double-counting
+        // Process from direct inventory logs of type === 'dispense' to catch any missing events in prescriptions/dispensations
+        fetchedLogs.forEach(log => {
+          if (log.type === 'dispense') {
+            const medName = log.medication_name || '';
+            const medDosage = log.dosage || '';
+            const qty = Number(log.qty) || 0;
+            const logTime = toDateSafely(log.timestamp)?.getTime() || 0;
+            const roundedTime = Math.floor(logTime / 10000) * 10000;
+            const encounterId = log.encounter_id || '';
+            
+            if (medName && qty > 0) {
+              const itemKey1 = `${medName.toLowerCase().trim()}|${cleanDosageStr(medDosage)}|${qty}|${encounterId}`;
+              const itemKey2 = `${medName.toLowerCase().trim()}|${cleanDosageStr(medDosage)}|${qty}|${roundedTime}`;
+              
+              if (!processedUniqueKeys.has(itemKey1) && !processedUniqueKeys.has(itemKey2)) {
+                processedUniqueKeys.add(itemKey1);
+                processedUniqueKeys.add(itemKey2);
+                reconstructedDispLog.push({
+                  id: log.id,
+                  medication_name: medName,
+                  dosage: medDosage,
+                  type: 'dispense' as const,
+                  qty: qty,
+                  user_name: log.user_name || 'Pharmacist',
+                  timestamp: log.timestamp,
+                  encounter_id: encounterId
+                });
+              }
+            }
+          }
+        });
+
+        // 3. Keep additions and expungements from logged events, and dispensations strictly from reconstructed prescriptions/dispensations/logs to prevent double-counting
         const additionLogs = fetchedLogs.filter(l => l.type === 'add');
-        setLogs([...additionLogs, ...reconstructedDispLog]);
+        const expungeLogs = fetchedLogs.filter(l => l.type === 'expunge');
+        setLogs([...additionLogs, ...expungeLogs, ...reconstructedDispLog]);
       } catch (e) {
         console.error("Error fetching inventory elements:", e);
       } finally {
@@ -198,9 +257,12 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
           currentStock: 0,
           addedInPeriod: 0,
           dispensedInPeriod: 0,
+          expungedInPeriod: 0,
           addedAfterPeriod: 0,
           dispensedAfterPeriod: 0,
+          expungedAfterPeriod: 0,
           additions: [], // Track individual additions to show date and user
+          expungements: [], // Track individual expungements to show date and user
           key
         });
       }
@@ -260,9 +322,12 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
           currentStock: 0,
           addedInPeriod: 0,
           dispensedInPeriod: 0,
+          expungedInPeriod: 0,
           addedAfterPeriod: 0,
           dispensedAfterPeriod: 0,
+          expungedAfterPeriod: 0,
           additions: [],
+          expungements: [],
           key
         });
       }
@@ -273,6 +338,7 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
       if (isAfter) {
         if (log.type === 'add') record.addedAfterPeriod += qty;
         else if (log.type === 'dispense') record.dispensedAfterPeriod += qty;
+        else if (log.type === 'expunge') record.expungedAfterPeriod += qty;
       } else {
         if (log.type === 'add') {
           record.addedInPeriod += qty;
@@ -283,6 +349,12 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
         else if (log.type === 'dispense') {
           record.dispensedInPeriod += qty;
         }
+        else if (log.type === 'expunge') {
+          record.expungedInPeriod += qty;
+          if (!record.expungements.some((x: any) => x.id === log.id)) {
+            record.expungements.push(log);
+          }
+        }
       }
     };
 
@@ -291,8 +363,8 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
 
     // Calculate beginning and ending balances
     const result = Array.from(medMap.values()).map(record => {
-      const endingBalance = record.currentStock - record.addedAfterPeriod + record.dispensedAfterPeriod;
-      const beginningBalance = endingBalance - record.addedInPeriod + record.dispensedInPeriod;
+      const endingBalance = record.currentStock - record.addedAfterPeriod + record.dispensedAfterPeriod + record.expungedAfterPeriod;
+      const beginningBalance = endingBalance - record.addedInPeriod + record.dispensedInPeriod + record.expungedInPeriod;
       return {
         ...record,
         beginningBalance: Math.max(0, beginningBalance), // Avoid negative due to data inconsistencies
@@ -352,11 +424,12 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
                 <TableCell sx={{ fontWeight: 'bold', minWidth: 100 }}>Beginning Bal.</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Added (New)</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Dispensed</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Expunged</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Ending Bal.</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {summary.filter(r => r.beginningBalance > 0 || r.addedInPeriod > 0 || r.dispensedInPeriod > 0).map(row => (
+              {summary.filter(r => r.beginningBalance > 0 || r.addedInPeriod > 0 || r.dispensedInPeriod > 0 || r.expungedInPeriod > 0).map(row => (
                 <React.Fragment key={row.key}>
                   <TableRow hover sx={{ '& > *': { borderBottom: 'unset' } }}>
                     <TableCell sx={{ fontWeight: 600 }}>{row.name}</TableCell>
@@ -378,11 +451,18 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
                         <Typography variant="body2" color="text.secondary">-</Typography>
                       )}
                     </TableCell>
+                    <TableCell>
+                      {row.expungedInPeriod > 0 ? (
+                        <Typography variant="body2" color="warning.main" fontWeight="bold">-{row.expungedInPeriod}</Typography>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">-</Typography>
+                      )}
+                    </TableCell>
                     <TableCell sx={{ fontWeight: 'bold', fontSize: '1.1em' }}>{row.endingBalance}</TableCell>
                   </TableRow>
                   {row.additions.length > 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} sx={{ pb: 2, pt: 0, bgcolor: '#fbfcfd' }}>
+                      <TableCell colSpan={7} sx={{ pb: 1, pt: 0, bgcolor: '#fbfcfd' }}>
                         <Box sx={{ ml: 4, mr: 4, p: 2, border: '1px dashed #e2e8f0', borderRadius: 2, bgcolor: '#fff' }}>
                           <Typography variant="caption" fontWeight="bold" color="text.secondary" gutterBottom display="block">
                             SHIPMENT HISTORY (ADDED IN THIS PERIOD)
@@ -402,6 +482,43 @@ const InventoryAnalytics: React.FC<AnalyticsProps> = ({ clinicId, inventory }) =
                                   <TableCell sx={{ py: 0.5 }}>
                                     <Typography variant="body2" color="text.secondary">
                                       on {addLog.timestamp ? dayjs(toDateSafely(addLog.timestamp)).format('DD/MM/YYYY HH:mm') : '-'}
+                                    </Typography>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {row.expungements.length > 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} sx={{ pb: 2, pt: 0, bgcolor: '#fffaf5' }}>
+                        <Box sx={{ ml: 4, mr: 4, p: 2, border: '1px dashed #f59e0b', borderRadius: 2, bgcolor: '#fff' }}>
+                          <Typography variant="caption" fontWeight="bold" color="warning.main" gutterBottom display="block">
+                            EXPUNGEMENT HISTORY (REMOVED IN THIS PERIOD)
+                          </Typography>
+                          <Table size="small" sx={{ '& td, & th': { borderBottom: 'none' } }}>
+                            <TableBody>
+                              {row.expungements.map((expLog: InventoryLog) => (
+                                <TableRow key={expLog.id}>
+                                  <TableCell sx={{ py: 0.5 }}>
+                                    <Typography variant="body2" color="error.main" fontWeight="bold">-{expLog.qty} {row.dosage || ''}</Typography>
+                                  </TableCell>
+                                  <TableCell sx={{ py: 0.5 }}>
+                                    <Typography variant="body2" color="text.secondary">
+                                      removed by <strong>{expLog.user_name}</strong>
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell sx={{ py: 0.5 }}>
+                                    <Typography variant="body2" color="text.secondary">
+                                      Reason: <strong>{expLog.reason}</strong> {expLog.notes ? `(${expLog.notes})` : ''}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell sx={{ py: 0.5 }}>
+                                    <Typography variant="body2" color="text.secondary">
+                                      on {expLog.timestamp ? dayjs(toDateSafely(expLog.timestamp)).format('DD/MM/YYYY HH:mm') : '-'}
                                     </Typography>
                                   </TableCell>
                                 </TableRow>

@@ -20,7 +20,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import SearchIcon from '@mui/icons-material/Search';
 import LocalPharmacyIcon from '@mui/icons-material/LocalPharmacy';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
-import { collection, query, where, getDocs, doc, updateDoc, addDoc, serverTimestamp, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, addDoc, serverTimestamp, onSnapshot, orderBy, limit, deleteDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
@@ -300,6 +300,64 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     } catch (e) {
       console.error(e);
       notify("Failed to cancel requisition", "error");
+    }
+  };
+
+  const [expungeState, setExpungeState] = useState<{
+    open: boolean;
+    batch: any | null;
+    reason: string;
+    notes: string;
+    submitting: boolean;
+  }>({
+    open: false,
+    batch: null,
+    reason: 'Expired Medicine',
+    notes: '',
+    submitting: false,
+  });
+
+  const handleOpenExpungeDialog = (batch: any) => {
+    setExpungeState({
+      open: true,
+      batch,
+      reason: 'Expired Medicine',
+      notes: '',
+      submitting: false,
+    });
+  };
+
+  const handleConfirmExpunge = async () => {
+    const { batch, reason, notes } = expungeState;
+    if (!selectedClinic || !batch || !notes.trim()) return;
+    setExpungeState(prev => ({ ...prev, submitting: true }));
+    try {
+      // 1. Delete the batch document
+      const batchRef = doc(db, "clinics", selectedClinic.id, "inventory", batch.id);
+      await deleteDoc(batchRef);
+
+      // 2. Add an expunge log document
+      const logPayload = {
+        clinic_id: selectedClinic.id,
+        medication_name: batch.medication_id || batch.name || 'Unknown',
+        dosage: batch.dosage || '',
+        batch_id: batch.batch_id || '',
+        type: 'expunge',
+        qty: Number(batch.quantity) || 0,
+        user_id: userProfile?.uid || '',
+        user_name: userProfile?.name || 'Administrator',
+        reason: reason,
+        notes: notes.trim(),
+        timestamp: serverTimestamp()
+      };
+      await addDoc(collection(db, "inventory_logs"), logPayload);
+
+      notify(`Successfully expunged ${batch.quantity} units of ${batch.medication_id || batch.name} (Batch ${batch.batch_id || 'N/A'})`, "success");
+      setExpungeState({ open: false, batch: null, reason: 'Expired Medicine', notes: '', submitting: false });
+    } catch (e) {
+      console.error("Error expunging batch:", e);
+      notify("Failed to expunge medicine batch", "error");
+      setExpungeState(prev => ({ ...prev, submitting: false }));
     }
   };
 
@@ -1754,7 +1812,13 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
       }
       
       groups[key].batches.push(item);
-      groups[key].totalQuantity += Number(item.quantity) || 0;
+
+      // EXPIRED check: do not count in the total quantity
+      const expDate = toDateSafely(item.expiry_date);
+      const isExpired = expDate ? dayjs(expDate).isBefore(dayjs(), 'day') : false;
+      if (!isExpired) {
+        groups[key].totalQuantity += Number(item.quantity) || 0;
+      }
     });
 
     // 2. Perform classification based on threshold rules
@@ -1846,6 +1910,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
               isLowSection={true} 
               isBottleMedicine={isBottleMedicine}
               toDateSafely={toDateSafely}
+              onDeleteBatch={handleOpenExpungeDialog}
             />
 
             {/* Sufficient stock section */}
@@ -1855,6 +1920,7 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
               isLowSection={false} 
               isBottleMedicine={isBottleMedicine}
               toDateSafely={toDateSafely}
+              onDeleteBatch={handleOpenExpungeDialog}
             />
           </Box>
         )}
@@ -2298,6 +2364,80 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog 
+        open={expungeState.open} 
+        onClose={() => !expungeState.submitting && setExpungeState(prev => ({ ...prev, open: false }))}
+        PaperProps={{ sx: { borderRadius: 4, padding: 2, minWidth: 450 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 'bold', pb: 1 }}>Expunge Medicine Batch</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mb: 2.5, p: 2, bgcolor: '#fef2f2', borderRadius: 3, border: '1px solid #fee2e2' }}>
+            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main', mb: 1 }}>
+              WARNING: This action is irreversible.
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              You are about to remove <strong>{expungeState.batch?.quantity} units</strong> of <strong>{expungeState.batch?.medication_id || expungeState.batch?.name} ({expungeState.batch?.dosage})</strong> from active stock.
+            </Typography>
+            {expungeState.batch?.batch_id && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                Batch ID: <strong>{expungeState.batch.batch_id}</strong>
+              </Typography>
+            )}
+          </Box>
+          
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Expunged by: <strong>{userProfile?.name || 'Administrator'}</strong>
+          </Typography>
+
+          <Stack spacing={2.5}>
+            <TextField
+              select
+              fullWidth
+              size="small"
+              label="Reason for Expunging"
+              value={expungeState.reason}
+              onChange={(e) => setExpungeState(prev => ({ ...prev, reason: e.target.value }))}
+              SelectProps={{ native: true }}
+            >
+              <option value="Expired Medicine">Expired Medicine</option>
+              <option value="Damaged / Broken Packaging">Damaged / Broken Packaging</option>
+              <option value="Contaminated / Spoiled">Contaminated / Spoiled</option>
+              <option value="Recall / Manufacturer Warning">Recall / Manufacturer Warning</option>
+              <option value="Other (Specify in notes below)">Other (Specify in notes below)</option>
+            </TextField>
+
+            <TextField
+              fullWidth
+              label="Explanation Notes"
+              multiline
+              rows={3}
+              value={expungeState.notes}
+              onChange={(e) => setExpungeState(prev => ({ ...prev, notes: e.target.value }))}
+              placeholder="Please provide a mandatory detailed reason to avoid theft..."
+              error={!expungeState.notes.trim()}
+              helperText={!expungeState.notes.trim() ? "A justification is required for auditing purposes." : ""}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, pt: 1 }}>
+          <Button 
+            onClick={() => setExpungeState(prev => ({ ...prev, open: false }))} 
+            color="inherit"
+            disabled={expungeState.submitting}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirmExpunge} 
+            color="error" 
+            variant="contained" 
+            disabled={expungeState.submitting || !expungeState.notes.trim()}
+          >
+            {expungeState.submitting ? <CircularProgress size={20} color="inherit" /> : "Expunge Batch"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </StationLayout>
     </LocalizationProvider>
   );
@@ -2308,7 +2448,8 @@ const InventoryGroupRow: React.FC<{
   isLowSection: boolean;
   isBottleMedicine: (medName: string) => boolean;
   toDateSafely: (timestamp: any) => Date | null;
-}> = ({ group, isLowSection, isBottleMedicine, toDateSafely }) => {
+  onDeleteBatch: (batch: any) => void;
+}> = ({ group, isLowSection, isBottleMedicine, toDateSafely, onDeleteBatch }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
   const bUnit = (group.base_unit || '').toLowerCase().trim();
@@ -2325,6 +2466,29 @@ const InventoryGroupRow: React.FC<{
     }
     return null;
   };
+
+  const batchAnalyses = (group.batches || []).map((b: any) => {
+    const status = getExpiryStatus(b.expiry_date);
+    return {
+      batch: b,
+      status: status,
+      isExpired: status?.label === 'EXPIRED',
+      isExpiringSoon: status && status.color === 'warning',
+      quantity: Number(b.quantity) || 0
+    };
+  });
+
+  const totalExpiredQuantity = batchAnalyses
+    .filter((b: any) => b.isExpired)
+    .reduce((sum: number, b: any) => sum + b.quantity, 0);
+
+  const totalExpiringSoonQuantity = batchAnalyses
+    .filter((b: any) => b.isExpiringSoon)
+    .reduce((sum: number, b: any) => sum + b.quantity, 0);
+
+  const allBatchesExpired = group.batches && group.batches.length > 0 && batchAnalyses.every((b: any) => b.isExpired);
+  const hasExpiredBatches = batchAnalyses.some((b: any) => b.isExpired);
+  const hasExpiringSoonBatches = batchAnalyses.some((b: any) => b.isExpiringSoon);
 
   return (
     <>
@@ -2345,12 +2509,81 @@ const InventoryGroupRow: React.FC<{
         <TableCell sx={{ fontWeight: 'bold' }}>{group.medication_id}</TableCell>
         <TableCell>{group.dosage}</TableCell>
         <TableCell>
-          <Chip 
-            label={group.totalQuantity} 
-            color={isLowSection ? "error" : "success"}
-            size="small"
-            sx={{ fontWeight: 'bold' }}
-          />
+          <Stack direction="row" spacing={1} alignItems="center">
+            {allBatchesExpired ? (
+              <Tooltip title={`All batches of this medicine are expired (${totalExpiredQuantity} units expired). Total usable stock is 0.`}>
+                <Chip 
+                  label="0 (ALL EXPIRED)"
+                  size="small"
+                  sx={{ 
+                    fontWeight: 'bold', 
+                    bgcolor: '#7f1d1d', // Dark red
+                    color: '#fef2f2',
+                    border: '1px solid #b91c1c',
+                    px: 1,
+                    '& .MuiChip-label': { px: 0.5 }
+                  }}
+                />
+              </Tooltip>
+            ) : hasExpiredBatches ? (
+              <>
+                <Tooltip title={`Usable stock: ${group.totalQuantity}. Excluded ${totalExpiredQuantity} expired units from the total.`}>
+                  <Chip 
+                    label={group.totalQuantity} 
+                    color={isLowSection ? "error" : "success"}
+                    size="small"
+                    sx={{ fontWeight: 'bold' }}
+                  />
+                </Tooltip>
+                <Tooltip title={`${totalExpiredQuantity} units in this medicine's batches are expired and excluded from the total stock.`}>
+                  <Chip 
+                    label={`-${totalExpiredQuantity} Expired`}
+                    size="small"
+                    variant="outlined"
+                    sx={{ 
+                      fontWeight: 'bold', 
+                      borderColor: '#fca5a5',
+                      color: '#b91c1c',
+                      bgcolor: '#fef2f2',
+                      fontSize: '0.72rem',
+                      height: 20
+                    }}
+                  />
+                </Tooltip>
+              </>
+            ) : hasExpiringSoonBatches ? (
+              <>
+                <Chip 
+                  label={group.totalQuantity} 
+                  color={isLowSection ? "error" : "success"}
+                  size="small"
+                  sx={{ fontWeight: 'bold' }}
+                />
+                <Tooltip title={`${totalExpiringSoonQuantity} units are expiring soon (under 90 days).`}>
+                  <Chip 
+                    label={`Expiring Soon`}
+                    size="small"
+                    variant="outlined"
+                    sx={{ 
+                      fontWeight: 'bold', 
+                      borderColor: '#fde047',
+                      color: '#a16207',
+                      bgcolor: '#fefce8',
+                      fontSize: '0.72rem',
+                      height: 20
+                    }}
+                  />
+                </Tooltip>
+              </>
+            ) : (
+              <Chip 
+                label={group.totalQuantity} 
+                color={isLowSection ? "error" : "success"}
+                size="small"
+                sx={{ fontWeight: 'bold' }}
+              />
+            )}
+          </Stack>
         </TableCell>
         <TableCell>
           <Typography variant="body2" color="text.secondary">
@@ -2388,14 +2621,26 @@ const InventoryGroupRow: React.FC<{
                     <TableCell sx={{ fontWeight: '700', color: '#64748b' }}>Expiry Date</TableCell>
                     <TableCell sx={{ fontWeight: '700', color: '#64748b' }}>Quantity</TableCell>
                     <TableCell sx={{ fontWeight: '700', color: '#64748b' }}>Alerts / Status</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: '700', color: '#64748b', pr: 4 }}>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {group.batches.map((batch: any) => {
                     const expiryState = getExpiryStatus(batch.expiry_date);
+                    const isExpired = expiryState?.label === 'EXPIRED';
+                    const isExpiring = expiryState && expiryState.color === 'warning';
                     return (
-                      <TableRow key={batch.id} hover>
-                        <TableCell sx={{ fontFamily: 'monospace' }}>{batch.batch_id || 'N/A'}</TableCell>
+                      <TableRow 
+                        key={batch.id} 
+                        hover
+                        sx={{
+                          ...(isExpired ? { bgcolor: '#fef2f2', opacity: 0.8 } : {}),
+                          ...(isExpiring ? { bgcolor: '#fffdf5' } : {})
+                        }}
+                      >
+                        <TableCell sx={{ fontFamily: 'monospace', fontWeight: isExpired || isExpiring ? 'bold' : 'normal' }}>
+                          {batch.batch_id || 'N/A'}
+                        </TableCell>
                         <TableCell>
                           {batch.expiry_date ? (
                             toDateSafely(batch.expiry_date) 
@@ -2403,7 +2648,9 @@ const InventoryGroupRow: React.FC<{
                               : 'N/A'
                           ) : 'N/A'}
                         </TableCell>
-                        <TableCell sx={{ fontWeight: 'bold' }}>{batch.quantity}</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', textDecoration: isExpired ? 'line-through' : 'none', color: isExpired ? 'text.secondary' : 'inherit' }}>
+                          {batch.quantity}
+                        </TableCell>
                         <TableCell>
                           {expiryState ? (
                             <Chip 
@@ -2415,6 +2662,23 @@ const InventoryGroupRow: React.FC<{
                           ) : (
                             <Typography variant="caption" color="success.main" fontWeight="bold">Healthy</Typography>
                           )}
+                        </TableCell>
+                        <TableCell align="right" sx={{ pr: 3 }}>
+                          <Tooltip title="Expunge Batch from Inventory">
+                            <IconButton 
+                              size="small" 
+                              color="error" 
+                              onClick={() => onDeleteBatch(batch)}
+                              sx={{ 
+                                bgcolor: '#fef2f2', 
+                                '&:hover': { bgcolor: '#fee2e2' },
+                                border: '1px solid #fee2e2',
+                                p: 0.5
+                              }}
+                            >
+                              <CloseIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     );
@@ -2435,7 +2699,8 @@ const GroupedInventoryTable: React.FC<{
   isLowSection: boolean;
   isBottleMedicine: (medName: string) => boolean;
   toDateSafely: (timestamp: any) => Date | null;
-}> = ({ groupsList, title, isLowSection, isBottleMedicine, toDateSafely }) => {
+  onDeleteBatch: (batch: any) => void;
+}> = ({ groupsList, title, isLowSection, isBottleMedicine, toDateSafely, onDeleteBatch }) => {
   return (
     <Box sx={{ mb: 4 }}>
       <Paper 
@@ -2494,6 +2759,7 @@ const GroupedInventoryTable: React.FC<{
                     isLowSection={isLowSection}
                     isBottleMedicine={isBottleMedicine}
                     toDateSafely={toDateSafely}
+                    onDeleteBatch={onDeleteBatch}
                   />
                 );
               })
