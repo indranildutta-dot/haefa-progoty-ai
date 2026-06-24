@@ -29,6 +29,7 @@ import { subscribeToQueue, updateQueueStatus, cancelQueueItem } from '../service
 import { getPatientById } from '../services/patientService';
 import { getOfflineInventory } from '../services/localDataSync';
 import { getVitalsByEncounter, saveDispensationProgress } from '../services/encounterService';
+import { bulkUpload } from '../services/pharmacyService';
 import { useAppStore } from '../store/useAppStore';
 import SaveIcon from '@mui/icons-material/Save';
 import StationLayout from '../components/StationLayout';
@@ -1057,33 +1058,20 @@ const PharmacyStation: React.FC<{ countryId: string }> = ({ countryId }) => {
     const file = event.target.files?.[0];
     if (!file || !selectedClinic) return;
     
+    notify("Uploading inventory, please wait...", "info");
+    
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
         const base64 = (e.target?.result as string).split(',')[1];
-        const response = await fetch("/api/pharmacy/bulk-upload", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            clinicId: selectedClinic.id,
-            fileBase64: base64,
-            userName: userProfile?.name || "Pharmacist"
-          })
-        });
-
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.error || "Failed to process bulk upload via server.");
-        }
+        await bulkUpload(base64, userProfile?.name || "Pharmacist", selectedClinic.id);
 
         notify("Inventory uploaded successfully", "success");
         // Reset input
         event.target.value = '';
-      } catch (err) {
+      } catch (err: any) {
         console.error("Upload error:", err);
-        notify("Error uploading inventory", "error");
+        notify(err.message || "Error uploading inventory", "error");
       }
     };
     reader.readAsDataURL(file);

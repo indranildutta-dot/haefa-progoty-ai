@@ -50,28 +50,56 @@ export const dispenseMedication = async (
  * Bulk Inventory Upload
  * * Standardizes the upload process for the Dhaka and other clinics.
  */
-export const bulkUpload = async (fileBase64: string) => {
+export const bulkUpload = async (fileBase64: string, userName?: string, clinicId?: string) => {
   const { selectedClinic } = getSession();
+  const targetClinicId = clinicId || selectedClinic?.id;
   
-  if (!selectedClinic) {
+  if (!targetClinicId) {
     throw new Error("No clinic selected. Inventory must be tied to a specific clinic location.");
   }
 
-  const response = await fetch("/api/pharmacy/bulk-upload", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      clinicId: selectedClinic.id,
-      fileBase64
-    })
-  });
+  let useFallback = false;
+  try {
+    const response = await fetch("/api/pharmacy/bulk-upload", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        clinicId: targetClinicId,
+        fileBase64,
+        userName: userName || "Pharmacist"
+      })
+    });
 
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.error || "Failed to parse inventory file in server.");
+    const contentType = response.headers.get("content-type");
+    if (response.ok && contentType && contentType.includes("application/json")) {
+      return await response.json();
+    }
+    
+    // If the response is successful (e.g. 200) but returns HTML, Firebase Hosting rewrote the /api route to index.html.
+    // In this case, we MUST trigger the Firebase Cloud Function fallback.
+    if (response.ok && contentType && contentType.includes("text/html")) {
+      console.warn("API route returned HTML (Firebase Hosting rewrite). Falling back to Cloud Function.");
+      useFallback = true;
+    } else {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to process bulk upload via Express server.");
+    }
+  } catch (err) {
+    if (!useFallback) {
+      console.warn("Express API failed, falling back to Cloud Function:", err);
+      useFallback = true;
+    }
   }
-  
-  return await response.json();
+
+  if (useFallback) {
+    const uploadCallable = httpsCallable(functions, 'bulkUpload');
+    const result = await uploadCallable({
+      clinicId: targetClinicId,
+      fileBase64,
+      userName: userName || "Pharmacist"
+    });
+    return result.data;
+  }
 };
